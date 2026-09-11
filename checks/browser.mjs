@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 const browser = await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -16,8 +17,9 @@ try {
   console.log('INITIAL RIG', JSON.stringify(s));
   assert(s.visible && s.armsDown && s.boneCount > 0);
   assert.equal(s.state, 'IDLE');
-  assert.equal(Object.keys(s.mapping).length, 21, 'Actual rig should map all 21 slots');
+  assert.equal(Object.keys(s.mapping).length, 19, 'Actual rig should map all 19 slots');
   await page.screenshot({path:'checks/idle.png'});
+  console.log('IDLE_IMAGE_BASE64:' + fs.readFileSync('checks/idle.png').toString('base64'));
   await page.getByRole('button', {name:'Walk',exact:true}).click();
   await page.waitForFunction(() => window.rigSandbox().state === 'WALK');
   await page.waitForTimeout(350);

@@ -84,11 +84,16 @@ function inspect(root) {
   for (const key of Object.keys(BONE_MAPPING)) {
     const side = key.startsWith('left') ? 'left' : key.startsWith('right') ? 'right' : '';
     const kind = side ? key.slice(side.length) : key;
-    const matches = bones.filter(b => {
+    let matches = bones.filter(b => {
       if (BONE_MAPPING[key]) return b.name === BONE_MAPPING[key];
       const p = nameParts(b.name);
       return p.side === side && aliases[kind].includes(p.core);
     });
+    // Numbered spine segments form a chain: use its lowest spine / highest chest.
+    if (!BONE_MAPPING[key] && matches.length > 1 && (key === 'spine' || key === 'chest')) {
+      matches = matches.filter(b => matches.every(other => other === b ||
+        (key === 'spine' ? isDescendant(other, b) : isDescendant(b, other))));
+    }
     const bone = matches.length === 1 && !used.has(matches[0]) ? matches[0] : null;
     if (bone) { rig[key] = bone; used.add(bone); }
     report.push({ slot: key, bone: bone?.name || 'UNRESOLVED', candidates: matches.map(b => b.name).join(', ') });
