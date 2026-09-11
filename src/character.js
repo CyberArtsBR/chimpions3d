@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import {validateGLB} from './upload.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // MANUAL BONE MAPPING: exact GLB bone names; null means automatic detection.
 // Check the console table and hierarchy. Ambiguous matches are never selected.
-const BONE_MAPPING = {
+const DEFAULT_BONE_MAPPING = {
   hips: null, spine: null, chest: null, neck: null, head: null,
   leftShoulder: null, leftUpperArm: null, leftForearm: null, leftHand: null,
   rightShoulder: null, rightUpperArm: null, rightForearm: null, rightHand: null,
@@ -13,7 +14,17 @@ const ARM_REST_ANGLE = THREE.MathUtils.degToRad(22); // Slightly open arms, half
 const MODEL_YAW = 0; // Set Math.PI if this model faces -Z. Gameplay forward is +Z.
 
 export async function loadCharacter(url, overrides = {}) {
-  const gltf = await new GLTFLoader().loadAsync(url);
+  const BONE_MAPPING={...DEFAULT_BONE_MAPPING,...overrides};
+  const manager=new THREE.LoadingManager();
+  if(url instanceof ArrayBuffer){
+    validateGLB(url);
+    manager.setURLModifier(value=>{
+      if(!value.startsWith('blob:')&&!value.startsWith('data:'))throw new Error('External avatar resources are not supported.');
+      return value;
+    });
+  }
+  const loader=new GLTFLoader(manager);
+  const gltf = url instanceof ArrayBuffer?await loader.parseAsync(url,''):await loader.loadAsync(url);
   const model = gltf.scene;
   model.visible = false;
   const root = new THREE.Group(), visual = new THREE.Group();
@@ -22,7 +33,7 @@ export async function loadCharacter(url, overrides = {}) {
   const X = new THREE.Vector3(1,0,0), Y = new THREE.Vector3(0,1,0), Z = new THREE.Vector3(0,0,1);
   const q = new THREE.Quaternion(), delta = new THREE.Quaternion();
   let state='IDLE', phase=0, jumpStage='', stageTime=0, bodyOffset=0;
-  Object.keys(BONE_MAPPING).forEach(key=>BONE_MAPPING[key]=overrides[key]||null);
+
   const aliases = {
   hips: ['hips', 'hip', 'pelvis'], spine: ['spine', 'spine0', 'spine1', 'spine01'],
   chest: ['chest', 'upperchest', 'spine2', 'spine02', 'spine3'],
@@ -72,7 +83,7 @@ function inspect(root) {
     report.push({ slot: key, bone: bone?.name || 'UNRESOLVED', candidates: matches.map(b => b.name).join(', ') });
   }
   console.table(report);
-  console.log('Manual overrides: BONE_MAPPING near the top of src/main.js.');
+  console.log('Manual overrides: BONE_MAPPING near the top of src/character.js.');
   for (const b of bones) rest.set(b, b.quaternion.clone());
   if (!bones.length) throw new Error('GLB has no bones.');
   if (!bones.some(b => b.parent) || !rig.leftUpperArm || !rig.rightUpperArm || !rig.leftForearm || !rig.rightForearm)
@@ -166,6 +177,19 @@ function applyPose({ pose, offset }, alpha) {
   visual.position.y = bodyOffset;
 }
 
+  try {
+  let triangles=0,skinned=0;const textures=new Set();
+  model.traverse(o=>{
+    if(o.isSkinnedMesh)skinned++;
+    if(o.isMesh){
+      triangles+=(o.geometry.index?.count||o.geometry.attributes.position?.count||0)/3;
+      for(const material of (Array.isArray(o.material)?o.material:[o.material]))Object.values(material||{}).forEach(v=>{if(v?.isTexture)textures.add(v);});
+    }
+  });
+  if(!skinned)throw new Error('The avatar has no skinned mesh.');
+  if(triangles>300000)throw new Error('Use an avatar below 300,000 triangles for this browser test.');
+  let pixels=0;for(const texture of textures){const image=texture.source?.data;pixels+=(image?.width||0)*(image?.height||0);}
+  if(pixels>48*1024*1024)throw new Error('Avatar textures are too large. Try 2K or smaller textures.');
   model.rotation.y += MODEL_YAW;
   model.updateWorldMatrix(true,true);
   const box = new THREE.Box3().setFromObject(model,true);
@@ -177,8 +201,11 @@ function applyPose({ pose, offset }, alpha) {
   model.position.x-=(box.min.x+box.max.x)/2;
   model.position.z-=(box.min.z+box.max.z)/2;
   model.position.y-=box.min.y;
-  model.traverse(o=>{if(o.isMesh)o.frustumCulled=false;});
+  model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;o.receiveShadow=true;}});
   inspect(model);
+  const required=['hips','leftThigh','rightThigh','leftShin','rightShin','leftFoot','rightFoot'];
+  const missing=required.filter(key=>!rig[key]);
+  if(missing.length)throw new Error('Could not map: '+missing.join(', ')+'. Use a compatible humanoid rig or configure bone overrides.');
   prepareIdle();
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});
   box.setFromObject(model,true);
@@ -186,7 +213,7 @@ function applyPose({ pose, offset }, alpha) {
   model.updateWorldMatrix(true,true);
   model.visible=true;
   return {
-    root, model, boneCount:rest.size,
+    root, model, boneCount:rest.size, triangles,
     update(dt,time,velocity,bounceAge,active) {
       state=active?'JUMP':'IDLE';
       jumpStage=active?(bounceAge<0.09?'TAKEOFF':velocity>3?'TAKEOFF':'AIRBORNE'):'';
@@ -194,4 +221,19 @@ function applyPose({ pose, offset }, alpha) {
       applyPose(makePose(time,0),1-Math.exp(-18*dt));
     }
   };
+  }catch(error){disposeCharacter({root});throw error;}
+}
+
+export function disposeCharacter(a){
+ const geometries=new Set(),materials=new Set(),textures=new Set(),skeletons=new Set();
+ a.root.traverse(o=>{
+  if(o.skeleton)skeletons.add(o.skeleton);
+  if(o.geometry)geometries.add(o.geometry);
+  for(const m of (o.material?(Array.isArray(o.material)?o.material:[o.material]):[])){
+   materials.add(m);Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);});
+  }
+ });
+ geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());
+ textures.forEach(t=>{t.dispose();t.source?.data?.close?.();});
+ skeletons.forEach(s=>s.dispose());
 }
