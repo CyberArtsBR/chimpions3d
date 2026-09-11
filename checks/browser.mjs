@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 const browser = await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', msg => console.log('BROWSER', msg.type(), msg.text()));
@@ -19,7 +19,6 @@ try {
   assert.equal(s.state, 'IDLE');
   assert.equal(Object.keys(s.mapping).length, 19, 'Actual rig should map all 19 slots');
   await page.screenshot({path:'checks/idle.png'});
-  console.log('IDLE_IMAGE_BASE64:' + fs.readFileSync('checks/idle.png').toString('base64'));
   await page.getByRole('button', {name:'Walk',exact:true}).click();
   await page.waitForFunction(() => window.rigSandbox().state === 'WALK');
   await page.waitForTimeout(350);
@@ -38,7 +37,9 @@ try {
   assert((await snap()).grounded);
   await page.getByLabel('Show Skeleton').check();
   await page.screenshot({path:'checks/skeleton.png'});
-  await page.keyboard.down('w'); await page.waitForTimeout(500); await page.keyboard.up('w');
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => window.rigSandbox().position[2] > 0.2);
+  await page.keyboard.up('w');
   assert((await snap()).position[2] > 0.1);
   await page.keyboard.down('s'); await page.waitForTimeout(700); await page.keyboard.up('s');
   await page.keyboard.down('a'); await page.waitForTimeout(250); await page.keyboard.up('a');
@@ -50,5 +51,8 @@ try {
   console.log('PASS: production model loads, complete mapping, lowered idle arms, all states, jump/land, controls, skeleton.');
 } finally {
   await page.screenshot({path:'checks/final.png'});
+  for (const name of ['idle','walk','run','jump','skeleton']) {
+    if (fs.existsSync('checks/' + name + '.png')) console.log(name.toUpperCase() + '_IMAGE_BASE64:' + fs.readFileSync('checks/' + name + '.png').toString('base64'));
+  }
   await browser.close();
 }
