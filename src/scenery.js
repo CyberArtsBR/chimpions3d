@@ -43,14 +43,17 @@ function forestTexture(seed){
  return canvasTexture(1024,1536,(c,w,h)=>{
   const r=rng(seed);
   function limb(x,y,len,angle,width,depth){
+   angle=Math.max(-1.15,Math.min(1.15,angle));
    const nx=x+Math.sin(angle)*len,ny=y-Math.cos(angle)*len;
-   c.strokeStyle='#173e38';c.lineWidth=width;c.lineCap='round';c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+Math.sin(angle-.2)*len*.5,y-Math.cos(angle)*len*.5,nx,ny);c.stroke();
+   c.strokeStyle='#42675c';c.lineWidth=width;c.lineCap='round';c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+Math.sin(angle-.2)*len*.5,y-Math.cos(angle)*len*.5,nx,ny);c.stroke();
    if(depth>0){limb(nx,ny,len*(.62+r()*.13),angle-.42-r()*.25,width*.62,depth-1);limb(nx,ny,len*(.6+r()*.17),angle+.3+r()*.4,width*.6,depth-1);}
-   else for(let j=0;j<26;j++){c.fillStyle=['#284b3d','#345d46','#4d7250','#708953'][Math.floor(r()*4)];c.beginPath();c.ellipse(nx+(r()-.5)*95,ny+(r()-.5)*55,10+r()*17,4+r()*9,r()*3,0,Math.PI*2);c.fill();}
+   else for(let j=0;j<26;j++){c.fillStyle=['#476e59','#52765a','#638863','#88a371'][Math.floor(r()*4)];c.beginPath();c.ellipse(nx+(r()-.5)*95,ny+(r()-.5)*55,10+r()*17,4+r()*9,r()*3,0,Math.PI*2);c.fill();}
   }
-  for(let i=0;i<9;i++)limb(r()*w,h+100,300+r()*400,(r()-.5)*.25,10+r()*24,4);
+  for(let i=0;i<5;i++)limb((i+.3+r()*.3)*w/5,h+100,300+r()*400,(r()-.5)*.15,10+r()*24,4);
   // Fern-like foreground at each tree layer's base.
-  for(let i=0;i<50;i++){const x=r()*w,y=h-r()*150;for(let j=0;j<9;j++){c.fillStyle='#2b5544';c.beginPath();c.ellipse(x+(j-4)*6,y-j*8,18,4,-.8,0,7);c.fill();}}
+  for(let i=0;i<50;i++){const x=r()*w,y=h-r()*150;for(let j=0;j<9;j++){c.fillStyle='#426653';c.beginPath();c.ellipse(x+(j-4)*6,y-j*8,18,4,-.8,0,7);c.fill();}}
+  const soft=document.createElement('canvas');soft.width=w;soft.height=h;soft.getContext('2d').drawImage(c.canvas,0,0);
+  c.clearRect(0,0,w,h);c.filter='blur(5px)';c.drawImage(soft,0,0);c.filter='none';
  });
 }
 const logGeo=new THREE.CylinderGeometry(.19,.24,1,18,3);
@@ -78,7 +81,7 @@ export function createScenery(scene,renderer){
  const forest=[];
  for(let i=0;i<3;i++){
   const map=forestTexture(26+i*16);
-  const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:[0xa7cbbb,0x7caa93,0x466b56][i],opacity:[.5,.55,.75][i],fog:false});
+  const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:[0xa7cbbb,0x7caa93,0x466b56][i],opacity:[.3,.38,.48][i],fog:false});
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(38-i*5,32),material);
   mesh.position.z=-22+i*5;mesh.renderOrder=-10+i;background.add(mesh);forest.push(mesh);
  }

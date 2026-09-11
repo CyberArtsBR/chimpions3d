@@ -8,6 +8,7 @@ try{
  await page.goto('http://127.0.0.1:4173/?test=1');
  await page.waitForFunction(()=>window.chimpJump?.().ready);
  assert((await page.evaluate(()=>window.chimpJump())).visible);
+ assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.keyboard.down('ArrowLeft');
