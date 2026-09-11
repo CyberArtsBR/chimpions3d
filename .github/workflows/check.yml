@@ -1,6 +1,7 @@
 name: Sandbox build and rig check
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
