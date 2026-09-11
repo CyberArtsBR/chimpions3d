@@ -8,7 +8,7 @@ page.on('pageerror', error => errors.push(error.message));
 page.on('console', msg => console.log('BROWSER', msg.type(), msg.text()));
 try {
   for (let attempt = 0; ; attempt++) {
-    try { await page.goto('http://127.0.0.1:4173'); break; }
+    try { await page.goto('http://127.0.0.1:4173/?rig=1'); break; }
     catch (e) { if (attempt === 20) throw e; await new Promise(resolve => setTimeout(resolve, 500)); }
   }
   await page.waitForFunction(() => window.rigSandbox?.().ready, { timeout: 30000 });

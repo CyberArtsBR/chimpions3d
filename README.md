@@ -1,25 +1,35 @@
-# Chimpion rig sandbox
+# Chimp Jump
 
-Small Vite + vanilla JavaScript + Three.js locomotion test. Uses the existing `public/model/chimpion.glb`; no imported animations or physics engine.
+A lightweight 2.5D endless jumper using Vite, vanilla JavaScript, Three.js and the existing rigged GLB.
+
+## Play
+
+A/D or Left/Right to steer. Jumping is automatic. Cross either edge to wrap. P/Escape pauses; Enter starts/retries. Touch the arrow buttons on mobile. Sound is optional.
+
+Branches: green = solid, blue = moving, cracked wood = one bounce, red mushroom = spring. Collect bananas; highest altitude is your personal best. Themes change every 30 seconds of active play. Score stays on this device.
 
 ## Run
 
-Use Node.js 22.12 or newer.
+Node 22.12+:
 
 ```sh
 npm install
 npm run dev
 npm run build
-npm run preview
 ```
 
-W / Up moves forward, S / Down backward, A / D rotates, Shift runs, Space jumps.
-Idle / Walk / Run buttons inspect poses in place; Jump performs one jump and returns to the previous forced state. Movement keys resume normal control. Show Skeleton overlays the existing skeleton.
+Render uses the root render.yaml and publishes dist after passing checks.
 
-The console prints every bone and its hierarchy, plus a mapping table. Edit the clearly labeled BONE_MAPPING at the top of src/main.js to override exact bone names. MODEL_YAW can correct forward orientation. Unresolved optional bones are reported; an unsafe arm mapping keeps the model hidden.
+## Rig lab
 
-The GLB stays hidden until arms are lowered, idle is applied, matrices are updated, and arm directions pass validation. All animation is relative to cached quaternions. The original file, rest-pose data and inverse bind matrices are never changed. No rest-pose toggle is exposed.
+Open /?rig=1 for the original inspection sandbox, its procedural animations, manual mapping, and skeleton toggle. Character gameplay code is in src/character.js. Original GLB/rest data is untouched; the character is prepared in idle before reveal, with 22-degree arm clearance.
 
-Procedural states: IDLE, WALK, RUN, JUMP, LAND. Jump phases: crouch, takeoff, airborne, landing. LAND is shown briefly in the state display so landing can be inspected. Camera follows behind and above. Feet use a basic swing, not IK; small sliding and floor penetration during extreme poses are possible. This is a skinning inspection sandbox, not production animation.
+## Avatars
 
-GitHub Actions runs the production build and browser smoke checks against the actual GLB.
+public/avatars.json lists supplied characters. Only the current chimp is available initially. Add entries with id, name, url (relative to public), and optional bones mapping after checking each GLB in the rig lab. Only the selected avatar is loaded. A large catalog thumbnail grid is a follow-up once the remaining assets are supplied.
+
+## Checks
+
+node checks/physics.mjs checks the jump/landing rules and route spacing. GitHub Actions builds and tests the real GLB in both the lab and game, including pause, turns, themes, restart and mobile layout.
+
+See docs/GAME_PLAN.md for the longer design. This first playable build covers the core loop; broad device profiling and the 221-avatar audit remain follow-up work.

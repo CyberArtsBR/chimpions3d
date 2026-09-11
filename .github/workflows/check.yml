@@ -1,4 +1,4 @@
-name: Sandbox build and rig check
+name: Chimp Jump build and checks
 on:
   push:
     branches: [main]
@@ -16,6 +16,7 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+      - run: node checks/physics.mjs
       - name: Inspect source GLB
         run: |
           node --input-type=module <<'NODE'
@@ -31,6 +32,7 @@ jobs:
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
           node checks/browser.mjs
+          node checks/game-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
