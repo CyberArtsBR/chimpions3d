@@ -37,6 +37,7 @@ try{
  await page.getByRole('button',{name:'JUMP AGAIN'}).click();
  assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Jungle Morning');
  await page.setViewportSize({width:390,height:844});
+ await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  await page.getByRole('button',{name:'Move right',exact:true}).click();
  await page.screenshot({path:'checks/game-mobile.png'});
 

@@ -186,6 +186,9 @@ function resize(){
  camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;
  camera.updateProjectionMatrix();
  document.documentElement.style.setProperty('--court',courtWidth+'px');
+ // Rotation/resizing changes the touch layout: freeze the run until resumed.
+ if(mode==='playing')menu('paused');
+ previous=performance.now();
 }
 addEventListener('resize',resize);quality();menu('menu');
 renderer.setAnimationLoop(now=>{

@@ -24,7 +24,7 @@ Visual target: detailed, atmospheric forest with legible arcade platforms. This 
 | Upload | Catalog only | Local file picker, rig/size/texture checks, normalization, idle-before-reveal and restore previous avatar on rejection |
 | Facing | Assumed one source forward direction | Optional “Flip avatar facing”; visual turns still pass through the character's front |
 | Resource use | Simple meshes, disposal needed for new details | Shared scenery geometry/textures, instanced leaves, bounded branch/particle counts, disposal on avatar replacement and rejection |
-| Mobile | One quality setting | Balanced default for coarse-pointer devices, user-selectable High/Balanced, capped pixel ratio and touch controls |
+| Mobile | One quality setting | Balanced default for coarse-pointer devices, user-selectable High/Balanced, capped pixel ratio and touch controls; viewport resizing pauses the run until resumed |
 | Menu | Too little room for upload options | Responsive scrollable card, avatar feedback and quality controls |
 | Preservation | Existing rig testing still useful | Original lab retained at ?rig=1; source GLB and technical rest pose unchanged |
 
