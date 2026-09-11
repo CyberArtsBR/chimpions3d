@@ -1,0 +1,14 @@
+# Chimp Jump — static browser build. Current app is the rig sandbox.
+services:
+  - type: web
+    name: chimp-jump
+    runtime: static
+    branch: main
+    buildCommand: npm install --include=dev && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: "22.23.2"
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
