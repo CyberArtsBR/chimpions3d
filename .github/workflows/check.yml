@@ -1,0 +1,38 @@
+name: Sandbox build and rig check
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run build
+      - name: Inspect source GLB
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const b = fs.readFileSync('public/model/chimpion.glb');
+          const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString());
+          console.log(JSON.stringify({skins: json.skins, nodes: json.nodes.map(({name,children,translation,rotation}) => ({name,children,translation,rotation}))}, null, 2));
+          NODE
+      - name: Browser smoke check dependencies (test only)
+        run: npm install --no-save --package-lock=false @playwright/test@1.55.1
+      - run: npx playwright install --with-deps chromium
+      - name: Test production bundle
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
+          node checks/browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rig-screenshots
+          path: checks/*.png
