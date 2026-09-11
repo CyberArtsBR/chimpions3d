@@ -11,6 +11,7 @@ const BONE_MAPPING = {
   leftThigh: null, leftShin: null, leftFoot: null,
   rightThigh: null, rightShin: null, rightFoot: null,
 };
+const ARM_REST_ANGLE = THREE.MathUtils.degToRad(22); // Slightly open arms, halfway toward an A-pose.
 const MODEL_YAW = 0; // Set Math.PI if this model faces -Z. Gameplay forward is +Z.
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb8cbd5);
@@ -118,7 +119,10 @@ function prepareIdle() {
     model.updateWorldMatrix(true, true);
     const from = worldDirection(arm, elbow);
     if (from.lengthSq() < 0.5) throw new Error('Arm has zero length; cannot safely prepare idle.');
-    const to = new THREE.Vector3(side === 'left' ? 0.12 : -0.12, -1, 0.04).normalize();
+    const to = new THREE.Vector3(
+      (side === 'left' ? 1 : -1) * Math.sin(ARM_REST_ANGLE),
+      -Math.cos(ARM_REST_ANGLE), 0.04,
+    ).normalize();
     const parentWorld = arm.parent.getWorldQuaternion(new THREE.Quaternion());
     const world = arm.getWorldQuaternion(new THREE.Quaternion());
     arm.quaternion.copy(parentWorld.invert().multiply(new THREE.Quaternion().setFromUnitVectors(from, to)).multiply(world));
