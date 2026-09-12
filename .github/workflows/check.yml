@@ -15,6 +15,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - name: Inspect uploaded GLB assets
+        run: node checks/inspect-assets.mjs
       - run: npm run build
       - run: node checks/physics.mjs
       - name: Inspect source GLB
