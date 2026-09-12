@@ -39,4 +39,6 @@ jobs:
         if: always()
         with:
           name: rig-screenshots
-          path: checks/*.png
+          path: |
+            checks/*.png
+            checks/*-report.json
