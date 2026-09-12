@@ -3,14 +3,14 @@ import {loadCharacter} from './character.js';
 import {createScenery} from './scenery.js';
 import {readLocalGLB} from './upload.js';
 import {disposeCharacter} from './character.js';
-import {Game,STEP,WIDTH,VIEW_HEIGHT} from './physics.js';
+import {Game,STEP,WIDTH,VIEW_HEIGHT,paceAt} from './physics.js';
 import './game.css';
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
 <header id="hud"><div class="stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Enable sound">♪</button><button id="pause" aria-label="Pause game" hidden>Ⅱ</button></div></header>
-<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div>
-<div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Find your next branch.<br>Keep bouncing. Chase the canopy.</p><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>to steer · auto jump</span></div><a class="secondary" href="?rig=1">Rig laboratory</a></section></div>
+<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace">PACE 1.06×</div>
+<div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>The canopy gets faster as you climb.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>to steer · auto jump</span></div><a class="secondary" href="?rig=1">Rig laboratory</a></section></div>
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
 const $=id=>document.getElementById(id);
@@ -32,21 +32,22 @@ const rim=new THREE.DirectionalLight(0xb6dee0,1.1);rim.position.set(4,4,-4);scen
 const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer);
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
-let highDetail= !matchMedia('(pointer: coarse)').matches;
-try{const value=localStorage.getItem('chimp-jump-detail');if(value)highDetail=value==='high';}catch{}
+const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
+let highDetail=!mobileProfile();
 function quality(){
+ highDetail=!mobileProfile();
  renderer.setPixelRatio(Math.min(devicePixelRatio,highDetail?1.75:1.15));
  renderer.shadowMap.enabled=highDetail;scenery.setQuality(highDetail);
- $('quality').textContent='Detail: '+(highDetail?'High':'Balanced');
+ $('quality').textContent='Detail: '+(highDetail?'High · Desktop':'Balanced · Mobile');
+ $('quality').disabled=true;
  resize();
 }
-$('quality').onclick=()=>{highDetail=!highDetail;quality();try{localStorage.setItem('chimp-jump-detail',highDetail?'high':'balanced');}catch{}};
 const platformMeshes=new Map();
 const characterLayer=new THREE.Group();scene.add(characterLayer);
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=Math.PI/2,targetYaw=Math.PI/2;
 let facingFlip=0;
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1;
-let best=0,muted=true,audioContext,toastTimer,avatarRequest=0,catalog=[];
+let best=0,muted=true,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='chimpion';
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
 const keys=new Set(),pointers=new Map();
 const input=()=>Number(keys.has('ArrowRight')||keys.has('KeyD')||[...pointers.values()].includes(1))-Number(keys.has('ArrowLeft')||keys.has('KeyA')||[...pointers.values()].includes(-1));
@@ -70,6 +71,7 @@ function sound(type){
  }catch{}
 }
 function syncUI(){
+ $('pace').textContent='PACE '+paceAt(game.time).toFixed(2)+'×';
  $('height').textContent=Math.floor(game.height);$('coins').textContent=game.bananas;
  $('best').textContent='PERSONAL BEST  ·  '+Math.floor(best)+' m';
  $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';
@@ -89,7 +91,7 @@ function menu(kind){
  $('description').textContent='Your climb is paused.';$('play').textContent='KEEP CLIMBING';$('choose').hidden=true;
  }else{
  $('eyebrow').textContent='A little chimp. A big climb.';$('title').innerHTML='CHIMP<br><span>JUMP</span>';
- $('description').innerHTML='Find your next branch.<br>Keep bouncing. Chase the canopy.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
+ $('description').innerHTML='Read the branches. Time your landing.<br>The canopy gets faster as you climb.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
  }
  syncUI();
 }
@@ -123,7 +125,7 @@ async function selectAvatar(entry){
  if(request!==avatarRequest){disposeCharacter(next);return;}
  if(avatar){characterLayer.remove(avatar.root);disposeCharacter(avatar);}
  for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();game.reset(7);lastTheme=-1;
- avatar=next;facingFlip=0;avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
+ avatar=next;selectedId=entry.id||'';facingFlip=0;avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
  $('play').disabled=false;menu('menu');
  $('avatar-status').textContent=entry.name+' · '+avatar.boneCount+' bones'+(entry.buffer?' · local file':'');
  }catch(e){
@@ -142,9 +144,32 @@ $('avatar-file').onchange=async e=>{
  }catch(error){$('avatar-status').textContent=error.message;}
 };
 $('flip').onclick=()=>{facingFlip=facingFlip?0:Math.PI;toast('Avatar front direction reversed');};
-$('choose').onclick=()=>{
- const list=$('avatar-list');list.hidden=!list.hidden;list.replaceChildren();
- for(const entry of catalog){const b=document.createElement('button');b.className='avatar-option';b.textContent=entry.name;b.onclick=()=>selectAvatar(entry);list.append(b);}
+let collectionPage=0,collectionQuery='';
+function renderCollection(){
+ const list=$('avatar-list');list.replaceChildren();
+ const search=document.createElement('input');search.type='search';search.placeholder='Search chimp name';search.setAttribute('aria-label','Search characters');search.value=collectionQuery;
+ search.oninput=()=>{collectionQuery=search.value;collectionPage=0;renderCollection();const field=list.querySelector('input');field.focus();};list.append(search);
+ const entries=[...catalog,...collection.filter(c=>!catalog.some(a=>a.id===c.id))].filter(c=>c.name.toLowerCase().includes(collectionQuery.toLowerCase()));
+ const pages=Math.max(1,Math.ceil(entries.length/12));collectionPage=Math.min(collectionPage,pages-1);
+ const grid=document.createElement('div');grid.className='avatar-grid';
+ for(const entry of entries.slice(collectionPage*12,collectionPage*12+12)){
+  const button=document.createElement('button');button.className='avatar-option';button.disabled=!entry.url;
+  button.setAttribute('aria-label',entry.name+(entry.url?'':' · GLB coming soon'));button.setAttribute('aria-pressed',String(selectedId===entry.id));
+  if(entry.image){const img=document.createElement('img');img.src=entry.image;img.loading='lazy';img.decoding='async';img.alt='';img.referrerPolicy='no-referrer';img.onerror=()=>{img.remove();};button.append(img);}
+  const name=document.createElement('strong');name.textContent=entry.name;button.append(name);
+  const status=document.createElement('small');status.textContent=entry.url?(selectedId===entry.id?'Selected':'Play'): 'GLB coming soon';button.append(status);
+  button.onclick=()=>selectAvatar(entry);grid.append(button);
+ }
+ list.append(grid);
+ const nav=document.createElement('div');nav.className='collection-nav';
+ for(const [label,direction]of [['Previous',-1],['Next',1]]){const button=document.createElement('button');button.textContent=label;button.disabled=direction<0?collectionPage===0:collectionPage===pages-1;button.onclick=()=>{collectionPage+=direction;renderCollection();};nav.append(button);}
+ const count=document.createElement('span');count.textContent=(collectionPage+1)+' / '+pages+' · '+entries.length+' chimps';nav.append(count);list.append(nav);
+}
+$('choose').onclick=async()=>{
+ const list=$('avatar-list');list.hidden=!list.hidden;
+ if(list.hidden){list.replaceChildren();return;}
+ if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=await response.json();}catch{toast('Collection unavailable. Your chimp is ready.');}
+ if(!list.hidden)renderCollection();
 };
 fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();})
 .then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');return selectAvatar(entries[0]);})
@@ -190,7 +215,7 @@ function resize(){
  if(mode==='playing')menu('paused');
  previous=performance.now();
 }
-addEventListener('resize',resize);quality();menu('menu');
+addEventListener('resize',quality);quality();menu('menu');
 renderer.setAnimationLoop(now=>{
  const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);
  if(raw>0.75&&mode==='playing')menu('paused');
@@ -204,7 +229,7 @@ renderer.setAnimationLoop(now=>{
  sun.position.set(-5,game.camera+9,12);sun.target.position.set(0,game.camera,0);
  drawWorld(dt);syncUI();renderer.render(scene,camera);
 });
-window.chimpJump=()=>({ready,mode,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
+window.chimpJump=()=>({ready,mode,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
 if(new URLSearchParams(location.search).has('test')){
  window.chimpJumpTest={step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();},game:()=>game};
 }

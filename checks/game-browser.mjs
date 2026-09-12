@@ -8,6 +8,7 @@ try{
  await page.goto('http://127.0.0.1:4173/?test=1');
  await page.waitForFunction(()=>window.chimpJump?.().ready);
  assert((await page.evaluate(()=>window.chimpJump())).visible);
+ assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
  assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
@@ -63,8 +64,8 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visible);
  assert.equal(external,0,'Local avatar must not trigger external requests');
  await page.getByRole('button',{name:'Flip avatar facing'}).click();
- await page.getByRole('button',{name:/Detail:/}).click();
- const quality=await page.evaluate(()=>window.chimpJump().quality);assert(['balanced','high'].includes(quality));
+ assert(await page.getByRole('button',{name:/Detail:/}).isDisabled());
+ const quality=await page.evaluate(()=>window.chimpJump().quality);assert.equal(quality,'balanced');
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.getByRole('button',{name:'Pause game'}).click();
  await page.screenshot({path:'checks/game-mobile-menu.png'});
@@ -80,6 +81,19 @@ try{
  const after=await page.evaluate(()=>window.chimpJump());
  assert(after.geometries<=before.geometries+3,'Geometry count must remain bounded');
  assert(after.textures<=before.textures+1,'Texture count must remain bounded');
+ // Catalog search uses original names; only supplied GLBs can be selected.
+ await page.getByRole('button',{name:'Pause game'}).click();
+ await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+ await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
+ await page.route('https://cdn.helius-rpc.com/**',route=>route.abort());
+ await page.getByRole('button',{name:'Choose chimp',exact:true}).click();
+ await page.getByRole('searchbox',{name:'Search characters'}).fill('The Zealous');
+ assert(await page.getByRole('button',{name:'The Zealous · GLB coming soon',exact:true}).isDisabled());
+ assert.equal(await page.locator('.avatar-option').count(),1);
+ await page.getByRole('searchbox',{name:'Search characters'}).fill('Silver Chimp');
+ await page.getByRole('button',{name:'Silver Chimp',exact:true}).click();
+ await page.waitForFunction(()=>window.chimpJump().ready);
+ assert(await page.locator('#avatar-list').isHidden());
  console.log('RENDER_STATS:'+JSON.stringify(after));
  assert.deepEqual(errors,[]);
 

@@ -77,6 +77,7 @@ export function createScenery(scene,renderer){
  const red=new THREE.MeshStandardMaterial({color:0xc75635,roughness:.55});
  const cream=new THREE.MeshStandardMaterial({color:0xe6d6ac,roughness:.85});
  const blue=new THREE.MeshStandardMaterial({color:0x55c4d0,emissive:0x17666f,emissiveIntensity:.35,roughness:.5});
+ let highQuality=true,treeImageMesh=null;
  const background=new THREE.Group();scene.add(background);
  const forest=[];
  for(let i=0;i<3;i++){
@@ -89,7 +90,27 @@ export function createScenery(scene,renderer){
  const pos=trunkGeo.attributes.position;
  for(let i=0;i<pos.count;i++){const y=pos.getY(i);pos.setX(i,pos.getX(i)+Math.sin(y*.16)*.28);pos.setZ(i,pos.getZ(i)+Math.sin(y*.23)*.12);}
  trunkGeo.computeVertexNormals();
+ // Carved bark silhouette for desktop, sharing one material.
+ const detailedTrunkGeo=trunkGeo.clone();
+ const detailedPos=detailedTrunkGeo.attributes.position;
+ for(let i=0;i<detailedPos.count;i++){
+  const x=detailedPos.getX(i),y=detailedPos.getY(i),z=detailedPos.getZ(i);
+  const angle=Math.atan2(z,x-Math.sin(y*.16)*.28);
+  const relief=.065*Math.sin(angle*11+y*.18)+.025*Math.sin(angle*19-y*.7);
+  detailedPos.setX(i,x+Math.cos(angle)*relief);detailedPos.setZ(i,z+Math.sin(angle)*relief);
+ }detailedTrunkGeo.computeVertexNormals();
  const trunk=new THREE.Mesh(trunkGeo,bark);trunk.position.set(.35,0,-4);trunk.receiveShadow=true;background.add(trunk);
+ // Optional vertically tileable tree image. No missing-file requests by default.
+ fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}).then(config=>{
+  if(!config.treeImage)return;
+  new THREE.TextureLoader().load(import.meta.env.BASE_URL+config.treeImage,map=>{
+   map.colorSpace=THREE.SRGBColorSpace;map.wrapT=THREE.RepeatWrapping;map.anisotropy=4;
+   const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,fog:false});
+   treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(6,24),material);
+   treeImageMesh.position.set(.35,0,-4);treeImageMesh.visible=highQuality;
+   background.add(treeImageMesh);trunk.visible=!highQuality;
+  },undefined,()=>console.warn('Tree image unavailable; using procedural tree.'));
+ }).catch(()=>{});
  const ivy=new THREE.InstancedMesh(leafGeo,leaf,110);ivy.instanceMatrix.setUsage(THREE.DynamicDrawUsage);ivy.frustumCulled=false;background.add(ivy);
  const motePositions=new Float32Array(90*3);const r=rng(51);
  for(let i=0;i<90;i++){motePositions[i*3]=(r()-.5)*24;motePositions[i*3+1]=(r()-.5)*24;motePositions[i*3+2]=-1-r()*6;}
@@ -111,6 +132,13 @@ export function createScenery(scene,renderer){
    const twig=mesh(logGeo,bark,group,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
   const top=mesh(mossGeo,moss,group,0,-.075);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
+  const detail=new THREE.Group();group.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
+  for(let i=0;i<5;i++){
+   const x=(i/4-.5)*p.width*.85;
+   const knot=mesh(knotGeo,dark,detail,x,-.27,.205);knot.scale.set(.6+i%2*.25,.5,1);
+   const tuft=mesh(mossGeo,moss,detail,x,-.035,-.04);tuft.scale.set(.12,.055,.19);
+   const fern=mesh(leafGeo,leaf,detail,x,-.31,.05);fern.scale.set(.11,.22,1);fern.rotation.z=(i%2?1:-1)*.6;
+  }
   const foliage=new THREE.InstancedMesh(leafGeo,leaf,14);group.add(foliage);
   for(let i=0;i<14;i++){
    dummy.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);
@@ -138,6 +166,7 @@ export function createScenery(scene,renderer){
   update(cameraY,time,dt,palette,night){
    forest.forEach((m,i)=>{m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(new THREE.Color(0x25483e),.4+i*.12);});
    trunk.position.y=cameraY;
+   if(treeImageMesh){treeImageMesh.position.y=cameraY;treeImageMesh.material.map.offset.y=cameraY/24;}
    for(let i=0;i<110;i++){
     const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
     dummy.position.set(side*(1.2+Math.sin(i*6.7)*.2)+.35,cameraY+y,-2.75);
@@ -153,6 +182,6 @@ export function createScenery(scene,renderer){
    particleGeo.attributes.position.needsUpdate=true;
   },
   reset(){sparks.length=0;ringAge=1;},
-  setQuality(high){motes.visible=high;forest[0].visible=high;}
+  setQuality(high){highQuality=high;motes.visible=high;forest[0].visible=high;trunk.geometry=high?detailedTrunkGeo:trunkGeo;trunk.visible=!high||!treeImageMesh;if(treeImageMesh)treeImageMesh.visible=high;scene.traverse(o=>{if(o.userData.desktopDetail)o.visible=high;});}
  };
 }

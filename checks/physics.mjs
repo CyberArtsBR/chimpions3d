@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
-for(let seed=0;seed<250;seed++){
- const g=new Game(seed);g.camera=200;g.generate();
+for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
+ const g=new Game(seed);g.time=age;g.camera=200;g.generate();
  for(let i=1;i<g.platforms.length;i++){
   const prev=g.platforms[i-1],p=g.platforms[i],dy=p.y-prev.y;
-  assert(dy>=2.59&&dy<=3.46,'Rows must remain widely spaced');
+  assert(dy>=3.14&&dy<=3.76,'Rows must remain widely spaced');
   assert(Math.abs(p.baseX-prev.baseX)>=1.64,'Avoid stacked branches');
   const test=new Game(seed);test.platforms=[{...p}];test.nextY=1000;
-  test.y=prev.y;test.x=prev.x;test.vy=JUMP;test.height=prev.y;test.camera=Math.max(5,prev.y-.8);
+  test.time=age;test.y=prev.y;test.x=prev.x;test.vy=JUMP;test.height=prev.y;test.camera=Math.max(5,prev.y-.8);
   for(let tick=0;tick<100&&!test.bounces&&!test.dead;tick++){
-   const target=p.baseX+(p.type==='moving'?Math.sin((test.time+STEP)*1.1+p.phase)*.38:0);
+   const target=p.type==='moving'?movingX(p,test.time+STEP):p.baseX;
    const distance=target-test.x-test.vx*Math.abs(test.vx)/48;
    test.step(Math.abs(distance)<.08?0:Math.sign(distance));
   }
@@ -32,4 +32,8 @@ const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
 const idle=new Game(9);for(let i=0;i<600;i++)idle.step(0);assert(idle.height<10);
+assert.equal(paceAt(0),1.06);assert.equal(paceAt(180),1.3);assert.equal(paceAt(10000),1.3);
+assert(platformPhaseAt(180.001)-platformPhaseAt(180)<.002,'Moving phase stays continuous at speed cap');
+const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20)){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
+assert(rates[0]>.30&&rates[0]<.40);assert(rates[1]>.49&&rates[1]<.61);
 console.log('PASS physics: '+pairs+' generated transfers, larger gaps, slower/higher arcs, wrap, landing, spring, fragile branches, retry');

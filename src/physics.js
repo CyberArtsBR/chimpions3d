@@ -1,4 +1,7 @@
 export const WIDTH=8.6, GRAVITY=18, JUMP=12.6, SPEED=4.4, VIEW_HEIGHT=13.76, STEP=1/60;
+export const paceAt=time=>1.06+.24*Math.min(Math.max(time,0)/180,1);
+export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
+export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)+(platform.phase||0))*.48;
 export class Game {
   constructor(seed=1){this.reset(seed);}
   reset(seed=1){
@@ -13,7 +16,7 @@ export class Game {
   generate(){
     while(this.nextY<this.camera+10){
       const difficulty=Math.min(this.nextY/180,1);
-      this.nextY+=2.6+this.random()*.45+difficulty*.4;
+      this.nextY+=3.15+this.random()*.30+difficulty*.30;
       // Exactly one branch per row, with an intentional lateral transfer.
       const candidates=[-2.65,-2,-1.3,0,1.3,2,2.65].filter(x=>{
         const distance=Math.abs(x-this.nextX);
@@ -21,16 +24,18 @@ export class Game {
       });
       this.nextX=candidates[Math.floor(this.random()*candidates.length)];
       let type='solid';
-      if(this.nextY>18 && this.nextId%4===0){
+      if(this.nextY>10){
         const roll=this.random();
-        type=roll<.4?'moving':roll<.75?'cracked':'spring';
+        type=roll<.35+Math.min(this.time/180,1)*.2?'moving':roll<.7?'solid':roll<.88?'cracked':'spring';
       }
       this.add(this.nextX,this.nextY,2.5-difficulty*.65,type);
     }
   }
   step(input,dt=STEP){
     if(this.dead)return [];
-    const events=[];this.time+=dt;this.bounceAge+=dt;
+    const events=[];this.time+=dt;
+    // Active play time stays real: theme changes remain every 30 seconds.
+    dt*=paceAt(this.time);this.bounceAge+=dt;
     this.previousCamera=this.camera;
     const target=input*SPEED, amount=24*dt;
     this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
@@ -41,7 +46,7 @@ export class Game {
     let landing=null, earliest=2;
     for(const p of this.platforms){
       const previousX=p.x;
-      if(p.type==='moving')p.x=p.baseX+Math.sin(this.time*1.1+p.phase)*0.38;
+      if(p.type==='moving')p.x=movingX(p,this.time);
       if(p.broken)continue;
       if(this.vy<0 && oldY>=p.y && this.y<=p.y){
         const t=(oldY-p.y)/(oldY-this.y), x=oldX+travel*t;

@@ -28,3 +28,21 @@
 
 .court-edges{position:fixed;left:50%;top:16%;bottom:13%;width:min(100vw,var(--court));transform:translateX(-50%);border-left:1px dashed #e4eed028;border-right:1px dashed #e4eed028;display:flex;align-items:center;justify-content:space-between;pointer-events:none;color:#eff9d680;font-size:25px;text-shadow:0 1px 5px #153c2d}
 .court-edges span{padding:0 6px}
+
+/* A compact collection drawer keeps the play action visible with 221 avatars. */
+#pace{position:fixed;top:122px;left:50%;transform:translateX(-50%);color:#ffdf8d;font-size:10px;letter-spacing:1.5px;text-shadow:0 2px 5px #12382b}
+.branch-guide{display:flex;justify-content:center;gap:16px;font-size:10px;color:#b9d7bf;margin:14px 0}
+.branch-guide span:first-child{color:#80e0e2}.branch-guide span:last-child{color:#ffc19d}
+#avatar-list{max-height:310px;overflow:auto;padding:4px}
+#avatar-list input{width:100%;border:1px solid #b5d79d55;border-radius:9px;background:#082b25;color:#fff6d5;padding:11px;margin-bottom:10px;font:inherit}
+.avatar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.avatar-option{display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px;min-width:0;border:1px solid #93b99c55;background:#163e30}
+.avatar-option[aria-pressed=true]{border-color:#ffe081;background:#355333}
+.avatar-option img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px}
+.avatar-option strong{font-size:10px;overflow-wrap:anywhere}.avatar-option small{font-size:9px;color:#c7d6b7}
+.avatar-option:disabled{cursor:default;opacity:.65}
+.collection-nav{display:flex;align-items:center;gap:8px;margin:12px 0;font-size:10px;flex-wrap:wrap}
+.collection-nav button{border:1px solid #b8d09a55;background:#183c2e;color:#fff2c4;border-radius:7px;padding:6px 10px}
+.collection-nav button:disabled{opacity:.4}
+.options button:disabled{opacity:.8;cursor:default}
+@media(min-width:900px){.card{width:440px;border-radius:30px}.card h1{font-size:72px;letter-spacing:-4px}.primary{padding:18px}.card .eyebrow{letter-spacing:2px}}
