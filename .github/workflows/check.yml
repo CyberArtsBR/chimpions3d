@@ -17,6 +17,7 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: node checks/physics.mjs
+      - run: node checks/assets.mjs
       - name: Inspect source GLB
         run: |
           node --input-type=module <<'NODE'
