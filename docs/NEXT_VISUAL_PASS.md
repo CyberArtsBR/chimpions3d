@@ -1,3 +1,5 @@
+> Atualização: [assets integrados, nova tela inicial e inventário completo](ASSET_INTEGRATION.md).
+
 # Chimp Jump: próxima etapa visual e entrega de assets
 
 ## Implementado nesta etapa

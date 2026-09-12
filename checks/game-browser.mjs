@@ -10,6 +10,8 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visible);
  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
  assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
+ await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
+ assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>=4);
  await page.screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.keyboard.down('ArrowLeft');
@@ -66,6 +68,8 @@ try{
  await page.getByRole('button',{name:'Flip avatar facing'}).click();
  assert(await page.getByRole('button',{name:/Detail:/}).isDisabled());
  const quality=await page.evaluate(()=>window.chimpJump().quality);assert.equal(quality,'balanced');
+ assert.equal(await page.evaluate(()=>window.chimpJump().authoredBranches),0);
+ assert.equal(await page.evaluate(()=>window.chimpJump().backgroundReady),false);
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.getByRole('button',{name:'Pause game'}).click();
  await page.screenshot({path:'checks/game-mobile-menu.png'});
@@ -87,8 +91,8 @@ try{
  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
  await page.route('https://cdn.helius-rpc.com/**',route=>route.abort());
  await page.getByRole('button',{name:'Choose chimp',exact:true}).click();
- await page.getByRole('searchbox',{name:'Search characters'}).fill('The Zealous');
- assert(await page.getByRole('button',{name:'The Zealous · GLB coming soon',exact:true}).isDisabled());
+ await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aviator');
+ assert(await page.getByRole('button',{name:'The Aviator · GLB coming soon',exact:true}).isDisabled());
  assert.equal(await page.locator('.avatar-option').count(),1);
  await page.getByRole('searchbox',{name:'Search characters'}).fill('Silver Chimp');
  await page.getByRole('button',{name:'Silver Chimp',exact:true}).click();

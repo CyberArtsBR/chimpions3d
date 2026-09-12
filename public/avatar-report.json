@@ -1,0 +1,39 @@
+{
+  "duplicates": [
+    "The Boson.glb"
+  ],
+  "extra": [
+    "The First Born",
+    "The VassalCAT"
+  ],
+  "missing": [
+    "The Aviator",
+    "The Beacon",
+    "The Bionic",
+    "The Branded",
+    "The Chevalier",
+    "The Deckhand",
+    "The Evaluator",
+    "The Grunt",
+    "The High Priest",
+    "The Irradiated",
+    "The Patient",
+    "The Pensive",
+    "The Preeminent",
+    "The Static",
+    "The Witch Doctor"
+  ],
+  "unavailable": [
+    {
+      "name": "The Inverted",
+      "reason": "Rig needs correction: only one bone in GLB"
+    },
+    {
+      "name": "The Ordained",
+      "reason": "Rig needs correction: no skeleton in GLB"
+    }
+  ],
+  "files": 209,
+  "playable": 207,
+  "matchedCards": 206
+}

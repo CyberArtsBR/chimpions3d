@@ -1,3 +1,5 @@
+> Atualização: [assets integrados, nova tela inicial e inventário completo](ASSET_INTEGRATION.md).
+
 # Chimp Jump — graphics and gameplay audit
 
 ## Decision

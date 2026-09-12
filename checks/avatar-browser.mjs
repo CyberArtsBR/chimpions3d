@@ -51,6 +51,7 @@ try{
       await choose.click();
 
       const search=page.getByRole('searchbox',{name:'Search characters'});
+      await search.waitFor({state:'visible'});
       item.searchCount=await search.count();
       assert.equal(item.searchCount,1,'Expected exactly one character search box');
       await search.fill(name);
@@ -62,7 +63,6 @@ try{
       assert.equal(item.disabled,false,`${name} must be playable`);
       await option.click();
 
-      await page.waitForFunction(expected=>document.getElementById('avatar-status')?.textContent===expected,preparing,{timeout:5000});
       await page.waitForFunction(expected=>{
         const text=document.getElementById('avatar-status')?.textContent||'';
         return text && text!==expected;

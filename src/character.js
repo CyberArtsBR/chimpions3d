@@ -37,7 +37,7 @@ export async function loadCharacter(url, overrides = {}) {
   const aliases = {
   hips: ['hips', 'hip', 'pelvis'], spine: ['spine', 'spine0', 'spine1', 'spine01'],
   chest: ['chest', 'upperchest', 'spine2', 'spine02', 'spine3'],
-  neck: ['neck', 'neck1'], head: ['head'],
+  neck: ['neck', 'neck1', 'necktwist01'], head: ['head'],
   Shoulder: ['shoulder', 'clavicle', 'collar'], UpperArm: ['upperarm', 'arm', 'uparm'],
   Forearm: ['forearm', 'lowerarm', 'elbow'], Hand: ['hand', 'wrist'],
   Thigh: ['thigh', 'upleg', 'upperleg'], Shin: ['shin', 'calf', 'leg', 'lowerleg', 'knee'],
@@ -45,7 +45,7 @@ export async function loadCharacter(url, overrides = {}) {
 };
 function nameParts(name) {
   let s = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase()
-    .replace(/mixamorig\d*[:_ ]*/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    .replace(/mixamorig\d*[:_ ]*/g, '').replace(/cc[_ ]*base[_ ]*/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   let words = s.split(/\s+/);
   let side = words.includes('left') || words.includes('l') ? 'left'
     : words.includes('right') || words.includes('r') ? 'right' : '';
@@ -73,6 +73,10 @@ function inspect(root) {
       const p = nameParts(b.name);
       return p.side === side && aliases[kind].includes(p.core);
     });
+    // Hip/Pelvis chains: select the common ancestor, never an arbitrary match.
+    if (!BONE_MAPPING[key] && key === 'hips' && matches.length > 1) {
+      matches = matches.filter(b => matches.every(other => other === b || isDescendant(other, b)));
+    }
     // Numbered spine segments form a chain: use its lowest spine / highest chest.
     if (!BONE_MAPPING[key] && matches.length > 1 && (key === 'spine' || key === 'chest')) {
       matches = matches.filter(b => matches.every(other => other === b ||

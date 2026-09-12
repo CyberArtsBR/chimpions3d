@@ -42,12 +42,11 @@ function assetInfo(name,bytes,json){
 }
 
 const avatars=JSON.parse(fs.readFileSync('public/avatars.json','utf8'));
-assert.equal(avatars.length,6,'Expected default chimp plus five supplied Chimpions');
-const expected=['The Bosun','The Executioner','The Knight Commander','The One Who Rocks Hard','The Street Fighter'];
-assert.deepEqual(avatars.slice(1).map(a=>a.name),expected,'Playable avatar catalog changed unexpectedly');
+assert(avatars.filter(a=>a.url).length>200,'Expected complete uploaded collection');
+assert.equal(new Set(avatars.map(a=>a.id)).size,avatars.length,'Unique IDs');
 
 const avatarReport=[];
-for(const avatar of avatars.slice(1)){
+for(const avatar of avatars.slice(1).filter(a=>a.url)){
   const path='public/'+decodeURIComponent(avatar.url);
   assert(fs.existsSync(path),`${avatar.name}: missing ${path}`);
   const {bytes,json}=parseGLB(path);
@@ -57,7 +56,7 @@ for(const avatar of avatars.slice(1)){
   assert(info.skinnedNodes>0,`${avatar.name}: no skinned mesh node`);
   avatarReport.push(info);
 }
-console.log('AVATAR_ASSET_REPORT:'+JSON.stringify(avatarReport));
+console.log('AVATAR_ASSET_COUNT:'+avatarReport.length);
 
 const branchPath='public/environment/platforms/branch-moss.glb';
 assert(fs.existsSync(branchPath),'Missing branch-moss.glb');
@@ -67,4 +66,4 @@ assert(branchReport.meshes>0,'branch-moss.glb has no mesh');
 console.log('BRANCH_ASSET_REPORT:'+JSON.stringify(branchReport));
 
 fs.writeFileSync('checks/assets-report.json',JSON.stringify({avatars:avatarReport,branch:branchReport},null,2));
-console.log('PASS assets: five supplied Chimpions and branch-moss.glb are structurally valid GLB 2.0 assets');
+console.log('PASS assets: uploaded Chimpions and branch-moss.glb are structurally valid GLB 2.0 assets');
