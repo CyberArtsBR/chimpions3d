@@ -3,5 +3,40 @@
     "id": "chimpion",
     "name": "Silver Chimp",
     "url": "model/chimpion.glb"
+  },
+  {
+    "id": "26",
+    "name": "The Bosun",
+    "image": "https://cdn.helius-rpc.com/cdn-cgi/image//https://arweave.net/Xct_-Q1nQaFfhHKQfUhyMr2c1KcoCaCTJQpcr9mqdbs",
+    "tribe": "Old World Cult",
+    "url": "model/characters/The%20Bosun.glb"
+  },
+  {
+    "id": "69",
+    "name": "The Executioner",
+    "image": "https://cdn.helius-rpc.com/cdn-cgi/image//https://arweave.net/EohzHR7EWFyx1kZ0ygiHqBkO6sttJJJguAd-SMgwqiI",
+    "tribe": "Future War Pack",
+    "url": "model/characters/The%20Executioner.glb"
+  },
+  {
+    "id": "118",
+    "name": "The Knight Commander",
+    "image": "https://cdn.helius-rpc.com/cdn-cgi/image//https://arweave.net/u7HN5OscUF5sS9-fzlsyNNQ36DoGbjm8D1WuMx4hzEk",
+    "tribe": "Old World Cult",
+    "url": "model/characters/The%20Knight%20Commander.glb"
+  },
+  {
+    "id": "142",
+    "name": "The One Who Rocks Hard",
+    "image": "https://cdn.helius-rpc.com/cdn-cgi/image//https://arweave.net/NT8x91PCnv02uvkY4w5NUHcERK0p6l-_Tqr1rNwxRjI",
+    "tribe": "Proletariat",
+    "url": "model/characters/The%20One%20Who%20Rocks%20Hard.glb"
+  },
+  {
+    "id": "193",
+    "name": "The Street Fighter",
+    "image": "https://cdn.helius-rpc.com/cdn-cgi/image//https://arweave.net/yRhvGxxkyDkwQwQmxnORL3vacyGI3ERvMugkLkDvjK8",
+    "tribe": "Old World Cult",
+    "url": "model/characters/The%20Street%20Fighter.glb"
   }
 ]
