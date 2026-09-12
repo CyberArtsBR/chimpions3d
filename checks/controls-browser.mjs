@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {chromium} from '@playwright/test';
+import {readPad} from '../src/input.js';
+assert.equal(readPad([]).axis,0);
+assert.equal(readPad([{connected:true,axes:[.1],buttons:[]}]).axis,0);
+const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1200,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+try{
+ await page.goto('http://127.0.0.1:4173/?test=1&background=pixel');
+ await page.waitForFunction(()=>window.chimpJump?.().ready);
+ assert.equal(await page.evaluate(()=>window.chimpJump().courtWidth),11.2);
+ await page.locator('#play').click();
+ await page.mouse.move(800,400);
+ await page.waitForFunction(()=>window.chimpJump().vx>1);
+ await page.mouse.move(400,400);
+ await page.waitForFunction(()=>window.chimpJump().vx< -1);
+ await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+ const first=await page.locator('#pixel-backdrop').evaluate(c=>c.toDataURL());
+ await page.evaluate(()=>{window.chimpJumpTest.game().camera+=10;window.chimpJumpTest.render();});
+ assert.equal(await page.locator('#pixel-backdrop').evaluate(c=>c.toDataURL()),first,'Background must not scroll');
+ await page.evaluate(()=>{window.chimpJumpTest.game().time=31;window.chimpJumpTest.render();});
+ assert.notEqual(await page.locator('#pixel-backdrop').evaluate(c=>c.toDataURL()),first,'Stage changes the artwork');
+ await page.screenshot({path:'checks/pixel-gameplay.png'});
+ await page.reload();
+ await page.waitForFunction(()=>window.chimpJump?.().ready);
+ await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[{connected:true,axes:[1],buttons:Array.from({length:16},()=>({pressed:false}))}]}));
+ await page.locator('#play').click();
+ await page.waitForFunction(()=>window.chimpJump().vx>1);
+ await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[]}));
+ assert.deepEqual(errors,[]);
+ console.log('PASS mouse, generic gamepad, wider court, fixed pixel scenery and stage switch');
+}finally{await browser.close();}

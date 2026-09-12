@@ -1,5 +1,5 @@
-export const WIDTH=8.6, GRAVITY=18, JUMP=12.6, SPEED=4.4, VIEW_HEIGHT=13.76, STEP=1/60;
-export const paceAt=time=>1.06+.24*Math.min(Math.max(time,0)/180,1);
+export const WIDTH=11.2, GRAVITY=18, JUMP=12.6, SPEED=5.8, VIEW_HEIGHT=13.76, STEP=1/60;
+export const paceAt=time=>1.16+.20*Math.min(Math.max(time,0)/180,1);
 export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
 export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)+(platform.phase||0))*.48;
 export class Game {
@@ -16,9 +16,9 @@ export class Game {
   generate(){
     while(this.nextY<this.camera+10){
       const difficulty=Math.min(this.nextY/180,1);
-      this.nextY+=3.15+this.random()*.30+difficulty*.30;
+      this.nextY+=3.85+this.random()*.10+difficulty*.10;
       // Exactly one branch per row, with an intentional lateral transfer.
-      const candidates=[-2.65,-2,-1.3,0,1.3,2,2.65].filter(x=>{
+      const candidates=[-3.7,-2.5,-1.3,0,1.3,2.5,3.7].filter(x=>{
         const distance=Math.abs(x-this.nextX);
         return distance>=1.65 && distance<=2.9;
       });

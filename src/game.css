@@ -81,3 +81,12 @@ body[data-mode=menu] .keys b{font-size:2.2cqw;padding:.65cqw 1.2cqw;background:l
 #collection-dialog .avatar-option{min-height:60px}#collection-dialog .avatar-option strong{font-size:12px}#collection-dialog .avatar-option small{font-size:10px}
 @media(max-width:600px){body[data-mode=menu] .card{--menu-width:min(560px,149vw)}#collection-dialog{padding:15px}#collection-dialog .avatar-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){body[data-mode=menu] #play{transition:none}}
+
+/* Fixed pixel scenery and luminous wrap boundaries. */
+#pixel-backdrop{image-rendering:pixelated;pointer-events:none}
+.pixel-mode #world>.sun,.pixel-mode #world>.rays,.pixel-mode #world>.hill,.pixel-mode #world>.mist{display:none}
+.court-edges{top:0;bottom:0;border:0;font-size:0}
+.court-edges span{padding:0;width:9px;height:100%;background:repeating-linear-gradient(165deg,#dbff98 0 5px,#438c55 5px 12px,#a4ef6c 12px 17px,#245c46 17px 23px);box-shadow:0 0 6px #c9ff8b,0 0 19px #64e8a680;opacity:.85}
+#background-style{position:fixed;right:14px;bottom:12px;z-index:12;border:1px solid #b8e694;background:#143d39ed;color:#fff4cf;border-radius:10px;padding:8px 12px;font:inherit;font-size:12px}
+body[data-mode=playing] #background-style{display:none}
+#hud,#touch{width:min(94vw,var(--court))}

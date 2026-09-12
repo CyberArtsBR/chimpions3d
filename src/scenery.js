@@ -212,6 +212,7 @@ export function createScenery(scene,renderer){
   group.userData.coin=coin;attachPlatform(group);return group;
  }
  return {branch,
+  setPixelMode(enabled){background.visible=!enabled;},
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return !!treeImageMesh?.visible;},
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();},
