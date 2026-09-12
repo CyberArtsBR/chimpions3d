@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createBranchAsset} from './platformAsset.js';
 
 // All scenery is generated locally. Shared geometry, instanced leaves and small
 // reusable textures keep the forest independent of downloaded art packs.
@@ -77,6 +78,7 @@ export function createScenery(scene,renderer){
  const red=new THREE.MeshStandardMaterial({color:0xc75635,roughness:.55});
  const cream=new THREE.MeshStandardMaterial({color:0xe6d6ac,roughness:.85});
  const blue=new THREE.MeshStandardMaterial({color:0x55c4d0,emissive:0x17666f,emissiveIntensity:.35,roughness:.5});
+ const branchAsset=createBranchAsset();
  let highQuality=true,treeImageMesh=null;
  const background=new THREE.Group();scene.add(background);
  const forest=[];
@@ -126,25 +128,29 @@ export function createScenery(scene,renderer){
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
  function branch(p){
   const group=new THREE.Group();
-  const wood=mesh(logGeo,bark,group,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
+  // Only this holder is replaced by the GLB. Gameplay markers and collectables
+  // remain direct children of the platform group.
+  const base=new THREE.Group();group.add(base);
+  const wood=mesh(logGeo,bark,base,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
   for(const side of [-1,1]){
-   const cut=mesh(capGeo,end,group,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
-   const twig=mesh(logGeo,bark,group,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
+   const cut=mesh(capGeo,end,base,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
+   const twig=mesh(logGeo,bark,base,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
-  const top=mesh(mossGeo,moss,group,0,-.075);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
-  const detail=new THREE.Group();group.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
+  const top=mesh(mossGeo,moss,base,0,-.075);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
+  const detail=new THREE.Group();base.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
   for(let i=0;i<5;i++){
    const x=(i/4-.5)*p.width*.85;
    const knot=mesh(knotGeo,dark,detail,x,-.27,.205);knot.scale.set(.6+i%2*.25,.5,1);
    const tuft=mesh(mossGeo,moss,detail,x,-.035,-.04);tuft.scale.set(.12,.055,.19);
    const fern=mesh(leafGeo,leaf,detail,x,-.31,.05);fern.scale.set(.11,.22,1);fern.rotation.z=(i%2?1:-1)*.6;
   }
-  const foliage=new THREE.InstancedMesh(leafGeo,leaf,14);group.add(foliage);
+  const foliage=new THREE.InstancedMesh(leafGeo,leaf,14);base.add(foliage);
   for(let i=0;i<14;i++){
    dummy.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);
    dummy.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);
    dummy.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);
   }
+  branchAsset.attach(base,p.width);
   if(p.type==='moving')for(const x of [-.32,0,.32]){const marker=mesh(knotGeo,blue,group,x,-.23,.24);marker.scale.set(.6,1,1);}
   if(p.type==='cracked')for(let i=0;i<3;i++){const split=mesh(logGeo,dark,group,(i-1)*.13,-.19,.215);split.scale.set(.07,.38,.07);split.rotation.z=(i%2?-.5:.5);}
   if(p.type==='spring'){
