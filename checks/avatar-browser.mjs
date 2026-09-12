@@ -73,7 +73,7 @@ try{
       item.state=await page.evaluate(()=>window.chimpJump());
       assert(item.state.ready,`${name} must leave the game ready`);
       assert(item.state.visible,`${name} must be visible after loading`);
-      await page.locator('#world canvas').screenshot({path:`checks/avatar-${id}.png`});
+      await page.locator('#world canvas[data-engine]').screenshot({path:`checks/avatar-${id}.png`});
       item.ok=true;
       console.log('AVATAR_OK:'+JSON.stringify(item));
     }catch(err){
@@ -82,7 +82,7 @@ try{
       item.status=await page.locator('#avatar-status').textContent().catch(()=>null);
       item.state=await page.evaluate(()=>window.chimpJump?.()).catch(()=>null);
       item.bodyText=(await page.locator('body').innerText().catch(()=>'' )).slice(0,4000);
-      await page.locator('#world canvas').screenshot({path:`checks/avatar-failure-${id}.png`}).catch(()=>{});
+      await page.locator('#world canvas[data-engine]').screenshot({path:`checks/avatar-failure-${id}.png`}).catch(()=>{});
       console.log('AVATAR_FAILURE:'+JSON.stringify(item));
       saveReport();
       throw err;
@@ -95,3 +95,4 @@ try{
   saveReport();
   await browser.close();
 }
+
