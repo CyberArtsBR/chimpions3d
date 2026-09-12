@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import {chromium} from '@playwright/test';
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1000,height:720}});
+async function screenshot(options){
+ await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+ try{await page.screenshot(options);}finally{await page.evaluate(()=>window.chimpJumpTest.resumeRendering());}
+}
 const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')console.log(m.text());});
 try{
  await page.goto('http://127.0.0.1:4173/?test=1');
@@ -12,7 +16,7 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
  assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>=4);
- await page.screenshot({path:'checks/game-menu.png'});
+ await screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.keyboard.down('ArrowLeft');
  await page.waitForFunction(()=>window.chimpJump().yaw< -1.5);
@@ -21,7 +25,7 @@ try{
  await page.keyboard.down('ArrowRight');
  await page.waitForFunction(()=>window.chimpJump().yaw>1.5);
  await page.keyboard.up('ArrowRight');
- await page.screenshot({path:'checks/game-playing.png'});
+ await screenshot({path:'checks/game-playing.png'});
  await page.getByRole('button',{name:'Pause game'}).click();
  const time=await page.evaluate(()=>window.chimpJump().time);
  await page.waitForTimeout(100);
@@ -34,7 +38,7 @@ try{
   window.chimpJumpTest.step(1801);
  });
  assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Emerald Mist');
- await page.screenshot({path:'checks/game-theme.png'});
+ await screenshot({path:'checks/game-theme.png'});
  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'over');
  await page.getByRole('button',{name:'JUMP AGAIN'}).click();
@@ -42,7 +46,7 @@ try{
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  await page.getByRole('button',{name:'Move right',exact:true}).click();
- await page.screenshot({path:'checks/game-mobile.png'});
+ await screenshot({path:'checks/game-mobile.png'});
 
  // Upload the actual GLB through the file input; its bytes must stay local.
  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
@@ -72,7 +76,7 @@ try{
  assert.equal(await page.evaluate(()=>window.chimpJump().backgroundReady),false);
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.getByRole('button',{name:'Pause game'}).click();
- await page.screenshot({path:'checks/game-mobile-menu.png'});
+ await screenshot({path:'checks/game-mobile-menu.png'});
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  // Fixed scene size after repeat restarts: shared resources should not accumulate.
  await page.waitForTimeout(100);
@@ -103,7 +107,7 @@ try{
 
  console.log('PASS game: actual GLB, turns, movement, pause, themes, retry, mobile, local upload, invalid files/rigs, detail switch, bounded resources');
 }finally{
- await page.screenshot({path:'checks/game-final.png'});
+ await screenshot({path:'checks/game-final.png'});
  for(const name of ['game-menu','game-playing','game-theme','game-mobile','game-mobile-menu'])if(fs.existsSync('checks/'+name+'.png'))console.log(name.toUpperCase()+'_IMAGE_BASE64:'+fs.readFileSync('checks/'+name+'.png').toString('base64'));
  await browser.close();
 }

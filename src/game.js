@@ -229,7 +229,7 @@ function resize(){
  previous=performance.now();
 }
 addEventListener('resize',quality);quality();menu('menu');
-renderer.setAnimationLoop(now=>{
+function renderFrame(now){
  const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);
  if(raw>0.75&&mode==='playing')menu('paused');
  visualTime+=dt;
@@ -241,8 +241,9 @@ renderer.setAnimationLoop(now=>{
  camera.position.y=game.camera;
  sun.position.set(-5,game.camera+9,12);sun.target.position.set(0,game.camera,0);
  drawWorld(dt);syncUI();renderer.render(scene,camera);
-});
+}
+renderer.setAnimationLoop(renderFrame);
 window.chimpJump=()=>({ready,mode,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName("authored-branch")?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
 if(new URLSearchParams(location.search).has('test')){
- window.chimpJumpTest={suspendRendering:()=>renderer.setAnimationLoop(null),render:()=>{drawWorld();renderer.render(scene,camera);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();},game:()=>game};
+ window.chimpJumpTest={suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{drawWorld();renderer.render(scene,camera);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},game:()=>game};
 }
