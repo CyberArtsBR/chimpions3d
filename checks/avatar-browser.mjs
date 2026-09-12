@@ -31,6 +31,7 @@ const avatars=[
   ['193','The Street Fighter'],
 ];
 const report={avatars:[],errors,network};
+const preparing='Preparing pose and checking skeleton…';
 
 function saveReport(){
   fs.writeFileSync('checks/avatar-browser-report.json',JSON.stringify(report,null,2));
@@ -61,14 +62,16 @@ try{
       assert.equal(item.disabled,false,`${name} must be playable`);
       await option.click();
 
+      await page.waitForFunction(expected=>document.getElementById('avatar-status')?.textContent===expected,preparing,{timeout:5000});
       await page.waitForFunction(expected=>{
         const text=document.getElementById('avatar-status')?.textContent||'';
-        return text.startsWith(expected+' · ') && !text.includes('loading model');
-      },name,{timeout:45000});
+        return text && text!==expected;
+      },preparing,{timeout:30000});
 
       item.status=await page.locator('#avatar-status').textContent();
-      assert(!item.status.includes('failed'),`${name}: ${item.status}`);
+      assert(item.status.startsWith(name+' · '),`${name} rejected: ${item.status}`);
       item.state=await page.evaluate(()=>window.chimpJump());
+      assert(item.state.ready,`${name} must leave the game ready`);
       assert(item.state.visible,`${name} must be visible after loading`);
       await page.locator('#world canvas').screenshot({path:`checks/avatar-${id}.png`});
       item.ok=true;
