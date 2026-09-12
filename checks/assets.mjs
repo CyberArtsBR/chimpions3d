@@ -26,12 +26,14 @@ function triangles(json){
 }
 
 function assetInfo(name,bytes,json){
+  const jointIndexes=[...new Set((json.skins||[]).flatMap(s=>s.joints||[]))];
   return {
     name,bytes,
     extensionsUsed:json.extensionsUsed||[],
     extensionsRequired:json.extensionsRequired||[],
     skins:(json.skins||[]).length,
     joints:(json.skins||[]).reduce((n,s)=>n+(s.joints?.length||0),0),
+    jointNames:jointIndexes.map(i=>json.nodes?.[i]?.name||`node#${i}`),
     skinnedNodes:(json.nodes||[]).filter(n=>n.mesh!==undefined&&n.skin!==undefined).length,
     triangles:triangles(json),nodes:(json.nodes||[]).length,meshes:(json.meshes||[]).length,
     materials:(json.materials||[]).length,textures:(json.textures||[]).length,
