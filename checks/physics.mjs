@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,VINE_INSET,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,ITEM_SCALE,VINE_INSET,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
 for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
@@ -32,8 +32,8 @@ const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);a
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
-const idle=new Game(9);for(let i=0;i<600;i++)idle.step(0);assert(idle.height<10);
-assert.equal(paceAt(0),1.04);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
+const idle=new Game(9);for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert.equal(idle.height,idleHeight,'Wider early branches may help, but standing still cannot climb indefinitely');
+assert.equal(paceAt(0),.92);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 assert(platformPhaseAt(180.001)-platformPhaseAt(180)<.002,'Moving phase stays continuous at speed cap');
 const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20&&p.route==='safe')){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
 assert(rates[0]>.30&&rates[0]<.40);assert(rates[1]>.49&&rates[1]<.61);
@@ -50,8 +50,30 @@ const layout=new Game(812);layout.camera=260;layout.generate();
 const optional=layout.platforms.filter(p=>p.route==='optional');
 assert(optional.length>8,'Wider arena should generate more optional platforms');
 assert(optional.some(p=>Math.abs(p.baseX)>5.4),'Some choices must sit near the edges');
-assert(optional.some(p=>p.width<1.3),'Some optional platforms must be small');
+assert(optional.some(p=>p.width<1.3*PLATFORM_SCALE),'Some optional platforms must be small');
 const motion=new Set(layout.platforms.filter(p=>p.type==='moving').map(p=>p.moveSpeed));
 assert(motion.has(.62)&&motion.has(1)&&motion.has(1.48),'Moving platforms need slow, medium and fast tiers');
 console.log('PASS wider multi-platform layout, edge choices, small platforms and three motion speeds');
 
+assert(Math.abs(JUMP**2/12.6**2-1.3)<1e-10,'Normal jump apex is exactly 30% higher');
+assert(Math.abs(SPRING_JUMP**2/28**2-1.3)<1e-10,'Spring apex is also 30% higher');
+assert.equal(new Game(1).platforms[0].width,2.8*1.5,'Landing width must match larger visual');
+assert.equal(ITEM_SCALE,1.5);
+for(const [baseWidth,value] of [[1.1,2],[2.45,1]]){
+ const g=new Game(5);g.platforms=[];g.nextY=100;
+ g.add(0,0,baseWidth,'solid',true);g.y=.4;g.vy=0;
+ assert.equal(g.platforms[0].reward,value);
+ const events=g.step(0);assert.equal(g.bananas,value);
+ assert.equal(events.find(e=>e.type==='coin').value,value);
+ g.step(0);assert.equal(g.bananas,value,'A banana is only collected once');
+}
+let densityCount=0;
+for(let seed=0;seed<300;seed++){
+ const g=new Game(seed);g.camera=210;g.generate();
+ densityCount+=g.platforms.filter(p=>p.y>=20&&p.y<200).length;
+ for(const p of g.platforms)assert(Math.abs(p.baseX)+p.width/2+(p.type==='moving'?p.moveRange:0)<=WIDTH/2,'Full platform travel stays inside vines');
+}
+// Previous generator: 24,638 platforms over these same 300 seeds and altitude band.
+const densityIncrease=densityCount/24638-1;
+assert(densityIncrease>=.58&&densityIncrease<=.63,'Target 60% more visible platforms: '+densityIncrease);
+console.log('PASS 30% higher arcs, 50% larger dimensions, one-shot double rewards, density +'+(densityIncrease*100).toFixed(1)+'%');

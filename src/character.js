@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {JUMP} from './physics.js';
 import {validateGLB} from './upload.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 // MANUAL BONE MAPPING: exact GLB bone names; null means automatic detection.
@@ -32,7 +33,7 @@ export async function loadCharacter(url, overrides = {}) {
   const rig = {}, rest = new Map(), bases = new Map(), axes = new Map();
   const X = new THREE.Vector3(1,0,0), Y = new THREE.Vector3(0,1,0), Z = new THREE.Vector3(0,0,1);
   const q = new THREE.Quaternion(), delta = new THREE.Quaternion();
-  let state='IDLE', phase=0, jumpStage='', stageTime=0, bodyOffset=0, armLift=0, launchVelocity=12.6;
+  let state='IDLE', phase=0, jumpStage='', stageTime=0, bodyOffset=0, armLift=0, launchVelocity=JUMP;
 
   const aliases = {
   hips: ['hips', 'hip', 'pelvis'], spine: ['spine', 'spine0', 'spine1', 'spine01'],
@@ -222,7 +223,7 @@ function applyPose({ pose, offset }, alpha) {
     update(dt,time,velocity,bounceAge,active) {
       state=active?'JUMP':'IDLE';
       jumpStage=active?(bounceAge<0.09?'TAKEOFF':velocity>3?'TAKEOFF':'AIRBORNE'):'';
-      if(active&&bounceAge<.04&&velocity>0)launchVelocity=Math.max(12.6,velocity);
+      if(active&&bounceAge<.04&&velocity>0)launchVelocity=Math.max(JUMP,velocity);
       const targetLift=active?(velocity>=0?1-Math.min(1,velocity/launchVelocity):Math.max(0,1+velocity/launchVelocity)):0;
       armLift=THREE.MathUtils.damp(armLift,targetLift,active?9:14,dt);
       stageTime=bounceAge; phase+=dt*7;
@@ -245,4 +246,3 @@ export function disposeCharacter(a){
  textures.forEach(t=>{t.dispose();t.source?.data?.close?.();});
  skeletons.forEach(s=>s.dispose());
 }
-

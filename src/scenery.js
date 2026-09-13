@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WIDTH} from './physics.js';
+import {WIDTH, PLATFORM_SCALE, ITEM_SCALE} from './physics.js';
 
 // All scenery is generated locally. Shared geometry, instanced leaves and small
 // reusable textures keep the forest independent of downloaded art packs.
@@ -37,9 +37,28 @@ const leafTexture=canvasTexture(128,256,(c)=>{
  c.strokeStyle='#e0e6a766';c.lineWidth=2;c.beginPath();c.moveTo(64,12);c.lineTo(64,246);c.stroke();
  for(let y=45;y<220;y+=22){c.beginPath();c.moveTo(64,y+18);c.lineTo(20,y-12);c.moveTo(64,y+18);c.lineTo(108,y-12);c.stroke();}
 });
-const endTexture=canvasTexture(256,256,(c)=>{
- c.fillStyle='#c19b6b';c.fillRect(0,0,256,256);
- for(let i=8;i<130;i+=6){c.strokeStyle=i%4?'#684c3470':'#ecd2a277';c.lineWidth=1.5;c.beginPath();c.ellipse(126,129,i,i*.95,0,0,Math.PI*2);c.stroke();}
+const endTexture=canvasTexture(512,512,(c,w,h)=>{
+ const r=rng(118),grain=c.createRadialGradient(244,264,8,256,256,260);
+ grain.addColorStop(0,'#e5c18b');grain.addColorStop(.75,'#b88852');grain.addColorStop(1,'#715031');c.fillStyle=grain;c.fillRect(0,0,w,h);
+ for(let radius=12;radius<270;radius+=6+r()*5){
+  c.strokeStyle=radius%3>1?'#65422c65':'#f5d8a76b';c.lineWidth=1+r()*2;c.beginPath();
+  for(let i=0;i<=128;i++){const a=i/128*Math.PI*2,rr=radius+Math.sin(a*5+radius)*2.3;const x=244+Math.cos(a)*rr,y=264+Math.sin(a)*rr*.96;i?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();
+ }
+ c.strokeStyle='#4a302585';c.lineWidth=2;
+ for(let i=0;i<7;i++){const a=r()*Math.PI*2;c.beginPath();for(let j=0;j<5;j++){const radius=170+j*22,x=244+Math.cos(a+j*.013)*radius,y=264+Math.sin(a+j*.013)*radius;j?c.lineTo(x,y):c.moveTo(x,y);}c.stroke();}
+});
+const bananaTexture=canvasTexture(512,128,(c,w,h)=>{
+ const r=rng(423),g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#b58a10');g.addColorStop(.24,'#ffd22c');g.addColorStop(.5,'#fff39a');g.addColorStop(.8,'#efb515');g.addColorStop(1,'#b98507');
+ c.fillStyle=g;c.fillRect(0,0,w,h);
+ for(let i=0;i<110;i++){c.fillStyle='#825222';c.globalAlpha=.05+r()*.14;c.fillRect(r()*w,r()*h,1+r()*2,1+r()*2);}c.globalAlpha=1;
+ for(const y of [21,60,103]){c.strokeStyle='#fff1a14a';c.lineWidth=2;c.beginPath();c.moveTo(0,y);c.lineTo(w,y+3);c.stroke();}
+});
+const mushroomTexture=canvasTexture(512,256,(c,w,h)=>{
+ const r=rng(205),g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#f47746');g.addColorStop(.6,'#d44329');g.addColorStop(1,'#8e231d');c.fillStyle=g;c.fillRect(0,0,w,h);
+ for(let i=0;i<23;i++){const x=r()*w,y=25+r()*(h-60),radius=5+r()*11;c.fillStyle='#6b281f44';c.beginPath();c.ellipse(x,y+3,radius*1.13,radius*.82,0,0,7);c.fill();c.fillStyle=i%3?'#ffe9bb':'#fff6d9';c.beginPath();c.ellipse(x,y,radius,radius*.8,r()*.4,0,7);c.fill();}
+});
+const gillTexture=canvasTexture(256,256,(c)=>{
+ c.fillStyle='#e0cfa6';c.fillRect(0,0,256,256);for(let i=0;i<96;i++){const a=i/96*Math.PI*2;c.strokeStyle=i%2?'#9b76594d':'#fff8d391';c.lineWidth=1;c.beginPath();c.moveTo(128+Math.cos(a)*25,128+Math.sin(a)*25);c.lineTo(128+Math.cos(a)*128,128+Math.sin(a)*128);c.stroke();}
 });
 function forestTexture(seed){
  return canvasTexture(1024,1536,(c,w,h)=>{
@@ -58,14 +77,21 @@ function forestTexture(seed){
   c.clearRect(0,0,w,h);c.filter='blur(5px)';c.drawImage(soft,0,0);c.filter='none';
  });
 }
-const logGeo=new THREE.CylinderGeometry(.19,.24,1,18,3);
+const logGeo=new THREE.CylinderGeometry(.19,.24,1,24,8);
+// Shared carved silhouette catches directional light even on the fallback logs.
+const logPositions=logGeo.attributes.position;
+for(let i=0;i<logPositions.count;i++){
+ const x=logPositions.getX(i),y=logPositions.getY(i),z=logPositions.getZ(i),angle=Math.atan2(z,x);
+ const relief=1+.055*Math.sin(angle*7+y*9)+.027*Math.sin(angle*13-y*14);
+ logPositions.setX(i,x*relief);logPositions.setZ(i,z*relief);
+}logGeo.computeVertexNormals();
 const capGeo=new THREE.CircleGeometry(.2,24);
 const mossGeo=new THREE.SphereGeometry(1,16,8);
 const leafGeo=new THREE.PlaneGeometry(1,2);
-const mushroomGeo=new THREE.SphereGeometry(1,18,10,0,Math.PI*2,0,Math.PI/2);
+const mushroomGeo=new THREE.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI/2);
 const stemGeo=new THREE.CylinderGeometry(.1,.14,.26,10);
 const bananaPath=new THREE.QuadraticBezierCurve3(new THREE.Vector3(-.22,0,0),new THREE.Vector3(0,-.38,0),new THREE.Vector3(.23,.07,0));
-const bananaGeo=new THREE.TubeGeometry(bananaPath,14,.068,7,false);
+const bananaGeo=new THREE.TubeGeometry(bananaPath,22,.068,10,false);
 const tipGeo=new THREE.SphereGeometry(.06,7,5);
 const knotGeo=new THREE.TorusGeometry(.09,.027,6,16);
 const dummy=new THREE.Object3D();
@@ -73,11 +99,12 @@ export function createScenery(scene,renderer){
  const bark=new THREE.MeshStandardMaterial({color:0xa7977d,map:barkTexture,bumpMap:barkTexture,bumpScale:.09,roughness:.97});
  const moss=new THREE.MeshStandardMaterial({color:0xabc788,map:mossTexture,bumpMap:mossTexture,bumpScale:.05,roughness:.94});
  const leaf=new THREE.MeshStandardMaterial({map:leafTexture,alphaTest:.35,side:THREE.DoubleSide,roughness:.88});
- const end=new THREE.MeshStandardMaterial({map:endTexture,roughness:1});
+ const end=new THREE.MeshStandardMaterial({map:endTexture,bumpMap:endTexture,bumpScale:.025,roughness:.84});
  const dark=new THREE.MeshStandardMaterial({color:0x3f3023,roughness:1});
- const gold=new THREE.MeshStandardMaterial({color:0xffd04a,roughness:.4,metalness:.05,emissive:0x4c3102,emissiveIntensity:.25});
- const red=new THREE.MeshStandardMaterial({color:0xc75635,roughness:.55});
- const cream=new THREE.MeshStandardMaterial({color:0xe6d6ac,roughness:.85});
+ const gold=new THREE.MeshStandardMaterial({color:0xffffff,map:bananaTexture,roughness:.33,metalness:.02,emissive:0x5f3800,emissiveIntensity:.18});
+ const red=new THREE.MeshStandardMaterial({color:0xffffff,map:mushroomTexture,bumpMap:mushroomTexture,bumpScale:.016,roughness:.38});
+ const cream=new THREE.MeshStandardMaterial({color:0xf2e4bf,roughness:.68});
+ const gills=new THREE.MeshStandardMaterial({map:gillTexture,bumpMap:gillTexture,bumpScale:.035,roughness:.86,side:THREE.DoubleSide});
  const blue=new THREE.MeshStandardMaterial({color:0x55c4d0,emissive:0x17666f,emissiveIntensity:.35,roughness:.5});
  // Screen-edge collision vines are true lit 3D geometry, with braided stems and leaves.
  const edgeVines=new THREE.Group();scene.add(edgeVines);
@@ -99,9 +126,13 @@ export function createScenery(scene,renderer){
  function attachPlatform(group){
   if(!platformTemplate||group.getObjectByName('authored-branch'))return;
   const model=platformTemplate.clone(true),authored=new THREE.Group();authored.name='authored-branch';
-  model.scale.x*=group.userData.platformWidth;authored.add(model);authored.visible=highQuality;group.add(authored);
+  model.scale.x*=group.userData.platformWidth;model.scale.y*=PLATFORM_SCALE;model.scale.z*=PLATFORM_SCALE;authored.add(model);authored.visible=highQuality;group.add(authored);
   // Uploaded wood has no moss: keep a low, readable landing cushion.
-  const cushion=mesh(mossGeo,moss,authored,0,-.045,0);cushion.scale.set(group.userData.platformWidth*.48,.045,.28);cushion.receiveShadow=true;
+  const cushion=mesh(mossGeo,moss,authored,0,-.045*PLATFORM_SCALE,0);cushion.scale.set(group.userData.platformWidth*.48,.045*PLATFORM_SCALE,.28*PLATFORM_SCALE);cushion.receiveShadow=true;
+  // Small instanced clumps break up the authored branch silhouette without extra materials.
+  const width=group.userData.platformWidth;
+  instances(mossGeo,moss,authored,9,(i,o)=>{o.position.set((i/8-.5)*width*.88,-.05*PLATFORM_SCALE,Math.sin(i*3)*.16*PLATFORM_SCALE);o.scale.set(.16*PLATFORM_SCALE,.05*PLATFORM_SCALE,.13*PLATFORM_SCALE);});
+  instances(leafGeo,leaf,authored,10,(i,o)=>{o.position.set((i/9-.5)*width*.92,-.14*PLATFORM_SCALE,.22*PLATFORM_SCALE);o.scale.set(.10*PLATFORM_SCALE,.16*PLATFORM_SCALE,1);o.rotation.set(.18,Math.sin(i)*.3,Math.sin(i*4)*.8);});
   group.getObjectByName('procedural-branch').visible=!highQuality;
  }
  function loadPlatform(){
@@ -118,7 +149,14 @@ export function createScenery(scene,renderer){
    model.position.x-=(box.min.x+box.max.x)/2;
    model.position.z-=(box.min.z+box.max.z)/2;
    model.position.y-=box.max.y-(platformConfig.landingInset||0)*size.y;
-   model.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;}});
+   model.traverse(o=>{if(o.isMesh){
+    o.castShadow=o.receiveShadow=true;
+    for(const material of (Array.isArray(o.material)?o.material:[o.material])){
+     if(material?.isMeshStandardMaterial&&!material.map&&!material.vertexColors&&o.geometry.attributes.uv){
+      material.map=barkTexture;material.bumpMap=barkTexture;material.bumpScale=.045;material.roughness=.9;material.metalness=0;material.needsUpdate=true;
+     }
+    }
+   }});
    platformTemplate=normalizer;
    const groups=[];scene.traverse(o=>{if(o.userData.platformWidth)groups.push(o);});groups.forEach(attachPlatform);
   },undefined,error=>console.warn('Branch GLB unavailable; procedural branches remain.',error.message));
@@ -193,39 +231,48 @@ export function createScenery(scene,renderer){
  const ring=new THREE.Mesh(new THREE.RingGeometry(.35,.4,28),new THREE.MeshBasicMaterial({color:0xd7eca6,transparent:true,opacity:0,depthWrite:false}));
  scene.add(ring);let ringAge=1;
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
+ function instances(geometry,material,parent,count,place){
+  const batch=new THREE.InstancedMesh(geometry,material,count);parent.add(batch);
+  for(let i=0;i<count;i++){dummy.position.set(0,0,0);dummy.rotation.set(0,0,0);dummy.scale.set(1,1,1);place(i,dummy);dummy.updateMatrix();batch.setMatrixAt(i,dummy.matrix);}
+  batch.castShadow=batch.receiveShadow=true;return batch;
+ }
  function branch(p){
   const group=new THREE.Group();group.userData.platformWidth=p.width;
-  const fallback=new THREE.Group();fallback.name='procedural-branch';group.add(fallback);
+  const fallback=new THREE.Group();fallback.name='procedural-branch';fallback.scale.set(1,PLATFORM_SCALE,PLATFORM_SCALE);group.add(fallback);
+  // Physics already enlarged width; scale only thickness and depth here.
   const wood=mesh(logGeo,bark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
   for(const side of [-1,1]){
    const cut=mesh(capGeo,end,fallback,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
    const twig=mesh(logGeo,bark,fallback,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
-  const top=mesh(mossGeo,moss,fallback,0,-.075);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
+  const top=mesh(mossGeo,moss,fallback,0,-.085);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
   const detail=new THREE.Group();fallback.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
-  for(let i=0;i<5;i++){
-   const x=(i/4-.5)*p.width*.85;
-   const knot=mesh(knotGeo,dark,detail,x,-.27,.205);knot.scale.set(.6+i%2*.25,.5,1);
-   const tuft=mesh(mossGeo,moss,detail,x,-.035,-.04);tuft.scale.set(.12,.055,.19);
-   const fern=mesh(leafGeo,leaf,detail,x,-.31,.05);fern.scale.set(.11,.22,1);fern.rotation.z=(i%2?1:-1)*.6;
-  }
-  const foliage=new THREE.InstancedMesh(leafGeo,leaf,14);fallback.add(foliage);
-  for(let i=0;i<14;i++){
-   dummy.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);
-   dummy.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);
-   dummy.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);
-  }
-  if(p.type==='moving')for(const x of [-.32,0,.32]){const marker=mesh(knotGeo,blue,group,x,-.23,.38);marker.scale.set(.6,1,1);}
-  if(p.type==='cracked')for(let i=0;i<3;i++){const split=mesh(logGeo,dark,group,(i-1)*.13,-.19,.38);split.scale.set(.07,.38,.07);split.rotation.z=(i%2?-.5:.5);}
+  instances(knotGeo,dark,detail,5,(i,o)=>{o.position.set((i/4-.5)*p.width*.85,-.27,.205);o.scale.set(.6+i%2*.25,.5,1);});
+  instances(mossGeo,moss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
+  instances(leafGeo,leaf,detail,7,(i,o)=>{o.position.set((i/6-.5)*p.width*.85,-.31,.05);o.scale.set(.11,.22,1);o.rotation.z=(i%2?1:-1)*.6;});
+  instances(leafGeo,leaf,fallback,14,(i,o)=>{
+   o.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);o.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);o.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);
+  });
+  if(p.type==='moving')instances(knotGeo,blue,group,3,(i,o)=>{o.position.set((i-1)*.32*PLATFORM_SCALE,-.23*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.6*PLATFORM_SCALE,PLATFORM_SCALE,PLATFORM_SCALE);});
+  if(p.type==='cracked')instances(logGeo,dark,group,3,(i,o)=>{o.position.set((i-1)*.13*PLATFORM_SCALE,-.19*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.07*PLATFORM_SCALE,.38*PLATFORM_SCALE,.07*PLATFORM_SCALE);o.rotation.z=(i%2?-.5:.5);});
   if(p.type==='spring'){
-   mesh(stemGeo,cream,group,0,.08);const cap=mesh(mushroomGeo,red,group,0,.17);cap.scale.set(.4,.2,.32);
-   for(const x of [-.16,.12]){const spot=mesh(mossGeo,cream,group,x,.27,.17);spot.scale.set(.045,.025,.02);}
+   const mushroom=new THREE.Group();mushroom.scale.setScalar(ITEM_SCALE);group.add(mushroom);
+   const stem=mesh(stemGeo,cream,mushroom,0,.12);stem.castShadow=true;
+   const under=mesh(capGeo,gills,mushroom,0,.25);under.rotation.x=-Math.PI/2;under.scale.set(2,1.6,1);
+   const cap=mesh(mushroomGeo,red,mushroom,0,.25);cap.scale.set(.42,.23,.34);cap.castShadow=cap.receiveShadow=true;
+   const collar=mesh(knotGeo,cream,mushroom,0,.14);collar.rotation.x=Math.PI/2;collar.scale.set(1.1,1.1,1);
   }
-  const coin=new THREE.Group();coin.position.set(0,1,.18);group.add(coin);
-  for(let i=0;i<3;i++){
-   const fruit=mesh(bananaGeo,gold,coin,(i-1)*.075,Math.abs(i-1)*.035,i*.05);fruit.rotation.z=(i-1)*.18;
+  const coin=new THREE.Group();coin.position.set(0,1,.18);coin.scale.setScalar(ITEM_SCALE);group.add(coin);
+  const bunches=p.reward===2?2:1,fruitCount=bunches*3;
+  // Two complete bunches communicate the double reward; one shared draw per material.
+  function fruitPosition(i,o){
+   const fruit=i%3,bunch=Math.floor(i/3);o.position.set((bunch-(bunches-1)/2)*.56+(fruit-1)*.07,Math.abs(fruit-1)*.035,fruit*.05);o.rotation.z=(fruit-1)*.16;
   }
-  mesh(tipGeo,dark,coin,.23,.07,.06);
+  instances(bananaGeo,gold,coin,fruitCount,fruitPosition);
+  const endpoint=new THREE.Vector3();
+  instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{
+   const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);
+  });
   group.userData.coin=coin;attachPlatform(group);return group;
  }
  return {branch,
@@ -265,4 +312,3 @@ export function createScenery(scene,renderer){
   }
  };
 }
-
