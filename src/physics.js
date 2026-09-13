@@ -3,14 +3,14 @@ export const PLATFORM_SCALE=1.5*.75*.75, ITEM_SCALE=1.5;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=5, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const paceAt=time=>.92+2.08*Math.min(Math.max(time,0)/300,1);
-const PLATFORM_TRAVEL=1.1, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
+const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
 const basePlatformPhase=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
 export const platformPhaseAt=time=>{
   // Integrate each level separately so a speed increase never teleports a branch.
-  // Travel doubled: frequency * 1.75/2 gives the requested 75% linear speed gain.
+  // The extra 1.2 multiplier raises the previous movement speed by 20%.
   const t=Math.max(0,time),level=Math.floor(t/30);let phase=0;
   for(let i=0;i<level;i++)phase+=(basePlatformPhase((i+1)*30)-basePlatformPhase(i*30))*1.2**i;
-  return (phase+(basePlatformPhase(t)-basePlatformPhase(level*30))*1.2**level)*.875;
+  return (phase+(basePlatformPhase(t)-basePlatformPhase(level*30))*1.2**level)*1.05;
 };
 export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange??PLATFORM_TRAVEL);
 export class Game {
@@ -62,7 +62,9 @@ export class Game {
         type=roll<.35+Math.min(this.time/180,1)*.2?'moving':roll<.7?'solid':roll<.88?'cracked':'spring';
       }
       this.add(this.nextX,this.nextY,width,type,true,'safe');
-      const extras=this.random()<.5?1:0;
+      // Previous rows averaged 1.5 platforms. Aim for 2.7 (+80%) while
+      // allowing the swept-envelope check to reject unsafe optional branches.
+      const extras=1+(this.random()<.7?1:0);
       for(let i=0;i<extras;i++){
         const optionalType=this.nextY>12&&this.random()<.48?'moving':this.random()<.25?'cracked':'solid';
         const optionalWidth=.95+this.random()*1.05;

@@ -70,10 +70,10 @@ assert(optional.some(p=>p.width<1.3*PLATFORM_SCALE),'Some optional platforms mus
 const sizes=new Game(3);sizes.platforms=[];
 for(const [i,width] of [1.1,1.7,2.45].entries())sizes.add(0,i*4,width,'moving');
 assert(sizes.platforms[0].moveSpeed<sizes.platforms[1].moveSpeed&&sizes.platforms[1].moveSpeed<sizes.platforms[2].moveSpeed,'Larger platforms move faster');
-for(const p of sizes.platforms)assert.equal(p.moveRange,1.1,'Lateral travel doubled');
-const initialSpeed=(platformPhaseAt(.000001)/.000001)*sizes.platforms[0].moveSpeed*1.1;
+for(const p of sizes.platforms)assert.equal(p.moveRange,1.65,'Lateral travel increased to 1.65 units');
+const initialSpeed=(platformPhaseAt(.000001)/.000001)*sizes.platforms[0].moveSpeed*1.65;
 const oldSpeed=1.1*sizes.platforms[0].moveSpeed*.55;
-assert(Math.abs(initialSpeed/oldSpeed-1.75)<.000001,'Peak lateral speed increases exactly 75%');
+assert(Math.abs(initialSpeed/oldSpeed-3.15)<.000001,'Peak lateral speed includes the added 20% and longer travel');
 console.log('PASS wider multi-platform layout, edge choices, small platforms and three motion speeds');
 
 assert(Math.abs(JUMP**2/12.6**2-1.3)<1e-10,'Normal jump apex is exactly 30% higher');

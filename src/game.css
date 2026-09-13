@@ -72,6 +72,11 @@ body[data-mode=menu] #choose:hover,body[data-mode=menu] #upload:hover,body[data-
 body[data-mode=menu] #flip{position:absolute;left:34%;top:89%;width:32%;font-size:1.5cqw;background:#1c251ba8;color:#e4dbc6;border:1px solid #d6c48d55;border-radius:20px;padding:5px;margin:0}
 body[data-mode=menu] .keys{position:absolute;left:23%;top:75.5%;width:54%;height:5.2%;margin:0;gap:1.2cqw;font-size:1.75cqw;color:#fff4e1;flex-wrap:nowrap;text-shadow:0 1px 3px #170d04}
 body[data-mode=menu] .keys b{font-size:2.2cqw;padding:.65cqw 1.2cqw;background:linear-gradient(#566361,#283230);border:1px solid #d4ded180;box-shadow:0 2px 3px #0009;color:#fff;flex-shrink:0}
+body[data-mode=menu] .gamepad-callout{position:absolute;left:29%;top:88.2%;width:42%;display:flex;align-items:center;justify-content:center;gap:1.2cqw;color:#fff5d8;font-size:1.75cqw;font-weight:850;letter-spacing:.04cqw;text-shadow:0 2px 3px #160d06;filter:drop-shadow(0 3px 4px #170d07aa)}
+body[data-mode=menu] .gamepad-callout svg{width:5.8cqw;height:auto;overflow:visible;fill:#e0b766;stroke:#3a2412;stroke-width:3;stroke-linejoin:round}
+body[data-mode=menu] .gamepad-callout .pad-detail{fill:none;stroke:#fff2c2;stroke-width:4;stroke-linecap:round}
+body:not([data-mode=menu]) .gamepad-callout{display:none}
+body[data-mode=menu] #flip{top:94%}
 .card button:focus-visible,.card a:focus-visible{outline:3px solid #fff7c2;outline-offset:3px}
 #collection-dialog{width:min(740px,94vw);max-height:88dvh;padding:22px;background:linear-gradient(145deg,#254231,#0c241c);border:1px solid #bba477;border-radius:22px;color:#fff4d6;box-shadow:0 20px 100px #0009}
 #collection-dialog::backdrop{background:#081710c9;backdrop-filter:blur(7px)}
