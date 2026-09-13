@@ -2,7 +2,7 @@ export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_H
 export const PLATFORM_SCALE=1.5, ITEM_SCALE=1.5;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=5, JET_SPEED=24;
 export const VINE_INSET=.24;
-export const paceAt=time=>.92+2.08*Math.min(Math.max(time,0)/150,1);
+export const paceAt=time=>.92+2.08*Math.min(Math.max(time,0)/300,1);
 export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
 export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange||.48);
 export class Game {
@@ -41,7 +41,7 @@ export class Game {
       }
       this.add(this.nextX,this.nextY,width,type,true,'safe');
       const row=[this.platforms.at(-1)];
-      const extras=2;
+      const extras=this.random()<.5?1:0;
       for(let i=0;i<extras;i++){
         const optionalType=this.nextY>12&&this.random()<.48?'moving':this.random()<.25?'cracked':'solid';
         const optionalWidth=.95+this.random()*1.05;

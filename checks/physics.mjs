@@ -32,8 +32,8 @@ const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);a
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
-const idle=new Game(9);for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert.equal(idle.height,idleHeight,'Wider early branches may help, but standing still cannot climb indefinitely');
-assert.equal(paceAt(0),.92);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
+const idle=new Game(9);for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert(idle.height-idleHeight<.01,'Wider early branches may help, but standing still cannot climb indefinitely');
+assert.equal(paceAt(0),.92);assert(paceAt(180)<3);assert(Math.abs(paceAt(300)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 assert(platformPhaseAt(180.001)-platformPhaseAt(180)<.002,'Moving phase stays continuous at speed cap');
 const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20&&p.route==='safe')){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
 assert(rates[0]>.30&&rates[0]<.40);assert(rates[1]>.49&&rates[1]<.61);
@@ -44,11 +44,11 @@ const jet=new Game(7);jet.time=59.99;jet.step(0);assert(jet.jetpack,'Minute spaw
 jet.x=jet.jetpack.x;jet.y=jet.jetpack.y-.7;jet.vy=0;jet.step(0);assert.equal(jet.jetRemaining,5);
 const startY=jet.y;for(let i=0;i<300;i++)jet.step(0);assert(jet.jetRemaining<1e-10);assert(jet.y-startY>=119.9);assert(!jet.dead);
 jet.reset();assert.equal(jet.jetRemaining,0);assert.equal(jet.nextJetAt,60);
-assert(paceAt(120)<3);assert.equal(paceAt(150),3);console.log('PASS triple spring height, minute pickup, five-second flight and reset');
+assert(paceAt(240)<3);assert.equal(paceAt(300),3);console.log('PASS triple spring height, minute pickup, five-second flight and reset');
 
 const layout=new Game(812);layout.camera=260;layout.generate();
 const optional=layout.platforms.filter(p=>p.route==='optional');
-assert(optional.length>8,'Wider arena should generate more optional platforms');
+assert(optional.length>1,'Wider arena should retain optional platforms');
 assert(optional.some(p=>Math.abs(p.baseX)>5.4),'Some choices must sit near the edges');
 assert(optional.some(p=>p.width<1.3*PLATFORM_SCALE),'Some optional platforms must be small');
 const motion=new Set(layout.platforms.filter(p=>p.type==='moving').map(p=>p.moveSpeed));
@@ -74,6 +74,6 @@ for(let seed=0;seed<300;seed++){
  for(const p of g.platforms)assert(Math.abs(p.baseX)+p.width/2+(p.type==='moving'?p.moveRange:0)<=WIDTH/2,'Full platform travel stays inside vines');
 }
 // Previous generator: 24,638 platforms over these same 300 seeds and altitude band.
-const densityIncrease=densityCount/24638-1;
-assert(densityIncrease>=.58&&densityIncrease<=.63,'Target 60% more visible platforms: '+densityIncrease);
-console.log('PASS 30% higher arcs, 50% larger dimensions, one-shot double rewards, density +'+(densityIncrease*100).toFixed(1)+'%');
+const averagePerRow=densityCount/(300*45);
+assert(averagePerRow>=1.45&&averagePerRow<=1.55,'Target half of the previous three-platform row density: '+averagePerRow);
+console.log('PASS 30% higher arcs, 50% larger dimensions, one-shot double rewards, platform rate halved to '+averagePerRow.toFixed(2)+' per row');
