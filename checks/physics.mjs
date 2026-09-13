@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
 for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
@@ -9,7 +9,7 @@ for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
   assert(dy>=3.84&&dy<=4.06,'Rows must remain widely spaced');
   assert(Math.abs(p.baseX-prev.baseX)>=1.64,'Avoid stacked branches');
   const test=new Game(seed);test.platforms=[{...p}];test.nextY=1000;
-  test.time=age;test.y=prev.y;test.x=prev.x;test.vy=JUMP;test.height=prev.y;test.camera=Math.max(5,prev.y-.8);
+  test.nextJetAt=Infinity;test.time=age;test.y=prev.y;test.x=prev.x;test.vy=JUMP;test.height=prev.y;test.camera=Math.max(5,prev.y-.8);
   for(let tick=0;tick<100&&!test.bounces&&!test.dead;tick++){
    const target=p.type==='moving'?movingX(p,test.time+STEP):p.baseX;
    const distance=target-test.x-test.vx*Math.abs(test.vx)/48;
@@ -28,12 +28,19 @@ landing.y=-.1;landing.vy=10;landing.step(0);assert(landing.vy<10&&landing.vy>0,'
 const wrap=new Game(2);wrap.x=WIDTH/2-.01;wrap.vx=4.4;wrap.step(1);assert(wrap.x< -WIDTH/2+.1);assert(wrap.vx>0);
 const a=new Game(44),b=new Game(44);for(let i=0;i<300;i++){a.step(i%80<40?1:-1);b.step(i%80<40?1:-1);}assert.deepEqual(a,b);
 const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);assert(!fall.dead&&fall.time===0);
-const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,15.5);
+const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
 const idle=new Game(9);for(let i=0;i<600;i++)idle.step(0);assert(idle.height<10);
-assert.equal(paceAt(0),1.16);assert(Math.abs(paceAt(180)-1.36)<1e-10);assert(Math.abs(paceAt(10000)-1.36)<1e-10);
+assert.equal(paceAt(0),1.16);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 assert(platformPhaseAt(180.001)-platformPhaseAt(180)<.002,'Moving phase stays continuous at speed cap');
 const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20)){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
 assert(rates[0]>.30&&rates[0]<.40);assert(rates[1]>.49&&rates[1]<.61);
 console.log('PASS physics: '+pairs+' generated transfers, larger gaps, near-apex arcs, wrap, landing, spring, fragile branches, retry');
+
+assert(SPRING_JUMP**2/15.5**2>=3,'Spring height at least triples');
+const jet=new Game(7);jet.time=59.99;jet.step(0);assert(jet.jetpack,'Minute spawns a jetpack');
+jet.x=jet.jetpack.x;jet.y=jet.jetpack.y-.7;jet.vy=0;jet.step(0);assert.equal(jet.jetRemaining,5);
+const startY=jet.y;for(let i=0;i<300;i++)jet.step(0);assert(jet.jetRemaining<1e-10);assert(jet.y-startY>=119.9);assert(!jet.dead);
+jet.reset();assert.equal(jet.jetRemaining,0);assert.equal(jet.nextJetAt,60);
+assert.equal(paceAt(120),3);console.log('PASS triple spring height, minute pickup, five-second flight and reset');

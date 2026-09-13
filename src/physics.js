@@ -1,5 +1,6 @@
 export const WIDTH=11.2, GRAVITY=18, JUMP=12.6, SPEED=5.8, VIEW_HEIGHT=13.76, STEP=1/60;
-export const paceAt=time=>1.16+.20*Math.min(Math.max(time,0)/180,1);
+export const SPRING_JUMP=28, JET_DURATION=5, JET_SPEED=24;
+export const paceAt=time=>1.16+1.84*Math.min(Math.max(time,0)/120,1);
 export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
 export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)+(platform.phase||0))*.48;
 export class Game {
@@ -7,6 +8,7 @@ export class Game {
   reset(seed=1){
     this.seed=seed>>>0;this.x=0;this.y=0;this.vx=0;this.vy=JUMP;
     this.time=0;this.height=0;this.camera=5;this.previousCamera=5;
+    this.jetpack=null;this.jetRemaining=0;this.nextJetAt=60;
     this.bounceAge=0;this.bounces=0;this.bananas=0;this.dead=false;
     this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;
     this.add(0,0,2.8,'solid',false);this.generate();
@@ -33,7 +35,7 @@ export class Game {
   }
   step(input,dt=STEP){
     if(this.dead)return [];
-    const events=[];this.time+=dt;
+    const events=[];const realDt=dt;this.time+=dt;
     // Active play time stays real: theme changes remain every 30 seconds.
     dt*=paceAt(this.time);this.bounceAge+=dt;
     this.previousCamera=this.camera;
@@ -42,7 +44,20 @@ export class Game {
     const oldX=this.x, oldY=this.y;
     const travel=this.vx*dt;
     this.x=((oldX+travel+WIDTH/2)%WIDTH+WIDTH)%WIDTH-WIDTH/2;
-    this.vy-=GRAVITY*dt;this.y+=this.vy*dt;
+    if(this.jetRemaining>0){
+      const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
+      if(this.jetRemaining===0){this.vy=JUMP;events.push({type:'jet-end'});}
+    }else{this.y+=this.vy*dt-.5*GRAVITY*dt*dt;this.vy-=GRAVITY*dt;}
+    if(this.time>=this.nextJetAt){
+      this.nextJetAt=(Math.floor(this.time/60)+1)*60;
+      const target=this.platforms.find(p=>!p.broken&&p.y>this.y+1.5);
+      if(target){const side=target.baseX>=0?1:-1;this.jetpack={x:Math.max(-WIDTH/2+.4,Math.min(WIDTH/2-.4,target.baseX+side*(target.width/2+.35))),y:target.y+1.4,expires:this.time+20};events.push({type:'jet-spawn'});}
+    }
+    if(this.jetpack){
+      const j=this.jetpack;const dx=Math.abs(((this.x-j.x+WIDTH*1.5)%WIDTH+WIDTH)%WIDTH-WIDTH/2);
+      if(dx<.65&&j.y>=Math.min(oldY,this.y)+.15&&j.y<=Math.max(oldY,this.y)+1.45){this.jetpack=null;this.jetRemaining=JET_DURATION;events.push({type:'jet',x:this.x,y:this.y});}
+      else if(this.time>j.expires||j.y<this.camera-VIEW_HEIGHT/2)this.jetpack=null;
+    }
     let landing=null, earliest=2;
     for(const p of this.platforms){
       const previousX=p.x;
@@ -60,7 +75,7 @@ export class Game {
       }
     }
     if(landing){
-      this.y=landing.y;this.vy=landing.type==='spring'?15.5:JUMP;
+      this.y=landing.y;this.vy=landing.type==='spring'?SPRING_JUMP:JUMP;
       this.bounceAge=0;this.bounces++;
       if(landing.type==='cracked')landing.broken=true;
       events.push({type:'bounce',x:this.x,y:this.y,spring:landing.type==='spring'});
