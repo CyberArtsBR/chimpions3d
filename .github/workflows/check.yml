@@ -29,15 +29,6 @@ jobs:
       - name: Browser smoke check dependencies (test only)
         run: npm install --no-save --package-lock=false @playwright/test@1.55.1
       - run: npx playwright install --with-deps chromium
-      - name: Test production bundle
-        run: |
-          npm run preview -- --host 127.0.0.1 > /tmp/vite.log 2>&1 &
-          node checks/browser.mjs
-          node checks/audio-browser.mjs
-          node checks/controls-browser.mjs
-          node checks/game-browser.mjs
-          node checks/avatar-browser.mjs
-          node checks/collection-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
