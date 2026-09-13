@@ -242,7 +242,7 @@ function drawWorld(dt=0){
  const live=new Set(game.platforms.map(p=>p.id));
  for(const [id,m]of platformMeshes){if(!live.has(id)){removeBranch(m);platformMeshes.delete(id);}}
  for(const p of game.platforms){
-  let m=platformMeshes.get(p.id);if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
+  let m=platformMeshes.get(p.id);if(m&&m.userData.fragile!==!!p.fragile){removeBranch(m);platformMeshes.delete(p.id);m=null;}if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
   m.position.set(p.x,p.y,0);m.visible=!p.broken;scenery.animateBranch(m,p,visualTime);
   m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=1+Math.sin(visualTime*2+p.id)*.07;
  }
@@ -267,7 +267,7 @@ function tick(dt,control=input()){
  const distance=targetYaw-yaw;
  yaw+=Math.sign(distance)*Math.min(Math.abs(distance),Math.PI/0.28*dt);
  const events=game.step(control,dt);
- for(const e of events){scenery.burst(e);if(e.type==='death'){sound('death');menu('over');}else if(e.type==='coin'){sound('coin');if(e.value===2)toast('+2 bananas!');}else if(e.type==='jet'){sound('coin');toast('JETPACK · 5 seconds!');}else if(e.type==='jet-spawn'){toast('Jetpack nearby! Reach the edge');}else if(e.type==='bounce'){sound('bounce');if(e.spring)toast('Spring boost!');}}
+ for(const e of events){scenery.burst(e);if(e.type==='death'){sound('death');menu('over');}else if(e.type==='coin'){sound('coin');if(e.value===2)toast('+2 bananas!');}else if(e.type==='jet'){sound('coin');toast('JETPACK · 5 seconds!');}else if(e.type==='jet-spawn'){toast('Jetpack nearby! Find it in the canopy');}else if(e.type==='bounce'){sound('bounce');if(e.spring)toast('Spring boost!');}}
 }
 function resize(){
  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);

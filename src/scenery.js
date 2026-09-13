@@ -146,7 +146,7 @@ export function createScenery(scene,renderer){
  }
  let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null;
  function attachPlatform(group){
-  if(!platformTemplate||group.userData.platformType==='cracked'||group.getObjectByName('authored-branch'))return;
+  if(!platformTemplate||(group.userData.platformType==='cracked'||group.userData.fragile)||group.getObjectByName('authored-branch'))return;
   const model=platformTemplate.clone(true),authored=new THREE.Group();authored.name='authored-branch';
   model.scale.x*=group.userData.platformWidth;model.scale.y*=PLATFORM_SCALE;model.scale.z*=PLATFORM_SCALE;authored.add(model);authored.visible=highQuality;group.add(authored);
   // Uploaded wood has no moss: keep a low, readable landing cushion.
@@ -259,10 +259,10 @@ export function createScenery(scene,renderer){
   batch.castShadow=batch.receiveShadow=true;return batch;
  }
  function branch(p){
-  const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;
+  const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;group.userData.fragile=!!p.fragile;
   const fallback=new THREE.Group();fallback.name='procedural-branch';fallback.scale.set(1,PLATFORM_SCALE,PLATFORM_SCALE);group.add(fallback);
   // Physics already enlarged width; scale only thickness and depth here.
-  if(p.type==='cracked'){
+  if((p.type==='cracked'||p.fragile)){
    // Two pieces and exposed grain communicate fragility without moving the landing plane.
    for(const side of [-1,1]){
     const wood=mesh(logGeo,bark,fallback,side*p.width*.255,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.88,p.width*.49,1);wood.castShadow=wood.receiveShadow=true;
@@ -275,7 +275,7 @@ export function createScenery(scene,renderer){
    const cut=mesh(capGeo,end,fallback,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
    const twig=mesh(logGeo,bark,fallback,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
-  for(const side of (p.type==='cracked'?[-1,1]:[0])){
+  for(const side of ((p.type==='cracked'||p.fragile)?[-1,1]:[0])){
    const top=mesh(mossGeo,moss,fallback,side*p.width*.26,-.085);top.scale.set(p.width/(side?4:2),.085,.32);top.receiveShadow=true;
   }
   const detail=new THREE.Group();fallback.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
@@ -293,7 +293,7 @@ export function createScenery(scene,renderer){
    }
    instances(knotGeo,cream,group,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.3,-.24*PLATFORM_SCALE,0);o.rotation.y=Math.PI/2;o.scale.set(2.4,2.4,1.4);});
   }
-  if(p.type==='cracked')instances(logGeo,dark,group,3,(i,o)=>{o.position.set((i-1)*.13*PLATFORM_SCALE,-.19*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.07*PLATFORM_SCALE,.38*PLATFORM_SCALE,.07*PLATFORM_SCALE);o.rotation.z=(i%2?-.5:.5);});
+  if((p.type==='cracked'||p.fragile))instances(logGeo,dark,group,3,(i,o)=>{o.position.set((i-1)*.13*PLATFORM_SCALE,-.19*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.07*PLATFORM_SCALE,.38*PLATFORM_SCALE,.07*PLATFORM_SCALE);o.rotation.z=(i%2?-.5:.5);});
   if(p.type==='spring'){
    const mushroom=new THREE.Group();mushroom.scale.setScalar(ITEM_SCALE);group.add(mushroom);group.userData.mushroom=mushroom;
    const stem=mesh(stemGeo,cream,mushroom,0,.12);stem.castShadow=true;
