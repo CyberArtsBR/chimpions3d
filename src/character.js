@@ -32,7 +32,7 @@ export async function loadCharacter(url, overrides = {}) {
   const rig = {}, rest = new Map(), bases = new Map(), axes = new Map();
   const X = new THREE.Vector3(1,0,0), Y = new THREE.Vector3(0,1,0), Z = new THREE.Vector3(0,0,1);
   const q = new THREE.Quaternion(), delta = new THREE.Quaternion();
-  let state='IDLE', phase=0, jumpStage='', stageTime=0, bodyOffset=0;
+  let state='IDLE', phase=0, jumpStage='', stageTime=0, bodyOffset=0, armLift=0, launchVelocity=12.6;
 
   const aliases = {
   hips: ['hips', 'hip', 'pelvis'], spine: ['spine', 'spine0', 'spine1', 'spine01'],
@@ -132,7 +132,7 @@ function isDescendant(child, ancestor) {
   for (let p = child.parent; p; p = p.parent) if (p === ancestor) return true;
   return false;
 }
-function makePose(time, gait) {
+function makePose(time, gait, jumpLift=0) {
   const pose = {};
   const set = (key, x = 0, y = 0, z = 0) => { pose[key] = [x, y, z]; };
   const running = state === 'RUN';
@@ -155,18 +155,19 @@ function makePose(time, gait) {
   }
   let offset = breath * 0.004 + Math.abs(Math.cos(phase)) * (running ? 0.065 : 0.025) * gait;
   if (state === 'JUMP' || state === 'LAND') {
-    let crouch = 0;
-    if (jumpStage === 'CROUCH') crouch = Math.sin(Math.min(stageTime / 0.18, 1) * Math.PI / 2);
-    else if (jumpStage === 'LAND') crouch = Math.sin(Math.min(stageTime / 0.26, 1) * Math.PI);
-    else if (jumpStage === 'AIRBORNE') crouch = 0.28;
+    const launchKick=Math.max(0,1-stageTime/.15);
+    const landingPrep=jumpStage==='AIRBORNE'?Math.max(0,1-jumpLift)*.26:0;
+    const crouch=Math.min(1,launchKick*.85+landingPrep+jumpLift*.12);
     offset = -0.16 * crouch;
     set('hips', 0.12 * crouch); set('spine', 0.12 * crouch);
     for (const side of ['left', 'right']) {
       set(side + 'Thigh', -0.55 * crouch);
       set(side + 'Shin', 1.05 * crouch);
       set(side + 'Foot', -0.45 * crouch);
-      set(side + 'UpperArm', jumpStage === 'CROUCH' ? 0.3 * crouch : -0.5);
-      set(side + 'Forearm', -0.4);
+      set(side + 'Shoulder', -jumpLift*.08, 0, 0);
+      set(side + 'UpperArm', -1.08*jumpLift+.12*launchKick);
+      set(side + 'Forearm', -.16-.34*jumpLift-.16*launchKick);
+      set(side + 'Hand', .025+.12*jumpLift);
     }
   }
   return { pose, offset };
@@ -221,8 +222,11 @@ function applyPose({ pose, offset }, alpha) {
     update(dt,time,velocity,bounceAge,active) {
       state=active?'JUMP':'IDLE';
       jumpStage=active?(bounceAge<0.09?'TAKEOFF':velocity>3?'TAKEOFF':'AIRBORNE'):'';
+      if(active&&bounceAge<.04&&velocity>0)launchVelocity=Math.max(12.6,velocity);
+      const targetLift=active?(velocity>=0?1-Math.min(1,velocity/launchVelocity):Math.max(0,1+velocity/launchVelocity)):0;
+      armLift=THREE.MathUtils.damp(armLift,targetLift,active?9:14,dt);
       stageTime=bounceAge; phase+=dt*7;
-      applyPose(makePose(time,0),1-Math.exp(-18*dt));
+      applyPose(makePose(time,0,armLift),1-Math.exp(-18*dt));
     }
   };
   }catch(error){disposeCharacter({root});throw error;}
@@ -241,3 +245,4 @@ export function disposeCharacter(a){
  textures.forEach(t=>{t.dispose();t.source?.data?.close?.();});
  skeletons.forEach(s=>s.dispose());
 }
+

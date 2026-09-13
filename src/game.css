@@ -90,3 +90,7 @@ body[data-mode=menu] .keys b{font-size:2.2cqw;padding:.65cqw 1.2cqw;background:l
 #background-style{position:fixed;right:14px;bottom:12px;z-index:12;border:1px solid #b8e694;background:#143d39ed;color:#fff4cf;border-radius:10px;padding:8px 12px;font:inherit;font-size:12px}
 body[data-mode=playing] #background-style{display:none}
 #hud,#touch{width:min(94vw,var(--court))}
+
+.court-edges span{opacity:0!important}
+
+

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {WIDTH} from './physics.js';
 
 // All scenery is generated locally. Shared geometry, instanced leaves and small
 // reusable textures keep the forest independent of downloaded art packs.
@@ -78,6 +79,22 @@ export function createScenery(scene,renderer){
  const red=new THREE.MeshStandardMaterial({color:0xc75635,roughness:.55});
  const cream=new THREE.MeshStandardMaterial({color:0xe6d6ac,roughness:.85});
  const blue=new THREE.MeshStandardMaterial({color:0x55c4d0,emissive:0x17666f,emissiveIntensity:.35,roughness:.5});
+ // Screen-edge collision vines are true lit 3D geometry, with braided stems and leaves.
+ const edgeVines=new THREE.Group();scene.add(edgeVines);
+ const vineMaterial=new THREE.MeshStandardMaterial({color:0x365830,map:barkTexture,bumpMap:barkTexture,bumpScale:.13,roughness:.9});
+ const vineMoss=new THREE.MeshStandardMaterial({color:0x7ca852,map:mossTexture,bumpMap:mossTexture,bumpScale:.08,roughness:.92});
+ for(const side of [-1,1]){
+  for(let strand=0;strand<3;strand++){
+   const points=[];
+   for(let i=0;i<=20;i++){const y=-13+i*1.3;points.push(new THREE.Vector3(side*(WIDTH/2+.02+strand*.045+Math.sin(i*.92+strand)*.07),y,.35+strand*.08+Math.cos(i*.73)*.035));}
+   const vine=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),120,.075-strand*.012,9,false),strand===1?vineMoss:vineMaterial);vine.castShadow=vine.receiveShadow=true;edgeVines.add(vine);
+  }
+  for(let i=0;i<28;i++){
+   const y=-12.2+i*.92,leafMesh=new THREE.Mesh(leafGeo,leaf);
+   leafMesh.position.set(side*(WIDTH/2-.02+Math.sin(i*1.7)*.09),y,.48);
+   leafMesh.rotation.set(.15,side*.28,side*(.7+Math.sin(i*.8)*.35));leafMesh.scale.set(.13,.24+Math.sin(i)*.035,1);edgeVines.add(leafMesh);
+  }
+ }
  let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null;
  function attachPlatform(group){
   if(!platformTemplate||group.getObjectByName('authored-branch'))return;
@@ -222,6 +239,7 @@ export function createScenery(scene,renderer){
    if(event.type==='coin'||event.spring)for(let i=0;i<12;i++)sparks.push({x:event.x,y:event.y+.4,z:.5,vx:(r()-.5)*3,vy:1+r()*2,age:0});
   },
   update(cameraY,time,dt,palette,night){
+   edgeVines.position.y=cameraY;
    forest.forEach((m,i)=>{m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(new THREE.Color(0x25483e),.4+i*.12);});
    trunk.position.y=cameraY;
    currentCamera=cameraY;fitTree();
@@ -247,3 +265,4 @@ export function createScenery(scene,renderer){
   }
  };
 }
+

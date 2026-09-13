@@ -1,5 +1,6 @@
 export const WIDTH=14.4, GRAVITY=18, JUMP=12.6, SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
 export const SPRING_JUMP=28, JET_DURATION=5, JET_SPEED=24;
+export const VINE_INSET=.24;
 export const paceAt=time=>1.04+1.96*Math.min(Math.max(time,0)/150,1);
 export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
 export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange||.48);
@@ -55,7 +56,10 @@ export class Game {
     this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
     const oldX=this.x, oldY=this.y;
     const travel=this.vx*dt;
-    this.x=((oldX+travel+WIDTH/2)%WIDTH+WIDTH)%WIDTH-WIDTH/2;
+    const vineX=WIDTH/2-VINE_INSET, nextX=oldX+travel;
+    if(nextX>vineX){this.x=-vineX;events.push({type:'wrap',side:'right',x:this.x,y:this.y});}
+    else if(nextX<-vineX){this.x=vineX;events.push({type:'wrap',side:'left',x:this.x,y:this.y});}
+    else this.x=nextX;
     if(this.jetRemaining>0){
       const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
       if(this.jetRemaining===0){this.vy=JUMP;events.push({type:'jet-end'});}
@@ -99,3 +103,4 @@ export class Game {
     this.generate();return events;
   }
 }
+

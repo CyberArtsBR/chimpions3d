@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,VINE_INSET,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
 for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
@@ -26,7 +26,7 @@ function fixture(type='solid'){
 const bounce=fixture();for(let i=0;i<120;i++)bounce.step(0);assert(bounce.bounces>0);
 const landing=fixture();landing.y=.05;landing.vy=-20;landing.step(0);assert.equal(landing.y,0);assert.equal(landing.vy,JUMP);
 landing.y=-.1;landing.vy=10;landing.step(0);assert(landing.vy<10&&landing.vy>0,'Pass upwards through branches');
-const wrap=new Game(2);wrap.x=WIDTH/2-.01;wrap.vx=4.4;wrap.step(1);assert(wrap.x< -WIDTH/2+.1);assert(wrap.vx>0);
+const wrap=new Game(2);wrap.x=WIDTH/2-.01;wrap.vx=4.4;const momentum=wrap.vx;const wrapEvents=wrap.step(1);assert.equal(wrap.x,-WIDTH/2+VINE_INSET);assert(wrap.vx>=momentum);assert(wrapEvents.some(e=>e.type==='wrap'&&e.side==='right'));
 const a=new Game(44),b=new Game(44);for(let i=0;i<300;i++){a.step(i%80<40?1:-1);b.step(i%80<40?1:-1);}assert.deepEqual(a,b);
 const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);assert(!fall.dead&&fall.time===0);
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
@@ -54,3 +54,4 @@ assert(optional.some(p=>p.width<1.3),'Some optional platforms must be small');
 const motion=new Set(layout.platforms.filter(p=>p.type==='moving').map(p=>p.moveSpeed));
 assert(motion.has(.62)&&motion.has(1)&&motion.has(1.48),'Moving platforms need slow, medium and fast tiers');
 console.log('PASS wider multi-platform layout, edge choices, small platforms and three motion speeds');
+
