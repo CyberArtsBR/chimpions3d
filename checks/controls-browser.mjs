@@ -9,11 +9,14 @@ try{
  await page.goto('http://127.0.0.1:4173/?test=1&background=pixel');
  await page.waitForFunction(()=>window.chimpJump?.().ready);
  assert.equal(await page.evaluate(()=>window.chimpJump().courtWidth),11.2);
+ await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  await page.locator('#play').click();
  await page.mouse.move(800,400);
- await page.waitForFunction(()=>window.chimpJump().vx>1);
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(12));
+ assert(await page.evaluate(()=>window.chimpJump().vx>1),'Right input must accelerate right');
  await page.mouse.move(400,400);
- await page.waitForFunction(()=>window.chimpJump().vx< -1);
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(30));
+ assert(await page.evaluate(()=>window.chimpJump().vx< -1),'Mouse reversal must accelerate left');
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  const first=await page.locator('#pixel-backdrop').evaluate(c=>c.toDataURL());
  await page.evaluate(()=>{window.chimpJumpTest.game().camera+=10;window.chimpJumpTest.render();});
@@ -24,9 +27,13 @@ try{
  await page.reload();
  await page.waitForFunction(()=>window.chimpJump?.().ready);
  await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[{connected:true,axes:[1],buttons:Array.from({length:16},()=>({pressed:false}))}]}));
+ await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  await page.locator('#play').click();
- await page.waitForFunction(()=>window.chimpJump().vx>1);
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(12));
+ assert(await page.evaluate(()=>window.chimpJump().vx>1),'Right input must accelerate right');
  await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[]}));
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(30));
+ assert.equal(await page.evaluate(()=>window.chimpJump().vx),0,'Disconnected pad must stop steering');
  assert.deepEqual(errors,[]);
  console.log('PASS mouse, generic gamepad, wider court, fixed pixel scenery and stage switch');
 }finally{await browser.close();}
