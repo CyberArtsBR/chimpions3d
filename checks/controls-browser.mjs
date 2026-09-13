@@ -11,6 +11,8 @@ try{
  assert.equal(await page.evaluate(()=>window.chimpJump().courtWidth),14.4);
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  await page.locator('#play').click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.mouse.move(800,400);
  await page.evaluate(()=>window.chimpJumpTest.stepInput(12));
  assert(await page.evaluate(()=>window.chimpJump().vx>1),'Right input must accelerate right');
@@ -29,6 +31,8 @@ try{
  await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[{connected:true,axes:[1],buttons:Array.from({length:16},()=>({pressed:false}))}]}));
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  await page.locator('#play').click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.evaluate(()=>window.chimpJumpTest.stepInput(12));
  assert(await page.evaluate(()=>window.chimpJump().vx>1),'Right input must accelerate right');
  await page.evaluate(()=>Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[]}));

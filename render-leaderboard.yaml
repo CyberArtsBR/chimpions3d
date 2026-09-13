@@ -1,0 +1,22 @@
+# Separate optional Blueprint: activate only after approving the paid service/disk.
+services:
+  - type: web
+    name: chimp-jump-scores
+    runtime: node
+    plan: starter
+    branch: main
+    buildCommand: node --version
+    startCommand: node server/leaderboard.mjs
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    disk:
+      name: scores
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22.23.2"
+      - key: SCORES_DB
+        value: /var/data/scores.sqlite
+      - key: ALLOWED_ORIGINS
+        value: https://chimp-jump.onrender.com

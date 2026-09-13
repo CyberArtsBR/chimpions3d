@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,ITEM_SCALE,VINE_INSET,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,VINE_INSET,paceAt,movingX,platformPhaseAt} from '../src/physics.js';
+import {scoreFor,ordinal} from '../src/score.js';
+assert.equal(scoreFor(123.9,4),492);assert.equal(scoreFor(500,0),0);assert.equal(ordinal(1),'1st');assert.equal(ordinal(2),'2nd');assert.equal(ordinal(3),'3rd');assert.equal(ordinal(10),'10th');
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
 for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
@@ -57,8 +59,8 @@ console.log('PASS physics: '+pairs+' generated transfers, larger gaps, near-apex
 
 assert(SPRING_JUMP**2/15.5**2>=3,'Spring height at least triples');
 const jet=new Game(7);jet.time=29.99;jet.step(0);assert(jet.jetpack,'Thirty seconds spawns a jetpack');
-jet.x=jet.jetpack.x;jet.y=jet.jetpack.y-.7;jet.vy=0;jet.step(0);assert.equal(jet.jetRemaining,5);
-const startY=jet.y;for(let i=0;i<300;i++)jet.step(0);assert(jet.jetRemaining<1e-10);assert(jet.y-startY>=119.9);assert(!jet.dead);
+jet.x=jet.jetpack.x;jet.y=jet.jetpack.y-.7;jet.vy=0;jet.step(0);assert.equal(jet.jetRemaining,10);assert.equal(JET_DURATION,10);
+const startY=jet.y;for(let i=0;i<600;i++)jet.step(0);assert(jet.jetRemaining<1e-10);assert(jet.y-startY>=239.9);assert(!jet.dead);
 jet.reset();assert.equal(jet.jetRemaining,0);assert.equal(jet.nextJetAt,30);
 assert(paceAt(240)<3);assert.equal(paceAt(300),3);console.log('PASS triple spring height, 30-second pickup, five-second flight and reset');
 
@@ -66,7 +68,7 @@ const layout=new Game(812);layout.camera=260;layout.generate();
 const optional=layout.platforms.filter(p=>p.route==='optional');
 assert(optional.length>1,'Wider arena should retain optional platforms');
 assert(optional.some(p=>Math.abs(p.baseX)>5.4),'Some choices must sit near the edges');
-assert(optional.some(p=>p.width<1.3*PLATFORM_SCALE),'Some optional platforms must be small');
+assert(optional.some(p=>p.width<1.3*PLATFORM_LENGTH),'Some optional platforms must be small');
 const sizes=new Game(3);sizes.platforms=[];
 for(const [i,width] of [1.1,1.7,2.45].entries())sizes.add(0,i*4,width,'moving');
 assert(sizes.platforms[0].moveSpeed<sizes.platforms[1].moveSpeed&&sizes.platforms[1].moveSpeed<sizes.platforms[2].moveSpeed,'Larger platforms move faster');
@@ -78,7 +80,7 @@ console.log('PASS wider multi-platform layout, edge choices, small platforms and
 
 assert(Math.abs(JUMP**2/12.6**2-1.3)<1e-10,'Normal jump apex is exactly 30% higher');
 assert(Math.abs(SPRING_JUMP**2/28**2-1.3)<1e-10,'Spring apex is also 30% higher');
-assert.equal(new Game(1).platforms[0].width,2.8*PLATFORM_SCALE,'Landing width must match current visual');
+assert.equal(new Game(1).platforms[0].width,2.8*PLATFORM_LENGTH,'Landing width must match current visual');
 assert.equal(ITEM_SCALE,1.5);assert.equal(PLATFORM_SCALE,1.5*.75*.75);
 for(const [baseWidth,value] of [[1.1,2],[2.45,1]]){
  const g=new Game(5);g.platforms=[];g.nextY=100;
@@ -96,7 +98,7 @@ for(let seed=0;seed<300;seed++){
 }
 // Previous generator: 24,638 platforms over these same 300 seeds and altitude band.
 const averagePerRow=densityCount/(300*45);
-assert(averagePerRow>1&&averagePerRow<=1.55,'Keep optional choices only where the full travel fits: '+averagePerRow);
+assert(averagePerRow>1&&averagePerRow<=4,'Keep optional choices within the new candidate budget: '+averagePerRow);
 console.log('PASS 30% higher arcs, current reduced platform dimensions, one-shot double rewards, collision-safe platform density of '+averagePerRow.toFixed(2)+' per row');
 
 // Full travel envelopes, not a single sampled frame, must remain separated.

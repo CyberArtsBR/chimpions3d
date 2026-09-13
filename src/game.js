@@ -9,6 +9,9 @@ import {createPixelBackdrop} from './pixelBackdrop.js';
 import {readPad} from './input.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {createJetpack,animateJetpack} from './jetpackVisual.js';
+import {leaderboard} from './leaderboard.js';
+import {createResults,createRecordBook} from './results.js';
+import {createFallSplash} from './fallSplash.js';
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
@@ -18,6 +21,8 @@ document.body.innerHTML=`
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
 const $=id=>document.getElementById(id);
+document.querySelector('.gamepad-callout').setAttribute('aria-label','Play with a controller');
+document.querySelector('.gamepad-callout span').textContent='Play with a controller';
 const pixelBackdrop=createPixelBackdrop($('world'));
 let pixelMode=new URLSearchParams(location.search).get('background')==='pixel';
 const backdropButton=document.createElement('button');backdropButton.id='background-style';document.body.append(backdropButton);
@@ -27,6 +32,9 @@ const collectionDialog=document.createElement('dialog');collectionDialog.id='col
 collectionDialog.setAttribute('aria-label','Choose your chimp');
 collectionDialog.innerHTML='<header><h2>Choose your chimp</h2><button id="close-collection" aria-label="Close character selection">×</button></header>';
 collectionDialog.append($('avatar-list'));document.body.append(collectionDialog);
+const selectionActions=document.createElement('div');selectionActions.className='selection-actions';
+selectionActions.innerHTML='<button id="random-chimpion">Random Chimpion</button><p id="selected-chimpion" role="status"></p><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
+collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
 collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();$('choose').focus();});
 const scene=new THREE.Scene();
@@ -54,6 +62,7 @@ const heroLight=new THREE.DirectionalLight(0xfff4e7,2.6);heroLight.target=heroTa
 const heroFill=new THREE.DirectionalLight(0xe7f3ff,1.05);heroFill.target=heroTarget;heroFill.layers.set(1);scene.add(heroFill);
 const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer);
+const fallSplash=createFallSplash(scene);
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
 const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
 let desktopHigh=true;
@@ -78,6 +87,10 @@ let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FAC
 let facingFlip=0;
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3;
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='chimpion';
+let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
+const results=createResults({retry:()=>start(),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();}});
+const recordBook=createRecordBook();
+const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
 const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.19;music.preload='metadata';
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
 const keys=new Set(),pointers=new Map();
@@ -98,6 +111,8 @@ renderer.domElement.addEventListener('pointermove',e=>{
 renderer.domElement.addEventListener('pointerleave',()=>mouseTarget=null);
 function pollPad(){
  const pad=readPad(navigator.getGamepads?.()||[]);
+ if(collectionDialog.open){if(pad.buttons[0]&&!padPrevious[0])$('confirm-chimpion').click();padPrevious=pad.buttons;return;}
+ if(results.isOpen||recordBook.isOpen){if(results.isOpen&&pad.buttons[0]&&!padPrevious[0])document.getElementById('try-again').click();padPrevious=pad.buttons;return;}
  if(pad.axis)mouseTarget=null;
  if(pad.buttons[9]&&!padPrevious[9]){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
  if(pad.buttons[0]&&!padPrevious[0]&&mode!=='playing'&&!collectionDialog.open)start();
@@ -116,7 +131,8 @@ function sound(type){
  try{
  audioContext??=new AudioContext();audioContext.resume();
  const o=audioContext.createOscillator(),g=audioContext.createGain(),t=audioContext.currentTime;
- o.type='sine';o.frequency.setValueAtTime(type==='coin'?900:type==='death'?200:420,t);
+ o.type=type==='death'?'square':'sine';o.frequency.setValueAtTime(type==='coin'?900:type==='death'?640:420,t);
+ if(type==='death'){for(let i=1;i<=8;i++)o.frequency.setValueAtTime(640/2**(i*.48),t+i*.065);g.gain.setValueAtTime(.025,t);g.gain.exponentialRampToValueAtTime(.001,t+.65);o.connect(g);g.connect(audioContext.destination);o.start();o.stop(t+.66);return;}
  o.frequency.exponentialRampToValueAtTime(type==='death'?70:type==='coin'?1400:700,t+.12);
  g.gain.setValueAtTime(.035,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);
  o.connect(g);g.connect(audioContext.destination);o.start();o.stop(t+.17);
@@ -128,7 +144,7 @@ function syncUI(){
  $('height').textContent=Math.floor(game.height);$('coins').textContent=game.bananas;
  $('best').textContent='PERSONAL BEST  ·  '+Math.floor(best)+' m';
  $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';
- $('overlay').hidden=mode==='playing';
+ $('overlay').hidden=['playing','dying','over','starting'].includes(mode);
 }
 function menu(kind){
  if(collectionDialog.open)collectionDialog.close();
@@ -149,10 +165,11 @@ function menu(kind){
  }
  syncUI();
 }
-function start(){
- if(!ready||mode==='playing')return;
+async function start(){
+ if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
+ if(mode==='menu'&&!selectionConfirmed){openSelection();return;}
  const fresh=mode!=='paused';
- if(fresh){for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();game.reset(Math.floor(Math.random()*4294967295));yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;music.currentTime=0;}
+ if(fresh){mode='starting';syncUI();runTicket=null;inputTrace=[];try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();fallSplash.clear();game.reset(runTicket?.seed??Math.floor(Math.random()*4294967295));avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;music.currentTime=0;}
  mode='playing';music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();
 }
 $('play').onclick=start;
@@ -160,6 +177,7 @@ $('pause').onclick=()=>menu('paused');
 $('mute').onclick=()=>{muted=!muted;music.muted=muted;$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');if(!muted)sound('coin');};
 $('mute').style.opacity=1;
 addEventListener('keydown',e=>{
+ if(results.isOpen||recordBook.isOpen)return;
  if(collectionDialog.open){if(e.code==='Escape'){e.preventDefault();collectionDialog.close();}return;}
  if(e.target.matches('input,textarea,select'))return;
  if(e.code==='Enter'&&e.target.closest('button,a'))return;
@@ -176,6 +194,7 @@ for(const [id,dir]of [['left',-1],['right',1]]){
  b.onpointerup=b.onpointercancel=b.onlostpointercapture=e=>pointers.delete(e.pointerId);
 }
 async function selectAvatar(entry){
+ selectionConfirmed=false;
  const request=++avatarRequest;ready=false;$('play').disabled=true;$('play').textContent='LOADING YOUR CHIMP…';
  $('avatar-status').textContent='Preparing pose and checking skeleton…';
  try{
@@ -186,11 +205,13 @@ async function selectAvatar(entry){
  avatar=next;avatar.model.traverse(o=>{if(o.isMesh)o.layers.enable(1);});selectedId=entry.id||'';facingFlip=0;avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
  $('play').disabled=false;menu('menu');
  $('avatar-status').textContent=entry.name+' · '+avatar.boneCount+' bones'+(entry.buffer?' · local file':'');
+ return true;
  }catch(e){
   if(request!==avatarRequest)return;
   console.warn('Avatar rejected:',e.message);ready=!!avatar;$('play').disabled=!ready;
   $('play').textContent=ready?'LET’S JUMP':'MODEL UNAVAILABLE';
   $('avatar-status').textContent=e.message+(ready?' Your previous avatar is still ready.':'');
+  return false;
  }
 }
 $('upload').onclick=()=>{$('avatar-file').click();};
@@ -203,6 +224,16 @@ $('avatar-file').onchange=async e=>{
 };
 $('flip').onclick=()=>{facingFlip=facingFlip?0:Math.PI;toast('Avatar front direction reversed');};
 let collectionPage=0,collectionQuery='';
+function randomEntry(){const entries=catalog.filter(e=>e.url&&e.id!=='chimpion');const pool=entries.length?entries:catalog;return pool[Math.floor(Math.random()*pool.length)];}
+function showPending(){if(!pendingEntry)return;$('selected-chimpion').textContent='Selected: '+pendingEntry.name;$('confirm-chimpion').textContent='Play as '+pendingEntry.name;}
+$('random-chimpion').onclick=()=>{pendingEntry=randomEntry();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry?.id)/12));showPending();renderCollection();};
+$('confirm-chimpion').onclick=async()=>{
+ if(!pendingEntry||$('confirm-chimpion').disabled)return;
+ $('confirm-chimpion').disabled=$('random-chimpion').disabled=true;
+ collectionDialog.close();const loaded=pendingEntry.id===selectedId&&ready||await selectAvatar(pendingEntry);
+ $('confirm-chimpion').disabled=$('random-chimpion').disabled=false;
+ if(loaded){selectionConfirmed=true;start();}else{selectionConfirmed=false;openSelection();}
+};
 function renderCollection(){
  const list=$('avatar-list');list.replaceChildren();
  const search=document.createElement('input');search.type='search';search.placeholder='Search chimp name';search.setAttribute('aria-label','Search characters');search.value=collectionQuery;
@@ -212,24 +243,27 @@ function renderCollection(){
  const grid=document.createElement('div');grid.className='avatar-grid';
  for(const entry of entries.slice(collectionPage*12,collectionPage*12+12)){
   const button=document.createElement('button');button.className='avatar-option';button.disabled=!entry.url;
-  button.setAttribute('aria-label',entry.name+(entry.url?'':entry.unavailable?' · Rig needs correction':' · GLB coming soon'));button.setAttribute('aria-pressed',String(selectedId===entry.id));
+  button.setAttribute('aria-label',entry.name+(entry.url?'':entry.unavailable?' · Rig needs correction':' · GLB coming soon'));button.setAttribute('aria-pressed',String(pendingEntry?.id===entry.id));
   if(entry.image){const img=document.createElement('img');img.src=entry.image;img.loading='lazy';img.decoding='async';img.alt='';img.referrerPolicy='no-referrer';img.onerror=()=>{img.remove();};button.append(img);}
   const name=document.createElement('strong');name.textContent=entry.name;button.append(name);
-  const status=document.createElement('small');status.textContent=entry.url?(selectedId===entry.id?'Selected':'Play'): (entry.unavailable?'Rig needs correction':'GLB coming soon');button.title=entry.unavailable||entry.name;button.append(status);
-  button.onclick=()=>{collectionDialog.close();selectAvatar(entry);};grid.append(button);
+ const status=document.createElement('small');status.textContent=entry.url?(pendingEntry?.id===entry.id?'Selected':'Select'): (entry.unavailable?'Rig needs correction':'GLB coming soon');button.title=entry.unavailable||entry.name;button.append(status);
+  button.onclick=()=>{pendingEntry=entry;showPending();for(const option of grid.children)option.setAttribute('aria-pressed',String(option===button));};grid.append(button);
  }
  list.append(grid);
  const nav=document.createElement('div');nav.className='collection-nav';
  for(const [label,direction]of [['Previous',-1],['Next',1]]){const button=document.createElement('button');button.textContent=label;button.disabled=direction<0?collectionPage===0:collectionPage===pages-1;button.onclick=()=>{collectionPage+=direction;renderCollection();};nav.append(button);}
  const count=document.createElement('span');count.textContent=(collectionPage+1)+' / '+pages+' · '+entries.length+' chimps';nav.append(count);list.append(nav);
 }
-$('choose').onclick=async()=>{
+async function openSelection(){
+ if(collectionDialog.open||!catalog.length)return;
+ pendingEntry=randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
  const list=$('avatar-list');list.hidden=false;collectionDialog.showModal();
  if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=await response.json();}catch{toast('Collection unavailable. Your chimp is ready.');}
  if(collectionDialog.open){renderCollection();list.querySelector('input')?.focus();}
-};
+}
+$('choose').onclick=()=>{selectionConfirmed=false;openSelection();};
 fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();})
-.then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');return selectAvatar(entries[0]);})
+.then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');pendingEntry=randomEntry();return selectAvatar(pendingEntry);})
 .catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
 
 function drawWorld(dt=0){
@@ -263,11 +297,19 @@ function drawWorld(dt=0){
 }
 function tick(dt,control=input()){
  if(mode!=='playing')return;
+ const recorded=Math.round(Math.max(-1,Math.min(1,control))*1000);control=recorded/1000;
+ const last=inputTrace.at(-1);if(last&&last[0]===recorded)last[1]++;else inputTrace.push([recorded,1]);
  if(control)targetYaw=control>0?FACE_ANGLE:-FACE_ANGLE;
  const distance=targetYaw-yaw;
  yaw+=Math.sign(distance)*Math.min(Math.abs(distance),Math.PI/0.28*dt);
  const events=game.step(control,dt);
- for(const e of events){scenery.burst(e);if(e.type==='death'){sound('death');menu('over');}else if(e.type==='coin'){sound('coin');if(e.value===2)toast('+2 bananas!');}else if(e.type==='jet'){sound('coin');toast('JETPACK · 5 seconds!');}else if(e.type==='jet-spawn'){toast('Jetpack nearby! Find it in the canopy');}else if(e.type==='bounce'){sound('bounce');if(e.spring)toast('Spring boost!');}}
+ for(const e of events){scenery.burst(e);if(e.type==='death'){sound('death');music.pause();mode='dying';deathAge=0;splashed=false;deathPoint={x:game.x,y:game.camera-VIEW_HEIGHT/2};keys.clear();pointers.clear();avatar.root.visible=false;syncUI();}else if(e.type==='coin'){sound('coin');if(e.value===2)toast('+2 bananas!');}else if(e.type==='jet'){sound('coin');toast('JETPACK · 10 seconds!');}else if(e.type==='jet-spawn'){toast('Jetpack nearby! Find it in the canopy');}else if(e.type==='bounce'){sound('bounce');if(e.spring)toast('Spring boost!');}}
+}
+function updateEnding(dt){
+ fallSplash.update(dt);results.update(dt);
+ if(mode!=='dying')return;deathAge+=dt;
+ if(deathAge>=1&&!splashed){splashed=true;fallSplash.start(deathPoint.x,deathPoint.y);}
+ if(deathAge>=2){mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}results.open({id:runTicket?.id,trace:inputTrace,meters:Math.floor(game.height),bananas:game.bananas});syncUI();}
 }
 function resize(){
  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);
@@ -288,6 +330,7 @@ function renderFrame(now){
  const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);
  if(raw>0.75&&mode==='playing')menu('paused');
  visualTime+=dt;
+ updateEnding(dt);
  if(mode==='playing'){acc+=dt;while(acc>=STEP){tick(STEP);acc-=STEP;if(mode!=='playing'){acc=0;break;}}}
  if(avatar){
   avatar.root.position.set(game.x,game.y,0);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;
@@ -303,5 +346,5 @@ function renderFrame(now){
 renderer.setAnimationLoop(renderFrame);
 window.chimpJump=()=>({ready,mode,jetRemaining:game.jetRemaining,muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName("authored-branch")?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
 if(new URLSearchParams(location.search).has('test')){
- window.chimpJumpTest={stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},game:()=>game};
+ window.chimpJumpTest={stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
 }

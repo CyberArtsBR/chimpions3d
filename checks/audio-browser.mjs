@@ -18,6 +18,8 @@ try{
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'18e24cefec0f28e787872a0bfae2ac4dc4ba1843703a1defa1a116e742d7f88c');
  assert.equal(await page.evaluate(()=>window.chimpJump().musicVolume),.19);
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.waitForFunction(()=>window.chimpJump().musicTime>.3&&!window.chimpJump().musicPaused);
  const before=await page.evaluate(()=>window.chimpJump().musicTime);
  // A repeated start event must not reset an already active climb or its track.
@@ -39,10 +41,11 @@ try{
  // Decode the actual end of the track, then verify looping happens at its end.
  await page.evaluate(()=>{window.musicUnderTest.currentTime=window.musicUnderTest.duration-1;window.musicUnderTest.playbackRate=4;});
  await page.waitForFunction(()=>window.musicUnderTest.currentTime<3&&!window.musicUnderTest.paused);
- await page.evaluate(()=>{window.musicUnderTest.playbackRate=1;window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
+ await page.evaluate(()=>{window.musicUnderTest.playbackRate=1;window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'over');
  assert(await page.evaluate(()=>window.chimpJump().musicPaused));
- await page.getByRole('button',{name:'JUMP AGAIN',exact:true}).click();
+ await page.getByRole('button',{name:'Try Again',exact:true}).click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  assert(await page.evaluate(()=>window.chimpJump().musicTime)<.5,'A new climb restarts the music');
  console.log(`PASS music: full ${bytes.length} byte MP3 (${duration.toFixed(2)} s), 50% volume, play/pause/resume, mute, duplicate start, game over, restart, complete-track loop`);
 }finally{await browser.close();}

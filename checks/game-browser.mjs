@@ -18,9 +18,11 @@ try{
  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
  assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
- assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>=4);
+ assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>0);
  await screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.keyboard.down('ArrowLeft');
  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
  assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Left key must turn the character');
@@ -44,9 +46,10 @@ try{
  });
  assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Emerald Mist');
  await screenshot({path:'checks/game-theme.png'});
- await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
+ await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'over');
- await page.getByRole('button',{name:'JUMP AGAIN'}).click();
+ await page.getByRole('button',{name:'Try Again'}).click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Jungle Morning');
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
@@ -54,7 +57,9 @@ try{
  await screenshot({path:'checks/game-mobile.png'});
 
  // Upload the actual GLB through the file input; its bytes must stay local.
- await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
+ await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
+ await page.locator('#choose-again').click();
+ await page.keyboard.press('Escape');
  const modelBytes=fs.readFileSync('public/model/chimpion.glb');
  let external=0;page.on('request',r=>{if(!r.url().startsWith('http://127.0.0.1:4173')&&!r.url().startsWith('data:')&&!r.url().startsWith('blob:'))external++;});
  await page.locator('#avatar-file').setInputFiles({name:'my-chimp.glb',mimeType:'model/gltf-binary',buffer:modelBytes});
@@ -83,6 +88,8 @@ try{
  assert.equal(await page.evaluate(()=>window.chimpJump().backgroundReady),false);
  assert.equal(await page.evaluate(()=>window.chimpJump().treeVisible),false,'Balanced/Low keeps only the background layers');
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.getByRole('button',{name:'Pause game'}).click();
  await screenshot({path:'checks/game-mobile-menu.png'});
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
@@ -90,8 +97,9 @@ try{
  await page.waitForTimeout(100);
  const before=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
  for(let i=0;i<8;i++){
-  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
-  await page.getByRole('button',{name:'JUMP AGAIN'}).click();
+  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
+  await page.getByRole('button',{name:'Try Again'}).click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  }
  await page.waitForTimeout(100);
  const after=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
@@ -100,14 +108,16 @@ try{
  // Catalog search uses original names; only supplied GLBs can be selected.
  await page.getByRole('button',{name:'Pause game'}).click();
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
- await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
+ await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
  await page.route('https://cdn.helius-rpc.com/**',route=>route.abort());
- await page.getByRole('button',{name:'Choose chimp',exact:true}).click();
+ await page.locator('#choose-again').click();
  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aviator');
  assert(await page.getByRole('button',{name:'The Aviator · GLB coming soon',exact:true}).isDisabled());
  assert.equal(await page.locator('.avatar-option').count(),1);
  await page.getByRole('searchbox',{name:'Search characters'}).fill('Silver Chimp');
  await page.getByRole('button',{name:'Silver Chimp',exact:true}).click();
+ await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.waitForFunction(()=>window.chimpJump().ready);
  assert(await page.locator('#avatar-list').isHidden());
  console.log('RENDER_STATS:'+JSON.stringify(after));

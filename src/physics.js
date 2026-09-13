@@ -1,7 +1,8 @@
 export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
-export const PLATFORM_SCALE=1.5*.75*.75, ITEM_SCALE=1.5;
-export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=5, JET_SPEED=24;
+export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5;
+export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=10, JET_SPEED=24;
 export const VINE_INSET=.24;
+export const RULESET='2026-09-records-v1';
 export const paceAt=time=>.92+2.08*Math.min(Math.max(time,0)/300,1);
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
 const basePlatformPhase=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
@@ -34,12 +35,12 @@ export class Game {
   }
   add(x,y,width,type,coin=true,route='safe'){
     const size=Math.max(0,Math.min(1,(width-.95)/1.5));
-    width*=PLATFORM_SCALE;
+    width*=PLATFORM_LENGTH;
     // Equal travel amplitude: larger branches have a strictly higher peak speed.
     const moveRange=PLATFORM_TRAVEL,moveSpeed=1.25*(.62+.86*size);
     if(!this.canPlace(x,y,width,type))return false;
 
-    this.platforms.push({id:this.nextId++,x,baseX:x,y,width,type,coin,route,reward:width<=1.3*PLATFORM_SCALE?2:1,fragile:type!=='moving'&&paceAt(this.time)>=2.5,broken:false,phase:this.random()*6.28,
+    this.platforms.push({id:this.nextId++,x,baseX:x,y,width,type,coin,route,reward:width<=1.3*PLATFORM_LENGTH?2:1,fragile:type!=='moving'&&paceAt(this.time)>=2.5,broken:false,phase:this.random()*6.28,
       moveSpeed,moveRange});
     const platform=this.platforms.at(-1);if(type==='moving')platform.x=movingX(platform,this.time);
     return true;
@@ -50,7 +51,7 @@ export class Game {
       this.nextY+=3.85+this.random()*.10+difficulty*.10;
       // One reachable route plus lateral choices; keep their full motion envelopes apart.
       const width=2.45-difficulty*.65;
-      const centerLimit=WIDTH/2-VINE_INSET-.35-width*PLATFORM_SCALE/2-PLATFORM_TRAVEL;
+      const centerLimit=WIDTH/2-VINE_INSET-.35-width*PLATFORM_LENGTH/2-PLATFORM_TRAVEL;
       const candidates=[-5.8,-4.5,-3.2,-1.8,0,1.8,3.2,4.5,5.8].filter(x=>Math.abs(x)<=centerLimit).filter(x=>{
         const distance=Math.abs(x-this.nextX);
         return distance>=1.65 && distance<=3.15;
@@ -62,18 +63,17 @@ export class Game {
         type=roll<.35+Math.min(this.time/180,1)*.2?'moving':roll<.7?'solid':roll<.88?'cracked':'spring';
       }
       this.add(this.nextX,this.nextY,width,type,true,'safe');
-      // Previous rows averaged 1.5 platforms. Aim for 2.7 (+80%) while
-      // allowing the swept-envelope check to reject unsafe optional branches.
-      const extras=1+(this.random()<.7?1:0);
+      // 3.51 candidates per row: +30% from 2.7. Space checks stay authoritative.
+      const extras=2+(this.random()<.51?1:0);
       for(let i=0;i<extras;i++){
         const optionalType=this.nextY>12&&this.random()<.48?'moving':this.random()<.25?'cracked':'solid';
         const optionalWidth=.95+this.random()*1.05;
         const optionalY=this.nextY-1.1-this.random()*.35;
-        const extent=optionalWidth*PLATFORM_SCALE/2+(optionalType==='moving'?PLATFORM_TRAVEL:0);
+        const extent=optionalWidth*PLATFORM_LENGTH/2+(optionalType==='moving'?PLATFORM_TRAVEL:0);
         const limit=WIDTH/2-VINE_INSET-.35-extent;
         const candidates=[];
         for(let x=-limit;x<=limit+.001;x+=.15){
-          if(this.canPlace(x,optionalY,optionalWidth*PLATFORM_SCALE,optionalType))candidates.push(x);
+          if(this.canPlace(x,optionalY,optionalWidth*PLATFORM_LENGTH,optionalType))candidates.push(x);
         }
         if(!candidates.length)continue;
         // Prefer free outer lanes, retaining room for the next optional branch.
