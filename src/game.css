@@ -86,7 +86,7 @@ body[data-mode=menu] .keys b{font-size:2.2cqw;padding:.65cqw 1.2cqw;background:l
 #pixel-backdrop{image-rendering:pixelated;pointer-events:none}
 .pixel-mode #world>.sun,.pixel-mode #world>.rays,.pixel-mode #world>.hill,.pixel-mode #world>.mist{display:none}
 .court-edges{top:0;bottom:0;border:0;font-size:0}
-.court-edges span{padding:0;width:9px;height:100%;background:repeating-linear-gradient(165deg,#dbff98 0 5px,#438c55 5px 12px,#a4ef6c 12px 17px,#245c46 17px 23px);box-shadow:0 0 6px #c9ff8b,0 0 19px #64e8a680;opacity:.85}
+.court-edges span{position:relative;padding:0;width:16px;height:100%;border-radius:48% 52%;background:repeating-linear-gradient(168deg,#173d27 0 8px,#397248 8px 15px,#8fc16b 15px 18px,#285d39 18px 29px);box-shadow:inset 3px 0 3px #d5ef9d99,inset -4px 0 5px #102d22cc,0 0 7px #d7ffad,0 0 21px #70da8a99;opacity:.94}.court-edges span::after{content:"";position:absolute;inset:0 -9px;background:radial-gradient(ellipse at 15% 9%,#9bd276 0 5px,#356f45 6px 8px,transparent 9px),radial-gradient(ellipse at 83% 21%,#a8d97c 0 6px,#2b623d 7px 9px,transparent 10px);background-size:29px 72px,31px 86px;filter:drop-shadow(0 1px 2px #102d20);opacity:.9}
 #background-style{position:fixed;right:14px;bottom:12px;z-index:12;border:1px solid #b8e694;background:#143d39ed;color:#fff4cf;border-radius:10px;padding:8px 12px;font:inherit;font-size:12px}
 body[data-mode=playing] #background-style{display:none}
 #hud,#touch{width:min(94vw,var(--court))}

@@ -133,7 +133,7 @@ export function createScenery(scene,renderer){
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
   const active=highQuality&&!!treeImageMesh?.material.map;
-  trunk.visible=!active;ivy.visible=!active;
+  trunk.visible=highQuality&&!active;ivy.visible=highQuality&&!active;
   forest.forEach((m,i)=>{m.visible=!active&&(highQuality||i>0);});
   if(treeImageMesh)treeImageMesh.visible=active;
  }
@@ -215,6 +215,7 @@ export function createScenery(scene,renderer){
   setPixelMode(enabled){background.visible=!enabled;},
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return !!treeImageMesh?.visible;},
+  get treeVisible(){return trunk.visible||ivy.visible||!!treeImageMesh?.visible;},
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();},
   burst(event){
    if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;}

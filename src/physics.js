@@ -1,8 +1,8 @@
-export const WIDTH=11.2, GRAVITY=18, JUMP=12.6, SPEED=5.8, VIEW_HEIGHT=13.76, STEP=1/60;
+export const WIDTH=14.4, GRAVITY=18, JUMP=12.6, SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
 export const SPRING_JUMP=28, JET_DURATION=5, JET_SPEED=24;
-export const paceAt=time=>1.16+1.84*Math.min(Math.max(time,0)/120,1);
+export const paceAt=time=>1.04+1.96*Math.min(Math.max(time,0)/150,1);
 export const platformPhaseAt=time=>1.1*(time+.45*(time<=180?time*time/360:time-90));
-export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)+(platform.phase||0))*.48;
+export const movingX=(platform,time)=>platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange||.48);
 export class Game {
   constructor(seed=1){this.reset(seed);}
   reset(seed=1){
@@ -14,15 +14,19 @@ export class Game {
     this.add(0,0,2.8,'solid',false);this.generate();
   }
   random(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296;}
-  add(x,y,width,type,coin=true){this.platforms.push({id:this.nextId++,x,baseX:x,y,width,type,coin,broken:false,phase:this.random()*6.28});}
+  add(x,y,width,type,coin=true,route='safe'){
+    const motionRoll=this.random();
+    this.platforms.push({id:this.nextId++,x,baseX:x,y,width,type,coin,route,broken:false,phase:this.random()*6.28,
+      moveSpeed:motionRoll<.34?.62:motionRoll<.72?1:1.48,moveRange:.38+this.random()*.34});
+  }
   generate(){
     while(this.nextY<this.camera+10){
       const difficulty=Math.min(this.nextY/180,1);
       this.nextY+=3.85+this.random()*.10+difficulty*.10;
       // Exactly one branch per row, with an intentional lateral transfer.
-      const candidates=[-3.7,-2.5,-1.3,0,1.3,2.5,3.7].filter(x=>{
+      const candidates=[-5.8,-4.5,-3.2,-1.8,0,1.8,3.2,4.5,5.8].filter(x=>{
         const distance=Math.abs(x-this.nextX);
-        return distance>=1.65 && distance<=2.9;
+        return distance>=1.65 && distance<=3.15;
       });
       this.nextX=candidates[Math.floor(this.random()*candidates.length)];
       let type='solid';
@@ -30,7 +34,15 @@ export class Game {
         const roll=this.random();
         type=roll<.35+Math.min(this.time/180,1)*.2?'moving':roll<.7?'solid':roll<.88?'cracked':'spring';
       }
-      this.add(this.nextX,this.nextY,2.5-difficulty*.65,type);
+      this.add(this.nextX,this.nextY,2.45-difficulty*.65,type,true,'safe');
+      const extras=this.random()<.72?1+(this.random()<.32?1:0):0;
+      for(let i=0;i<extras;i++){
+        const edge=this.random()<.42,side=this.random()<.5?-1:1;
+        const x=edge?side*(5.55+this.random()*.75):(-5.2+this.random()*10.4);
+        if(Math.abs(x-this.nextX)<1.15)continue;
+        const optionalType=this.nextY>12&&this.random()<.48?'moving':this.random()<.25?'cracked':'solid';
+        this.add(x,this.nextY-.42+this.random()*.84,.95+this.random()*1.05,optionalType,true,'optional');
+      }
     }
   }
   step(input,dt=STEP){

@@ -8,7 +8,7 @@ const page=await browser.newPage({viewport:{width:1200,height:800}});const error
 try{
  await page.goto('http://127.0.0.1:4173/?test=1&background=pixel');
  await page.waitForFunction(()=>window.chimpJump?.().ready);
- assert.equal(await page.evaluate(()=>window.chimpJump().courtWidth),11.2);
+ assert.equal(await page.evaluate(()=>window.chimpJump().courtWidth),14.4);
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  await page.locator('#play').click();
  await page.mouse.move(800,400);

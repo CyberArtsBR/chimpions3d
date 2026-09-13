@@ -4,8 +4,9 @@ assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
 let pairs=0;
 for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
  const g=new Game(seed);g.time=age;g.camera=200;g.generate();
- for(let i=1;i<g.platforms.length;i++){
-  const prev=g.platforms[i-1],p=g.platforms[i],dy=p.y-prev.y;
+ const safe=g.platforms.filter(p=>p.route==='safe').sort((a,b)=>a.y-b.y);
+ for(let i=1;i<safe.length;i++){
+  const prev=safe[i-1],p=safe[i],dy=p.y-prev.y;
   assert(dy>=3.84&&dy<=4.06,'Rows must remain widely spaced');
   assert(Math.abs(p.baseX-prev.baseX)>=1.64,'Avoid stacked branches');
   const test=new Game(seed);test.platforms=[{...p}];test.nextY=1000;
@@ -32,9 +33,9 @@ const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
 const idle=new Game(9);for(let i=0;i<600;i++)idle.step(0);assert(idle.height<10);
-assert.equal(paceAt(0),1.16);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
+assert.equal(paceAt(0),1.04);assert(Math.abs(paceAt(180)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 assert(platformPhaseAt(180.001)-platformPhaseAt(180)<.002,'Moving phase stays continuous at speed cap');
-const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20)){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
+const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20&&p.route==='safe')){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
 assert(rates[0]>.30&&rates[0]<.40);assert(rates[1]>.49&&rates[1]<.61);
 console.log('PASS physics: '+pairs+' generated transfers, larger gaps, near-apex arcs, wrap, landing, spring, fragile branches, retry');
 
@@ -43,4 +44,13 @@ const jet=new Game(7);jet.time=59.99;jet.step(0);assert(jet.jetpack,'Minute spaw
 jet.x=jet.jetpack.x;jet.y=jet.jetpack.y-.7;jet.vy=0;jet.step(0);assert.equal(jet.jetRemaining,5);
 const startY=jet.y;for(let i=0;i<300;i++)jet.step(0);assert(jet.jetRemaining<1e-10);assert(jet.y-startY>=119.9);assert(!jet.dead);
 jet.reset();assert.equal(jet.jetRemaining,0);assert.equal(jet.nextJetAt,60);
-assert.equal(paceAt(120),3);console.log('PASS triple spring height, minute pickup, five-second flight and reset');
+assert(paceAt(120)<3);assert.equal(paceAt(150),3);console.log('PASS triple spring height, minute pickup, five-second flight and reset');
+
+const layout=new Game(812);layout.camera=260;layout.generate();
+const optional=layout.platforms.filter(p=>p.route==='optional');
+assert(optional.length>8,'Wider arena should generate more optional platforms');
+assert(optional.some(p=>Math.abs(p.baseX)>5.4),'Some choices must sit near the edges');
+assert(optional.some(p=>p.width<1.3),'Some optional platforms must be small');
+const motion=new Set(layout.platforms.filter(p=>p.type==='moving').map(p=>p.moveSpeed));
+assert(motion.has(.62)&&motion.has(1)&&motion.has(1.48),'Moving platforms need slow, medium and fast tiers');
+console.log('PASS wider multi-platform layout, edge choices, small platforms and three motion speeds');
