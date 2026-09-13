@@ -7,6 +7,8 @@ import {Game,STEP,WIDTH,VIEW_HEIGHT,ITEM_SCALE,paceAt} from './physics.js';
 import './game.css';
 import {createPixelBackdrop} from './pixelBackdrop.js';
 import {readPad} from './input.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {createJetpack,animateJetpack} from './jetpackVisual.js';
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
@@ -19,7 +21,7 @@ const $=id=>document.getElementById(id);
 const pixelBackdrop=createPixelBackdrop($('world'));
 let pixelMode=new URLSearchParams(location.search).get('background')==='pixel';
 const backdropButton=document.createElement('button');backdropButton.id='background-style';document.body.append(backdropButton);
-function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel art':'Scenery: Cinematic';}
+function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel expedition':'Scenery: Golden forest';}
 backdropButton.onclick=()=>{pixelMode=!pixelMode;applyBackdrop();};
 const collectionDialog=document.createElement('dialog');collectionDialog.id='collection-dialog';
 collectionDialog.setAttribute('aria-label','Choose your chimp');
@@ -33,17 +35,23 @@ camera.position.set(0,0,20);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
 renderer.setClearColor(0,0);$('world').append(renderer.domElement);
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.02;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+// Soft reflection information keeps metallic avatars readable without repainting their materials.
+const environmentGenerator=new THREE.PMREMGenerator(renderer),studio=new RoomEnvironment();
+const studioMap=environmentGenerator.fromScene(studio,.04);
+scene.environment=studioMap.texture;scene.environmentIntensity=.38;studio.dispose();environmentGenerator.dispose();
 scene.fog=new THREE.Fog(0x91b6a0,25,58);
-const sun=new THREE.DirectionalLight(0xffefd1,3.2);sun.position.set(-5,9,12);
+const sun=new THREE.DirectionalLight(0xffefd1,2.4);sun.position.set(-5,9,12);
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
 Object.assign(sun.shadow.camera,{left:-7,right:7,top:10,bottom:-10,near:.5,far:35});
 sun.shadow.bias=-.0005;sun.shadow.normalBias=.04;scene.add(sun.target);
-scene.add(sun,new THREE.HemisphereLight(0xd9ecd9,0x303e31,1.7));
-const rim=new THREE.DirectionalLight(0xeafcff,2.05);rim.position.set(4,5,6);scene.add(rim);
+scene.add(sun,new THREE.HemisphereLight(0xe5eeeb,0x434133,1.3));
+const rim=new THREE.DirectionalLight(0xeafcff,.8);rim.position.set(4,5,6);scene.add(rim);
 const heroTarget=new THREE.Object3D();scene.add(heroTarget);
-const heroLight=new THREE.SpotLight(0xffffff,16,22,Math.PI/7,.06,1.25);heroLight.position.set(0,4.5,7);heroLight.target=heroTarget;scene.add(heroLight);
+// Dedicated neutral key/fill follow the avatar; scenery palette never darkens the hero.
+const heroLight=new THREE.DirectionalLight(0xfff4e7,2.6);heroLight.target=heroTarget;heroLight.layers.set(1);scene.add(heroLight);
+const heroFill=new THREE.DirectionalLight(0xe7f3ff,1.05);heroFill.target=heroTarget;heroFill.layers.set(1);scene.add(heroFill);
 const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer);
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
@@ -61,14 +69,7 @@ function quality(){
 $('quality').onclick=()=>{desktopHigh=!desktopHigh;quality();};
 const platformMeshes=new Map();
 const characterLayer=new THREE.Group();scene.add(characterLayer);
-const jetVisual=new THREE.Group(),jetEquipped=new THREE.Group();scene.add(jetVisual,jetEquipped);
-const jetMetal=new THREE.MeshStandardMaterial({color:0x43cdd7,metalness:.7,roughness:.25});
-const jetFire=new THREE.MeshBasicMaterial({color:0xffb52c});
-const jetTank=new THREE.CylinderGeometry(.14,.14,.58,20),jetNozzle=new THREE.ConeGeometry(.12,.55,16);
-for(const group of [jetVisual,jetEquipped])for(const side of [-1,1]){
- const tank=new THREE.Mesh(jetTank,jetMetal);tank.position.x=side*.18;group.add(tank);
- const flame=new THREE.Mesh(jetNozzle,jetFire);flame.rotation.z=Math.PI;flame.position.set(side*.18,-.48,0);group.add(flame);
-}
+const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,jetEquipped);
 jetVisual.scale.setScalar(ITEM_SCALE);jetEquipped.scale.setScalar(ITEM_SCALE);
 jetVisual.visible=jetEquipped.visible=false;
 
@@ -182,7 +183,7 @@ async function selectAvatar(entry){
  if(request!==avatarRequest){disposeCharacter(next);return;}
  if(avatar){characterLayer.remove(avatar.root);disposeCharacter(avatar);}
  for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();game.reset(7);lastTheme=-1;
- avatar=next;selectedId=entry.id||'';facingFlip=0;avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
+ avatar=next;avatar.model.traverse(o=>{if(o.isMesh)o.layers.enable(1);});selectedId=entry.id||'';facingFlip=0;avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
  $('play').disabled=false;menu('menu');
  $('avatar-status').textContent=entry.name+' · '+avatar.boneCount+' bones'+(entry.buffer?' · local file':'');
  }catch(e){
@@ -233,7 +234,8 @@ fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error
 
 function drawWorld(dt=0){
  jetVisual.visible=!!game.jetpack;
- if(game.jetpack){jetVisual.position.set(game.jetpack.x,game.jetpack.y,.6);jetVisual.rotation.y=visualTime;}
+ if(game.jetpack){jetVisual.position.set(game.jetpack.x,game.jetpack.y+Math.sin(visualTime*2)*.08,.6);jetVisual.rotation.y=Math.sin(visualTime*.9)*.45;}
+ animateJetpack(jetVisual,visualTime,false);animateJetpack(jetEquipped,visualTime,true);
  jetEquipped.visible=game.jetRemaining>0;
  jetEquipped.position.set(game.x,game.y+.55,-.25);jetEquipped.rotation.y=yaw;
 
@@ -241,11 +243,11 @@ function drawWorld(dt=0){
  for(const [id,m]of platformMeshes){if(!live.has(id)){removeBranch(m);platformMeshes.delete(id);}}
  for(const p of game.platforms){
   let m=platformMeshes.get(p.id);if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
-  m.position.set(p.x,p.y,0);m.visible=!p.broken;
+  m.position.set(p.x,p.y,0);m.visible=!p.broken;scenery.animateBranch(m,p,visualTime);
   m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=1+Math.sin(visualTime*2+p.id)*.07;
  }
- const idx=Math.floor(game.time/30)%4, blend=Math.min((game.time%30)/1.5,1);
- pixelBackdrop.draw(idx);
+ const idx=Math.floor(game.time/30)%4, blend=THREE.MathUtils.smoothstep(game.time%30,0,4);
+ if(pixelMode)pixelBackdrop.draw(idx,game.time<30?1:blend);
  const current=themes[idx],previousTheme=themes[(idx+3)%4],from=game.time<30?current:previousTheme;
  if(lastTheme!==idx){lastTheme=idx;$('theme').textContent=current.name;if(game.time>=30)toast(current.name);}
  const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle();
@@ -253,8 +255,10 @@ function drawWorld(dt=0){
  $('world').style.background='linear-gradient('+top+','+bottom+')';
  const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone();
  scene.fog.color.copy(palette);
- scenery.update(game.camera,visualTime,dt,palette,idx===3);
- $('world').classList.toggle('night',idx===3);
+ const night=THREE.MathUtils.lerp(from===themes[3]?1:0,idx===3?1:0,blend);
+ scenery.update(game.camera,visualTime,dt,palette,night);
+ $('world').classList.toggle('night',night>.5);
+ $('world').style.setProperty('--night-strength',night);
  sun.color.set(from.light).lerp(other.set(current.light),blend);
 }
 function tick(dt,control=input()){
@@ -287,7 +291,7 @@ function renderFrame(now){
  if(mode==='playing'){acc+=dt;while(acc>=STEP){tick(STEP);acc-=STEP;if(mode!=='playing'){acc=0;break;}}}
  if(avatar){
   avatar.root.position.set(game.x,game.y,0);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;
-  heroLight.position.set(game.x+2.4,game.y+4.5,7);heroTarget.position.set(game.x,game.y+1,0);
+  heroLight.position.set(game.x+2.4,game.y+4.5,7);heroFill.position.set(game.x-3,game.y+2,5);heroTarget.position.set(game.x,game.y+1,0);
   avatar.update(dt,visualTime,game.vy,game.bounceAge,mode==='playing');
  }
  if(mode==='playing'&&introTime<3)introTime=Math.min(3,introTime+dt);

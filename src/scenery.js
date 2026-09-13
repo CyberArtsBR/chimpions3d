@@ -30,6 +30,20 @@ function surface(kind){
  });
 }
 const barkTexture=surface('bark'),mossTexture=surface('moss');
+// Linear data maps: relief and roughness are independent of painted color.
+function reliefMap(kind){
+ const texture=canvasTexture(512,512,(c,w,h)=>{
+  const r=rng(kind==='bark'?938:541);c.fillStyle='#999999';c.fillRect(0,0,w,h);
+  for(let i=0;i<(kind==='bark'?160:6000);i++){
+   const v=Math.floor(45+r()*170);c.fillStyle=`rgb(${v},${v},${v})`;
+   if(kind==='bark'){
+    c.strokeStyle=c.fillStyle;c.lineWidth=1+r()*5;c.beginPath();const x=r()*w;
+    for(let y=0;y<=h;y+=8){const xx=x+Math.sin(y*.022+i)*4;y?c.lineTo(xx,y):c.moveTo(xx,y);}c.stroke();
+   }else{c.beginPath();c.arc(r()*w,r()*h,1+r()*3,0,Math.PI*2);c.fill();}
+  }
+ });texture.colorSpace=THREE.NoColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;return texture;
+}
+const barkRelief=reliefMap('bark'),mossRelief=reliefMap('moss');
 barkTexture.wrapS=barkTexture.wrapT=mossTexture.wrapS=mossTexture.wrapT=THREE.RepeatWrapping;
 const leafTexture=canvasTexture(128,256,(c)=>{
  const g=c.createLinearGradient(20,20,100,220);g.addColorStop(0,'#cedd86');g.addColorStop(.4,'#709446');g.addColorStop(1,'#183d29');
@@ -92,14 +106,22 @@ const mushroomGeo=new THREE.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI/2);
 const stemGeo=new THREE.CylinderGeometry(.1,.14,.26,10);
 const bananaPath=new THREE.QuadraticBezierCurve3(new THREE.Vector3(-.22,0,0),new THREE.Vector3(0,-.38,0),new THREE.Vector3(.23,.07,0));
 const bananaGeo=new THREE.TubeGeometry(bananaPath,22,.068,10,false);
+// Taper the curved fruit into a recognizable pointed silhouette.
+const fruitVertices=bananaGeo.attributes.position;
+for(let i=0;i<fruitVertices.count;i++){
+ const t=Math.floor(i/11)/22,center=bananaPath.getPoint(t),taper=.32+.68*Math.pow(Math.sin(Math.PI*t),.45);
+ fruitVertices.setXYZ(i,center.x+(fruitVertices.getX(i)-center.x)*taper,center.y+(fruitVertices.getY(i)-center.y)*taper,center.z+(fruitVertices.getZ(i)-center.z)*taper);
+}bananaGeo.computeVertexNormals();
 const tipGeo=new THREE.SphereGeometry(.06,7,5);
 const knotGeo=new THREE.TorusGeometry(.09,.027,6,16);
+const arrowShape=new THREE.Shape();arrowShape.moveTo(-.7,-.25);arrowShape.lineTo(.05,-.25);arrowShape.lineTo(.05,-.65);arrowShape.lineTo(.85,0);arrowShape.lineTo(.05,.65);arrowShape.lineTo(.05,.25);arrowShape.lineTo(-.7,.25);arrowShape.closePath();
+const arrowGeo=new THREE.ExtrudeGeometry(arrowShape,{depth:.12,bevelEnabled:true,bevelSize:.04,bevelThickness:.04,bevelSegments:1,steps:1});
 const dummy=new THREE.Object3D();
 export function createScenery(scene,renderer){
- const bark=new THREE.MeshStandardMaterial({color:0xa7977d,map:barkTexture,bumpMap:barkTexture,bumpScale:.09,roughness:.97});
- const moss=new THREE.MeshStandardMaterial({color:0xabc788,map:mossTexture,bumpMap:mossTexture,bumpScale:.05,roughness:.94});
+ const bark=new THREE.MeshStandardMaterial({color:0xc5a782,map:barkTexture,bumpMap:barkRelief,bumpScale:.055,roughness:.87});
+ const moss=new THREE.MeshStandardMaterial({color:0xa8bd79,map:mossTexture,bumpMap:mossRelief,bumpScale:.045,roughness:.96});
  const leaf=new THREE.MeshStandardMaterial({map:leafTexture,alphaTest:.35,side:THREE.DoubleSide,roughness:.88});
- const end=new THREE.MeshStandardMaterial({map:endTexture,bumpMap:endTexture,bumpScale:.025,roughness:.84});
+ const end=new THREE.MeshStandardMaterial({map:endTexture,bumpMap:endTexture,bumpScale:.012,roughness:.76});
  const dark=new THREE.MeshStandardMaterial({color:0x3f3023,roughness:1});
  const gold=new THREE.MeshStandardMaterial({color:0xffffff,map:bananaTexture,roughness:.33,metalness:.02,emissive:0x5f3800,emissiveIntensity:.18});
  const red=new THREE.MeshStandardMaterial({color:0xffffff,map:mushroomTexture,bumpMap:mushroomTexture,bumpScale:.016,roughness:.38});
@@ -124,7 +146,7 @@ export function createScenery(scene,renderer){
  }
  let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null;
  function attachPlatform(group){
-  if(!platformTemplate||group.getObjectByName('authored-branch'))return;
+  if(!platformTemplate||group.userData.platformType==='cracked'||group.getObjectByName('authored-branch'))return;
   const model=platformTemplate.clone(true),authored=new THREE.Group();authored.name='authored-branch';
   model.scale.x*=group.userData.platformWidth;model.scale.y*=PLATFORM_SCALE;model.scale.z*=PLATFORM_SCALE;authored.add(model);authored.visible=highQuality;group.add(authored);
   // Uploaded wood has no moss: keep a low, readable landing cushion.
@@ -153,7 +175,7 @@ export function createScenery(scene,renderer){
     o.castShadow=o.receiveShadow=true;
     for(const material of (Array.isArray(o.material)?o.material:[o.material])){
      if(material?.isMeshStandardMaterial&&!material.map&&!material.vertexColors&&o.geometry.attributes.uv){
-      material.map=barkTexture;material.bumpMap=barkTexture;material.bumpScale=.045;material.roughness=.9;material.metalness=0;material.needsUpdate=true;
+      material.map=barkTexture;material.bumpMap=barkRelief;material.bumpScale=.055;material.roughness=.9;material.metalness=0;material.needsUpdate=true;
      }
     }
    }});
@@ -237,15 +259,25 @@ export function createScenery(scene,renderer){
   batch.castShadow=batch.receiveShadow=true;return batch;
  }
  function branch(p){
-  const group=new THREE.Group();group.userData.platformWidth=p.width;
+  const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;
   const fallback=new THREE.Group();fallback.name='procedural-branch';fallback.scale.set(1,PLATFORM_SCALE,PLATFORM_SCALE);group.add(fallback);
   // Physics already enlarged width; scale only thickness and depth here.
-  const wood=mesh(logGeo,bark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
+  if(p.type==='cracked'){
+   // Two pieces and exposed grain communicate fragility without moving the landing plane.
+   for(const side of [-1,1]){
+    const wood=mesh(logGeo,bark,fallback,side*p.width*.255,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.88,p.width*.49,1);wood.castShadow=wood.receiveShadow=true;
+    const splinter=mesh(logGeo,end,fallback,side*.045,-.31,.17);splinter.rotation.z=side*.35;splinter.scale.set(.19,.38,.16);
+   }
+  }else{
+   const wood=mesh(logGeo,bark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
+  }
   for(const side of [-1,1]){
    const cut=mesh(capGeo,end,fallback,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
    const twig=mesh(logGeo,bark,fallback,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
-  const top=mesh(mossGeo,moss,fallback,0,-.085);top.scale.set(p.width/2,.085,.32);top.receiveShadow=true;
+  for(const side of (p.type==='cracked'?[-1,1]:[0])){
+   const top=mesh(mossGeo,moss,fallback,side*p.width*.26,-.085);top.scale.set(p.width/(side?4:2),.085,.32);top.receiveShadow=true;
+  }
   const detail=new THREE.Group();fallback.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
   instances(knotGeo,dark,detail,5,(i,o)=>{o.position.set((i/4-.5)*p.width*.85,-.27,.205);o.scale.set(.6+i%2*.25,.5,1);});
   instances(mossGeo,moss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
@@ -253,13 +285,24 @@ export function createScenery(scene,renderer){
   instances(leafGeo,leaf,fallback,14,(i,o)=>{
    o.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);o.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);o.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);
   });
-  if(p.type==='moving')instances(knotGeo,blue,group,3,(i,o)=>{o.position.set((i-1)*.32*PLATFORM_SCALE,-.23*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.6*PLATFORM_SCALE,PLATFORM_SCALE,PLATFORM_SCALE);});
+  if(p.type==='moving'){
+   const paddles=new THREE.Group();group.add(paddles);group.userData.paddles=paddles;
+   for(const side of [-1,1]){
+    const fin=mesh(arrowGeo,blue,paddles,side*(p.width*.5-.2),-.23*PLATFORM_SCALE,.48);
+    fin.rotation.z=side<0?Math.PI:0;fin.scale.setScalar(.24*PLATFORM_SCALE);
+   }
+   instances(knotGeo,cream,group,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.3,-.24*PLATFORM_SCALE,0);o.rotation.y=Math.PI/2;o.scale.set(2.4,2.4,1.4);});
+  }
   if(p.type==='cracked')instances(logGeo,dark,group,3,(i,o)=>{o.position.set((i-1)*.13*PLATFORM_SCALE,-.19*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.07*PLATFORM_SCALE,.38*PLATFORM_SCALE,.07*PLATFORM_SCALE);o.rotation.z=(i%2?-.5:.5);});
   if(p.type==='spring'){
-   const mushroom=new THREE.Group();mushroom.scale.setScalar(ITEM_SCALE);group.add(mushroom);
+   const mushroom=new THREE.Group();mushroom.scale.setScalar(ITEM_SCALE);group.add(mushroom);group.userData.mushroom=mushroom;
    const stem=mesh(stemGeo,cream,mushroom,0,.12);stem.castShadow=true;
    const under=mesh(capGeo,gills,mushroom,0,.25);under.rotation.x=-Math.PI/2;under.scale.set(2,1.6,1);
    const cap=mesh(mushroomGeo,red,mushroom,0,.25);cap.scale.set(.42,.23,.34);cap.castShadow=cap.receiveShadow=true;
+   instances(mossGeo,cream,mushroom,7,(i,o)=>{
+    const angle=i*2.399,rad=i===0?0:.23;o.position.set(Math.cos(angle)*rad,.25+.23*Math.sqrt(1-(rad/.42)**2),Math.sin(angle)*rad*.8);
+    o.scale.set(.046,.012,.039);o.rotation.z=-Math.cos(angle)*.4;
+   });
    const collar=mesh(knotGeo,cream,mushroom,0,.14);collar.rotation.x=Math.PI/2;collar.scale.set(1.1,1.1,1);
   }
   const coin=new THREE.Group();coin.position.set(0,1,.18);coin.scale.setScalar(ITEM_SCALE);group.add(coin);
@@ -276,6 +319,12 @@ export function createScenery(scene,renderer){
   group.userData.coin=coin;attachPlatform(group);return group;
  }
  return {branch,
+  animateBranch(group,p,time){
+   const paddles=group.userData.paddles;
+   if(paddles){paddles.position.x=Math.sin(time*(p.moveSpeed||1)*3+p.phase)*.045;paddles.scale.y=1+Math.sin(time*3+p.phase)*.06;}
+   const mushroom=group.userData.mushroom;
+   if(mushroom){const pulse=Math.sin(time*2+p.id)*.035;mushroom.scale.set(ITEM_SCALE*(1-pulse*.45),ITEM_SCALE*(1+pulse),ITEM_SCALE*(1-pulse*.45));}
+  },
   setPixelMode(enabled){background.visible=!enabled;},
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return !!treeImageMesh?.visible;},
@@ -290,7 +339,7 @@ export function createScenery(scene,renderer){
    forest.forEach((m,i)=>{m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(new THREE.Color(0x25483e),.4+i*.12);});
    trunk.position.y=cameraY;
    currentCamera=cameraY;fitTree();
-   if(treeImageMesh)treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,night?.4:.10);
+   if(treeImageMesh)treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);
    for(let i=0;i<110;i++){
     const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
     dummy.position.set(side*(1.2+Math.sin(i*6.7)*.2)+.35,cameraY+y,-2.75);
@@ -298,7 +347,7 @@ export function createScenery(scene,renderer){
     dummy.scale.set(.25+Math.sin(i)*.08,.25,1);dummy.updateMatrix();ivy.setMatrixAt(i,dummy.matrix);
    }ivy.instanceMatrix.needsUpdate=true;
    motes.position.set(Math.sin(time*.12)*.4,cameraY+Math.sin(time*.17),0);
-   moteMaterial.opacity=night?.9:.35;
+   moteMaterial.opacity=.35+night*.55;
    ringAge+=dt;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);
    for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}
    while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();
@@ -307,7 +356,7 @@ export function createScenery(scene,renderer){
   },
   reset(){sparks.length=0;ringAge=1;},
   setQuality(high){highQuality=high;loadPlatform();loadTree();
-   scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!platformTemplate;if(o.userData.desktopDetail)o.visible=high;});
+   scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});
    motes.visible=high;trunk.geometry=high?detailedTrunkGeo:trunkGeo;refreshBackground();
   }
  };

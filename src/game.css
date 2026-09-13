@@ -94,3 +94,12 @@ body[data-mode=playing] #background-style{display:none}
 .court-edges span{opacity:0!important}
 
 
+/* Expedition presentation: warm timber UI, jade accents, quiet playfield. */
+#theme{letter-spacing:.12em;text-shadow:0 2px 5px #102f2c;transition:color 1s ease}
+#background-style{background:#183b35ed;border-color:#a6b77b;color:#f9e8b9}
+.pixel-mode #theme,.pixel-mode #pace{font-family:monospace;letter-spacing:.1em;text-shadow:2px 2px 0 #16253e}
+.pixel-mode #background-style{border-radius:2px;border:2px solid #b6d69a;box-shadow:3px 3px 0 #132638;font-family:monospace}
+.pixel-mode .stat{border-radius:2px;box-shadow:3px 3px 0 #132638;background:#172b3ddd;border-color:#7caa98}
+.pixel-mode .touch{border-radius:4px;border:2px solid #b6d69a;box-shadow:3px 3px 0 #132638}
+#world>.sun{transition:opacity 4s ease,filter 4s ease}
+#world>.rays{transition:opacity 4s ease}
