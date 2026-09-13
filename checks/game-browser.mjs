@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import {chromium} from '@playwright/test';
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1000,height:720}});
+// Explicit simulation steps keep slow software-rendered CI frames from pausing input tests.
 async function screenshot(options){
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
- try{await page.screenshot(options);}finally{await page.evaluate(()=>window.chimpJumpTest.resumeRendering());}
+ await page.evaluate(()=>window.chimpJumpTest.render());
+ await page.screenshot(options);
 }
 const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')console.log(m.text());});
 try{
@@ -20,16 +22,18 @@ try{
  await screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.keyboard.down('ArrowLeft');
- await page.waitForFunction(()=>window.chimpJump().yaw< -.6);
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
+ assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Left key must turn the character');
  await page.keyboard.up('ArrowLeft');
  const left=await page.evaluate(()=>window.chimpJump());assert(left.x<0);
  await page.keyboard.down('ArrowRight');
- await page.waitForFunction(()=>window.chimpJump().yaw>.6);
+ await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
+ assert(await page.evaluate(()=>window.chimpJump().yaw>.6),'Right key must turn the character');
  await page.keyboard.up('ArrowRight');
  await screenshot({path:'checks/game-playing.png'});
  await page.getByRole('button',{name:'Pause game'}).click();
  const time=await page.evaluate(()=>window.chimpJump().time);
- await page.waitForTimeout(100);
+ await page.evaluate(()=>window.chimpJumpTest.step(60));
  assert.equal(await page.evaluate(()=>window.chimpJump().time),time);
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  // Keep a stationary, safe bounce fixture to inspect active-time theme changes.
@@ -84,13 +88,13 @@ try{
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  // Fixed scene size after repeat restarts: shared resources should not accumulate.
  await page.waitForTimeout(100);
- const before=await page.evaluate(()=>window.chimpJump());
+ const before=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
  for(let i=0;i<8;i++){
   await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);});
   await page.getByRole('button',{name:'JUMP AGAIN'}).click();
  }
  await page.waitForTimeout(100);
- const after=await page.evaluate(()=>window.chimpJump());
+ const after=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
  assert(after.geometries<=before.geometries+3,'Geometry count must remain bounded');
  assert(after.textures<=before.textures+1,'Texture count must remain bounded');
  // Catalog search uses original names; only supplied GLBs can be selected.
@@ -112,6 +116,5 @@ try{
  console.log('PASS game: actual GLB, turns, movement, pause, themes, retry, mobile, local upload, invalid files/rigs, detail switch, bounded resources');
 }finally{
  await screenshot({path:'checks/game-final.png'});
- for(const name of ['game-menu','game-playing','game-theme','game-mobile','game-mobile-menu'])if(fs.existsSync('checks/'+name+'.png'))console.log(name.toUpperCase()+'_IMAGE_BASE64:'+fs.readFileSync('checks/'+name+'.png').toString('base64'));
  await browser.close();
 }
