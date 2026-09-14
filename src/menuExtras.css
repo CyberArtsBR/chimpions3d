@@ -1,17 +1,57 @@
-/* Player-facing title menu layout fixes and community navigation. */
+/* Player-facing title menu refinements. */
 #world::before,#world>.mist{display:none!important}
-body[data-mode='menu']:not([data-dev-tools='true']) #choose,body[data-mode='menu'][data-dev-tools='true'] #choose{left:12%!important;top:62.2%!important;width:76%!important;height:5.5%!important}
-body[data-mode='menu']:not([data-dev-tools='true']) #quality,body[data-mode='menu'][data-dev-tools='true'] #quality{left:24%!important;top:68.8%!important;width:52%!important;height:5.4%!important}
-body[data-mode=menu] .keys{left:12%!important;top:75.2%!important;width:76%!important;height:5.4%!important}
-body[data-mode=menu] #chimpions-lab-button{position:absolute;left:28%;top:82.35%;width:44%;height:5.2%;margin:0;padding:0;border:0;border-radius:16px;background:transparent;color:#fff6e7;display:flex;align-items:center;justify-content:center;font:850 2.05cqw/1.2 ui-rounded,'Trebuchet MS',system-ui,sans-serif;text-shadow:0 2px 3px #130b06;cursor:pointer}
-body[data-mode=menu] #chimpions-lab-button:hover{background:#ffdc8525}body[data-mode=menu] .gamepad-callout{top:88.25%!important}body[data-mode=menu] #records-button{left:24%!important;top:93.05%!important;width:52%!important;height:4.2%!important;padding:0!important;display:flex;align-items:center;justify-content:center}
-body:not([data-mode=menu]) #chimpions-lab-button,body:not([data-mode=menu]) #community-links{display:none!important}
 
-/* Fixed to the viewport, not inside the illustrated card. The old implementation put
-   this dock below a clipped/scrolling card, so it could exist in DOM but never be seen. */
-#community-links{position:fixed;z-index:10000;left:50%;bottom:14px;transform:translateX(-50%);width:min(1120px,calc(100vw - 34px));display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:14px;pointer-events:auto}
-#community-links a{min-height:62px;padding:13px 20px;border-radius:18px;border:1px solid #456d8b;background:linear-gradient(180deg,#0b1928f5,#07111df5);color:#f4f7ff;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:11px;font:850 clamp(14px,1.35vw,19px)/1.15 ui-rounded,'Trebuchet MS',system-ui,sans-serif;box-shadow:0 10px 32px #0009,inset 0 1px #ffffff17;white-space:nowrap;backdrop-filter:blur(12px)}
-#community-links a:first-child{color:#8ff4eb;border-color:#2d7788}#community-links a:nth-child(2){color:#f4f5ff;border-color:#50617b}#community-links a:nth-child(3){color:#afa7ff;border-color:#565398}#community-links a:hover,#community-links a:focus-visible{transform:translateY(-2px);filter:brightness(1.14)}#community-links .community-icon{font-size:1.35em;line-height:1;font-weight:950}
-body[data-mode=menu] #overlay{padding-bottom:90px!important}
-@media(max-width:600px){body[data-mode='menu']:not([data-dev-tools='true']) #choose,body[data-mode='menu'][data-dev-tools='true'] #choose{left:11%!important;width:78%!important}body[data-mode=menu] .keys{left:10%!important;width:80%!important;font-size:1.6cqw!important}#community-links{grid-template-columns:1fr;gap:6px;bottom:8px;width:min(94vw,440px)}#community-links a{min-height:43px;padding:8px 12px;border-radius:12px;font-size:13px}body[data-mode=menu] #overlay{padding-bottom:160px!important}}
-@media(max-height:650px) and (min-width:601px){#community-links{bottom:7px;gap:8px}#community-links a{min-height:46px;padding:8px 12px;font-size:13px}body[data-mode=menu] #overlay{padding-bottom:58px!important}}
+/* The three wooden plaques directly under PERSONAL BEST are now the three requested
+   official destinations. The original Choose/Upload/Detail controls stay functional in
+   code, but no longer occupy those illustrated plaques. */
+body[data-mode=menu] #choose,
+body[data-mode=menu] #upload,
+body[data-mode=menu] #quality{display:none!important}
+
+body[data-mode=menu] #menu-social-buttons{display:contents}
+body:not([data-mode=menu]) #menu-social-buttons{display:none!important}
+body[data-mode=menu] #menu-social-buttons a{
+  position:absolute;margin:0;padding:0;border:0;box-shadow:none;background:transparent;
+  color:#fff6e7;text-decoration:none;border-radius:16px;display:flex;align-items:center;
+  justify-content:center;gap:.72cqw;text-shadow:0 2px 3px #130b06;line-height:1.1;
+  font:850 1.72cqw/1.1 ui-rounded,'Trebuchet MS',system-ui,sans-serif;
+  transition:background .14s ease,filter .14s ease;
+}
+body[data-mode=menu] #menu-social-buttons a:nth-child(1){left:22.6%;top:62.3%;width:27%;height:5.2%}
+body[data-mode=menu] #menu-social-buttons a:nth-child(2){left:52%;top:62.3%;width:29.3%;height:5.2%}
+body[data-mode=menu] #menu-social-buttons a:nth-child(3){left:32%;top:69%;width:37.5%;height:4.9%;font-size:1.85cqw}
+body[data-mode=menu] #menu-social-buttons a:hover,
+body[data-mode=menu] #menu-social-buttons a:focus-visible{background:#ffdc8528;filter:brightness(1.12)}
+body[data-mode=menu] #menu-social-buttons .community-icon{font-size:1.15em;line-height:1;font-weight:950;color:#ffe394}
+
+body[data-mode=menu] .keys{left:12%!important;top:75.2%!important;width:76%!important;height:5.4%!important}
+body[data-mode=menu] #chimpions-lab-button{
+  position:absolute;left:28%;top:82.35%;width:44%;height:5.2%;margin:0;padding:0;
+  border:0;border-radius:16px;background:transparent;color:#fff6e7;display:flex;
+  align-items:center;justify-content:center;font:850 2.05cqw/1.2 ui-rounded,'Trebuchet MS',system-ui,sans-serif;
+  text-shadow:0 2px 3px #130b06;cursor:pointer
+}
+body[data-mode=menu] #chimpions-lab-button:hover{background:#ffdc8525}
+body[data-mode=menu] .gamepad-callout{top:88.25%!important}
+body[data-mode=menu] #records-button{
+  left:24%!important;top:93.05%!important;width:52%!important;height:4.2%!important;
+  padding:0!important;display:flex;align-items:center;justify-content:center
+}
+body:not([data-mode=menu]) #chimpions-lab-button{display:none!important}
+
+/* Detail/quality is a gameplay setting, not a title-screen action. Keep the same
+   working button and move its only player-facing presentation to Pause. */
+body:not([data-mode=paused]) #quality{display:none!important}
+body[data-mode=paused] .options{display:flex!important;justify-content:center;margin:14px 0 4px}
+body[data-mode=paused] #quality{
+  display:inline-flex!important;align-items:center;justify-content:center;min-width:220px;
+  padding:10px 16px;border:1px solid #c7d79b66;border-radius:12px;background:#173d33;
+  color:#fff1c8;font-weight:850;font-size:13px;box-shadow:0 5px 18px #00150f55
+}
+body[data-mode=paused] #quality:not(:disabled):hover{filter:brightness(1.13)}
+
+@media(max-width:600px){
+  body[data-mode=menu] .keys{left:10%!important;width:80%!important;font-size:1.6cqw!important}
+  body[data-mode=menu] #menu-social-buttons a{font-size:1.55cqw;gap:.4cqw}
+  body[data-mode=menu] #menu-social-buttons a:nth-child(3){font-size:1.65cqw}
+}
