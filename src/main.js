@@ -1,6 +1,7 @@
 import './polish.css';
 import './runtimeEnhancements.js';
 import './visualCompletion.js';
+import './mobileVisualBudget.js';
 import {setupBiomePolish} from './biome-polish.js';
 
 const params=new URLSearchParams(location.search);
