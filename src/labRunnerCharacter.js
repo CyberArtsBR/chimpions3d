@@ -57,9 +57,8 @@ export async function createLabRunnerCharacter(url){
   model.position.x-=(box.min.x+box.max.x)/2;model.position.z-=(box.min.z+box.max.z)/2;model.position.y-=box.min.y;
   model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=false;o.frustumCulled=false;}});
 
-  // This is the same world-space arm solver used by the working Rig Lab. It avoids
-  // adding Euler rotations directly to arbitrary imported local bone axes (the source
-  // of the twisted character in the first Chimpion Dash prototype).
+  // Same world-space arm solver used by the working Rig Lab. Never add raw Euler
+  // values to imported bone-local axes: that was what twisted the first Dash prototype.
   for(const side of ['left','right']){
     const arm=rig[side+'UpperArm'],elbow=rig[side+'Forearm'];if(!isDescendant(elbow,arm))throw new Error('Forearm hierarchy is incompatible.');
     model.updateWorldMatrix(true,true);const from=worldDirection(arm,elbow);if(from.lengthSq()<.5)throw new Error('Arm has zero length.');
@@ -100,7 +99,8 @@ export async function createLabRunnerCharacter(url){
     return{pose,offset};
   }
 
-  applyPose(makePose('IDLE',0,0,0,false).pose,0,1);model.updateWorldMatrix(true,true);
+  // Keep the exact validated preparation path used by the Rig Lab.
+  const idle=makePose('IDLE',0,0,0,false);applyPose(idle.pose,idle.offset,1);model.updateWorldMatrix(true,true);
   for(const side of ['left','right'])if(worldDirection(rig[side+'UpperArm'],rig[side+'Forearm']).y>-.55)throw new Error('Idle arm validation failed.');
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});box.setFromObject(model,true);model.position.y-=box.min.y;model.updateWorldMatrix(true,true);
   root.rotation.y=Math.PI/2;model.visible=true;
