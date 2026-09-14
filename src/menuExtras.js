@@ -11,14 +11,14 @@ function makeLabButton(card){
   const lab=document.createElement('button');
   lab.id='chimpions-lab-button';
   lab.type='button';
-  lab.textContent='Chimpions Lab';
-  lab.setAttribute('aria-label','Open Chimpions Lab and Chimpion Dash');
+  lab.textContent='Chimpions Dash';
+  lab.setAttribute('aria-label','Open Chimpions Dash');
   lab.onclick=()=>{
     try{
       const selected=window.chimpJump?.().selectedId;
       if(selected)localStorage.setItem('chimpions-lab-avatar',String(selected));
     }catch{}
-    location.href='?lab=1';
+    location.href='?dash=1';
   };
   card.append(lab);
 }

@@ -136,3 +136,9 @@ body[data-lab-state=paused] #lab-3d{filter:saturate(.65) brightness(.75)}
   #dash-stage-flash,#dash-tip,.banana.collected{transition:none}
   #dash-light::after{animation:none!important;display:none}
 }
+
+/* One shared floor baseline for sprites, character and contact shadow. */
+#dash-ground{height:19%!important}
+#dash-shadow{bottom:18.35%}
+.hazard{object-fit:fill;filter:drop-shadow(0 2px 2px #02140d99)}
+#dash-tip{max-width:92vw;white-space:normal;text-align:center}

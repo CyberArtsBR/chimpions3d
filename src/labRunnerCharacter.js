@@ -29,7 +29,7 @@ export async function createLabRunnerCharacter(url){
   const gltf=await new GLTFLoader().loadAsync(url),model=gltf.scene,root=new THREE.Group(),visual=new THREE.Group();
   root.add(visual);visual.add(model);model.visible=false;
   const rig={},bases=new Map(),axes=new Map(),used=new Set(),q=new THREE.Quaternion(),delta=new THREE.Quaternion();
-  let phase=0,elapsed=0,bodyOffset=0,landingPulse=0;
+  let phase=0,elapsed=0,bodyOffset=0,landingPulse=0,duckBlend=0;
   const bones=[];model.traverse(o=>{if(o.isBone)bones.push(o);});if(!bones.length)throw new Error('GLB has no bones.');
   for(const key of Object.keys(BONE_MAPPING)){
     const side=key.startsWith('left')?'left':key.startsWith('right')?'right':'',kind=side?key.slice(side.length):key;
@@ -75,9 +75,25 @@ export async function createLabRunnerCharacter(url){
       const apex=clamp(jumpHeight/85,0,1),launch=clamp(vy/600,0,1),tuck=.18+.40*apex;offset=-.055*tuck;set('hips',.09*tuck);set('spine',.075*tuck);
       for(const side of ['left','right']){set(side+'Thigh',-.44*tuck);set(side+'Shin',.82*tuck);set(side+'Foot',-.28*tuck);set(side+'UpperArm',-.44+.14*launch);set(side+'Forearm',-.28);}
     }
-    if(sliding){
-      offset=-.39;set('hips',.30);set('spine',.42);set('chest',.15);set('neck',-.13);set('head',-.10);
-      for(const [side,sign] of [['left',1],['right',-1]]){set(side+'Thigh',-.82,0,sign*.04);set(side+'Shin',1.30);set(side+'Foot',-.42);set(side+'UpperArm',.27*sign,0,sign*.12);set(side+'Forearm',-.56);}
+    if(duckBlend>.001){
+      // Low athletic crouch: knees carry the compression, torso folds forward,
+      // head counter-rotates and arms tuck behind the knees rather than flailing.
+      const duck={
+       hips:[.28,0,0],spine:[.62,0,0],chest:[.18,0,0],neck:[-.34,0,0],head:[-.22,0,0],
+      };
+      for(const [side,sign] of [['left',1],['right',-1]]){
+       duck[side+'Thigh']=[-1.42,0,sign*.055];
+       duck[side+'Shin']=[1.92,0,0];
+       duck[side+'Foot']=[-.46,0,0];
+       duck[side+'Shoulder']=[.08,0,-sign*.025];
+       duck[side+'UpperArm']=[.55,0,sign*.065];
+       duck[side+'Forearm']=[-1.02,0,0];
+       duck[side+'Hand']=[-.08,0,0];
+      }
+      for(const [key,angles] of Object.entries(duck)){
+       const from=pose[key]||[0,0,0];pose[key]=angles.map((angle,i)=>THREE.MathUtils.lerp(from[i],angle,duckBlend));
+      }
+      offset=THREE.MathUtils.lerp(offset,-.72,duckBlend);
     }
     if(landingPulse>0&&!sliding){const t=landingPulse;offset-=.10*t;set('hips',.16*t);set('spine',.10*t);for(const side of ['left','right']){set(side+'Thigh',-.23*t);set(side+'Shin',.43*t);}}
     return{pose,offset};
@@ -86,17 +102,21 @@ export async function createLabRunnerCharacter(url){
   for(const side of ['left','right'])if(worldDirection(rig[side+'UpperArm'],rig[side+'Forearm']).y>-.55)throw new Error('Idle arm validation failed.');
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});box.setFromObject(model,true);model.position.y-=box.min.y;model.updateWorldMatrix(true,true);root.rotation.y=Math.PI/2;model.visible=true;
 
+  const footPoint=new THREE.Vector3();
+  const footHeight=()=>{root.updateWorldMatrix(true,true);return Math.min(...['leftFoot','rightFoot'].map(key=>{rig[key].getWorldPosition(footPoint);return root.worldToLocal(footPoint).y;}));};
+  const restingFootHeight=footHeight();
   return{
     root,model,boneCount:bones.length,
     update(dt,{state='RUN',speed=1,jumpHeight=0,vy=0,sliding=false,landed=false}={}){
-      elapsed+=dt;if(landed)landingPulse=1;landingPulse=Math.max(0,landingPulse-dt*7);
+      elapsed+=dt;duckBlend=THREE.MathUtils.damp(duckBlend,sliding?1:0,sliding?28:16,dt);if(landed)landingPulse=1;landingPulse=Math.max(0,landingPulse-dt*7);
       // speed is the game-speed ratio (1 at Stage 1, roughly 2 at the cap). Keep the
       // stride safe for varied rigs but increase foot cadence with world speed so the
       // Chimpion always looks like it is actually running, never jogging in slow motion.
-      const speedRatio=clamp(speed,.25,2.2),moving=state==='RUN'||state==='WALK';
+      const speedRatio=clamp(speed,.25,4),moving=state==='RUN'||state==='WALK';
       const gait=moving?clamp(.72+speedRatio*.28,.72,1.12):0;
-      phase+=dt*(state==='RUN'?11.8:6.4)*(moving?speedRatio:0.3);
+      phase+=dt*(state==='RUN'?11.8:6.4)*(moving?speedRatio:0.3)*(1-duckBlend*.9);
       const posed=makePose(state,gait,jumpHeight,vy,sliding);applyPose(posed.pose,posed.offset,1-Math.exp(-17*dt));model.updateWorldMatrix(true,true);
+      if(duckBlend>.001)visual.position.y+=(restingFootHeight-footHeight())*duckBlend;
     },
     setFacingRight(right=true){root.rotation.y=right?Math.PI/2:-Math.PI/2;},
     dispose(){const geometries=new Set(),materials=new Set(),textures=new Set(),skeletons=new Set();root.traverse(o=>{if(o.skeleton)skeletons.add(o.skeleton);if(o.geometry)geometries.add(o.geometry);for(const m of(o.material?(Array.isArray(o.material)?o.material:[o.material]):[])){materials.add(m);Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);});}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());skeletons.forEach(s=>s.dispose());}

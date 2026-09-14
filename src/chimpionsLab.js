@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import {createLabRunnerCharacter} from './labRunnerCharacter.js';
 import './chimpionsLab.css';
+import {GameAudio} from './dashAudio.js';
+const voice=new GameAudio(true);
+voice.musicSrc='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/main/dist/assets/chimpions-army.mp3';
 
 const BASE=import.meta.env.BASE_URL;
 const OLD='https://chimpions-dash.stephaniem-rehfeld.chatgpt.site/assets/';
@@ -9,11 +12,11 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 document.body.dataset.mode='lab';
 document.body.innerHTML=`
-<main id="dash-stage" aria-label="Chimpions Lab - Chimpion Dash">
+<main id="dash-stage" aria-label="Chimpions Dash">
   <div id="dash-sky"></div><div id="dash-far"></div><div id="dash-mid"></div><div id="dash-light"></div>
   <div id="dash-objects"></div><div id="dash-ground"></div><div id="dash-shadow"></div><div id="lab-3d"></div>
   <header id="dash-hud">
-    <div class="brand"><small>CHIMPIONS LAB</small><strong>CHIMPION DASH</strong></div>
+    <div class="brand"><small>CHIMPIONS DASH</small><strong>CHIMPIONS DASH</strong></div>
     <div><small>SCORE</small><strong id="dash-score">000000</strong></div>
     <div><small>DISTANCE</small><strong id="dash-distance">0.00 KM</strong></div>
     <div><small>BEST</small><strong id="dash-best">000000</strong></div>
@@ -21,16 +24,16 @@ document.body.innerHTML=`
   </header>
   <div id="dash-stage-label">01 / THE EMERALD WILDS</div>
   <div id="dash-flow">🍌 <b id="dash-bananas">0</b><span>FLOW <b id="dash-mult">1.00×</b></span></div>
-  <div id="dash-tip">SPACE / W / ↑ JUMP&nbsp;&nbsp; · &nbsp;&nbsp;↓ / SHIFT / S / A SLIDE</div>
+  <div id="dash-tip">HOLD LEFT MOUSE / ↑ TO JUMP HIGHER · RIGHT MOUSE / ↓ TO DUCK</div>
   <section id="dash-menu" class="dash-panel">
     <span class="eyebrow">THE JUNGLE IS CALLING</span>
-    <h1>CHIMPIONS <em>LAB</em></h1>
-    <h2>CHIMPION DASH · 2.5D</h2>
+    <h1>CHIMPIONS <em>DASH</em></h1>
+    <h2>CHIMPIONS DASH · 2.5D</h2>
     <p>Automatic side-running at full pace. Jump, slide and read the jungle while your selected rigged Chimpion stays in motion.</p>
     <label>YOUR RUNNING MATE<select id="lab-avatar" aria-label="Choose Chimpion"></select></label>
     <div id="lab-message" role="status">Loading Chimpion…</div>
     <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><a href="./">Back to Chimp Jump</a></div>
-    <p class="controls"><kbd>SPACE</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> jump · <kbd>↓</kbd>/<kbd>SHIFT</kbd>/<kbd>S</kbd>/<kbd>A</kbd> slide · <kbd>P</kbd> pause</p>
+    <p class="controls">Mouse: hold left to jump higher · right to duck. Controller: ↑ / ↓ or A / B.<br><kbd>SPACE</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> jump · <kbd>↓</kbd>/<kbd>SHIFT</kbd>/<kbd>S</kbd>/<kbd>A</kbd> slide · <kbd>P</kbd> pause</p>
   </section>
   <section id="dash-over" class="dash-panel modal" hidden><span class="eyebrow">RUN COMPLETE</span><h2>THE JUNGLE WON THIS ROUND</h2><p id="dash-result"></p><div class="dash-menu-actions"><button id="dash-retry" class="primary">RUN AGAIN</button><button id="dash-change">Change Chimpion</button><a href="./">Back to Chimp Jump</a></div></section>
   <section id="dash-paused" class="dash-panel modal" hidden><span class="eyebrow">TAKE A BREATHER</span><h2>PAUSED</h2><p>Your run is frozen exactly where you left it.</p><div class="dash-menu-actions"><button id="dash-resume" class="primary">RESUME</button><button id="dash-quit">MAIN MENU</button></div></section>
@@ -55,7 +58,7 @@ key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=6;key.
 key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
 
-const STEP=1/120,PLAYER_X=150,BASE_SPEED=265,MAX_SPEED=540,GRAVITY=2200,JUMP_IMPULSE=600,LOW_HEIGHT=70,HOLD_TIME=.22,JUMP_BUFFER=.16,COYOTE_TIME=.10;
+const STEP=1/120,PLAYER_X=150,BASE_SPEED=397.5,GRAVITY=2200,JUMP_IMPULSE=600,LOW_HEIGHT=70,HOLD_TIME=.22,JUMP_BUFFER=.16,COYOTE_TIME=.10;
 const BIOMES=[
  ['THE EMERALD WILDS','#73c897','#174e3d'],['CANOPY RUN','#5bb98d','#123e34'],
  ['WATERFALL GORGE','#83cbd3','#24556a'],['LOST TEMPLE','#d6b978','#4c553c'],
@@ -88,7 +91,7 @@ function hudText(id,value){
 function metrics(){
   const vw=Math.max(600,Math.min(1080,innerWidth/innerHeight*500));
   const scale=innerWidth/vw;
-  return{vw,scale,groundScreen:innerHeight*.82,groundBottom:innerHeight*.18};
+  return{vw,scale,groundScreen:innerHeight*.81,groundBottom:innerHeight*.19};
 }
 let viewH=12.5,viewW=12.5,runnerWorldX=-3,groundWorldY=-4;
 function resize3D(){
@@ -115,20 +118,21 @@ async function loadAvatar(entry){
     const next=await createLabRunnerCharacter(BASE+entry.url);
     if(character){scene.remove(character.root);character.dispose();}
     character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);
-    localStorage.setItem('chimpions-lab-avatar',entry.id);
+    try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
     $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones';
     $('dash-start').disabled=false;
   }catch(error){
-    console.error(error);$('lab-message').textContent='Rig rejected safely: '+error.message;
+    console.error(error);$('dash-start').disabled=!character;$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
   }finally{loading=false;$('lab-avatar').disabled=false;}
 }
 
 function hashSeed(value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0||1;}
 function randomValue(r){let t=r.seedState+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
-function speedFor(stage){const s=Math.max(0,stage-1);return Math.min(MAX_SPEED,BASE_SPEED+s*26+Math.max(0,s-2)*9);}
+function speedFor(stage){return BASE_SPEED*Math.pow(1.2,Math.max(0,stage-1));}
 function multiplier(flow){return flow>=100?5:flow>=80?3:flow>=60?2:flow>=40?1.5:flow>=20?1.25:1;}
 
-let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=Number(localStorage.getItem('chimpions-lab-best-score'))||0,stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
+function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
+let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 
 function makeRun(){
@@ -254,11 +258,11 @@ function renderObjects(){
   if(!run)return;
   const m=metrics();
   for(const o of obstacles){
-    const x=(o.x-run.scroll)*m.scale,overhead=o.family==='overhead'||o.family==='flex';
+    const x=(o.x-run.scroll)*m.scale;
     o.el.style.width=Math.round(o.w*m.scale)+'px';
     o.el.style.height=Math.round(o.h*m.scale)+'px';
     o.el.style.transform=`translate3d(${Math.round(x)}px,0,0)`;
-    o.el.style.bottom=Math.round(m.groundBottom+(overhead?50*m.scale:0))+'px';
+    o.el.style.bottom=Math.round(m.groundBottom)+'px';
   }
   for(const b of bananas){
     const size=(b.golden?38:34)*m.scale,x=(b.x-run.scroll)*m.scale;
@@ -272,22 +276,26 @@ function jump(held=true){
   if(!run||state!=='running'||run.dead)return;
   if(run.y===0||run.coyote>0){
     run.slideHeld=false;run.slideTime=0;run.slideMin=0;run.slideBlocked=false;
-    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;return;
+    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');return;
   }
   run.jumpBuffer=JUMP_BUFFER;run.jumpBufferHeld=held;
 }
 function releaseJump(){
   if(!run)return;
-  if(run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0&&run.y<LOW_HEIGHT)run.vy=Math.min(run.vy,Math.sqrt(Math.max(0,2*GRAVITY*(LOW_HEIGHT-run.y))));
+  if(run.vy>0){
+    // Tap has a guaranteed low-obstacle arc; holding increases the apex smoothly.
+    const floorVelocity=Math.sqrt(Math.max(0,2*GRAVITY*(LOW_HEIGHT-run.y)));
+    run.vy=Math.min(run.vy,Math.max(floorVelocity,run.vy*.48));
+  }
   run.jumpHeld=false;run.jumpBufferHeld=false;
 }
 function slide(on){
   if(!run||state!=='running'||run.dead)return;
   run.slideHeld=on;
+  if(on&&!run.slideTime&&run.y===0)voice.play('slide');
   if(on&&run.y===0){run.slideMin=Math.max(run.slideMin,.24);run.slideTime=Math.max(run.slideTime,.24);}
 }
 function movePlayer(dt){
-  run.landed=false;
   run.landing=Math.max(0,run.landing-dt);run.jumpBuffer=Math.max(0,run.jumpBuffer-dt);run.slideMin=Math.max(0,run.slideMin-dt);run.slideTime=Math.max(0,run.slideTime-dt);
   if(run.y===0){
     if(!run.vy)run.coyote=COYOTE_TIME;
@@ -295,10 +303,10 @@ function movePlayer(dt){
     if(run.slideHeld||run.slideMin>0||run.slideBlocked)run.slideTime=Math.max(run.slideTime,dt);
   }else run.coyote=Math.max(0,run.coyote-dt);
   if(!run.vy&&!run.y){if(run.jumpBuffer>0)jump(run.jumpBufferHeld);return;}
-  const gravity=run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0?0:(run.vy<0?GRAVITY*1.14:GRAVITY);
+  const gravity=run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0?GRAVITY*.35:(run.vy<0?GRAVITY*1.14:GRAVITY);
   run.jumpAge+=dt;run.y+=run.vy*dt-gravity*dt*dt/2;run.vy-=gravity*dt;
   if(run.y<=0){
-    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;
+    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');
     if(run.jumpBuffer>0)jump(run.jumpBufferHeld);
   }else run.grounded=false;
 }
@@ -307,29 +315,29 @@ function setState(next){
   $('dash-menu').hidden=next!=='menu';$('dash-over').hidden=next!=='over';$('dash-paused').hidden=next!=='paused';
 }
 function startRun(){
-  if(!character)return;
+  if(!character||loading)return;
+  clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
   clearWorld();run=makeRun();seedWorld();setState('running');accumulator=0;
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;$('dash-tip').classList.add('show');
   setTimeout(()=>$('dash-tip')?.classList.remove('show'),4200);last=performance.now();
 }
 function finishRun(){
   if(!run||run.dead)return;
-  run.dead=true;state='over';best=Math.max(best,Math.floor(run.score));localStorage.setItem('chimpions-lab-best-score',best);
+  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.play(run.score>best?'record':'dead');best=Math.max(best,Math.floor(run.score));try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
   hudText('dash-best',String(best).padStart(6,'0'));
   $('dash-result').textContent=`${Math.floor(run.score)} points · ${(run.distance/1000).toFixed(2)} km · ${run.bananaCount} bananas · stage ${run.stage}`;
   setState('over');
 }
-function pause(){if(state!=='running')return;setState('paused');}
-function resume(){if(state!=='paused')return;setState('running');last=performance.now();accumulator=0;}
-function quit(){clearWorld();run=makeRun();setState('menu');accumulator=0;}
+function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();setState('paused');}
+function resume(){if(state!=='paused')return;setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
+function quit(){clearInputs();voice.setDash(false);voice.stopMusic();clearWorld();run=makeRun();setState('menu');accumulator=0;}
 
 function updatePhysics(dt){
   if(state!=='running'||!run||run.dead)return;
   run.time+=dt;
   const stage=Math.floor((run.time+1e-7)/30)+1;
-  if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;}
-  const target=speedFor(run.stage);
-  run.speed=run.time<30?BASE_SPEED:run.speed+(target-run.speed)*Math.min(1,dt/2.5);
+  if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');}
+  run.speed=speedFor(run.stage);
   movePlayer(dt);
   run.scroll+=run.speed*dt;run.distance=run.scroll/100;
   maintainWorld();
@@ -350,12 +358,13 @@ function updatePhysics(dt){
     if(b.collected)continue;
     const x=b.x-run.scroll,centerY=run.y+(p.sliding?18:48);
     if(Math.abs(x-PLAYER_X)<27&&Math.abs(centerY-b.y)<31){
-      b.collected=true;run.bananaCount++;run.goldenBananas+=b.golden?1:0;
+      b.collected=true;voice.play(b.golden?'golden':'banana');run.bananaCount++;run.goldenBananas+=b.golden?1:0;
       run.flow=Math.min(100,run.flow+(b.golden?30:3));run.maxFlow=Math.max(run.maxFlow,run.flow);
       run.bonus+=Math.round((b.golden?500:25)*multiplier(run.flow));
       b.el.classList.add('collected');
     }
   }
+  voice.setDash(run.grounded&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked));
   run.flow=Math.max(0,run.flow-dt*2.2);
   run.score=Math.floor(run.distance*10)+run.bonus;
 }
@@ -377,10 +386,11 @@ function renderUI(dt){
 
   if(character){
     const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
-    character.update(dt,{state:animState,speed:active.speed/BASE_SPEED,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
+    character.update(dt,{state:animState,speed:active.speed/265,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
     const jumpWorld=active.y*m.scale*viewH/innerHeight;
     character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
   }
+  active.landed=false;
   const shadow=$('dash-shadow');
   if(shadow){
     const jump=active.y*m.scale;
@@ -392,28 +402,47 @@ function renderUI(dt){
   renderObjects();
 }
 
+const heldJump=new Set(),heldSlide=new Set();
+function setInput(kind,source,on){
+ const held=kind==='jump'?heldJump:heldSlide,was=held.size>0;
+ if(on)held.add(source);else held.delete(source);
+ const active=held.size>0;
+ if(active&&!was){if(kind==='jump')jump(true);else slide(true);}
+ if(!active&&was){if(kind==='jump')releaseJump();else slide(false);}
+}
+function clearInputs(){heldJump.clear();heldSlide.clear();keys.clear();releaseJump();if(run){run.slideHeld=false;run.jumpBuffer=0;}voice.setDash(false);}
 const jumpCodes=new Set(['Space','KeyW','ArrowUp']),slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS','KeyA']);
 addEventListener('keydown',e=>{
+  if(e.target.closest('input,select,textarea,button,a'))return;
   if(jumpCodes.has(e.code)||slideCodes.has(e.code)||e.code==='KeyP'){e.preventDefault();keys.add(e.code);}
-  if(jumpCodes.has(e.code)&&!e.repeat)jump(true);
-  if(slideCodes.has(e.code))slide(true);
+  if(jumpCodes.has(e.code)&&!e.repeat)setInput('jump',e.code,true);
+  if(slideCodes.has(e.code))setInput('slide',e.code,true);
   if(e.code==='KeyP'&&!e.repeat)(state==='paused'?resume():pause());
   if(e.code==='Escape'&&state!=='menu')quit();
 });
 addEventListener('keyup',e=>{
   keys.delete(e.code);
-  if(jumpCodes.has(e.code))releaseJump();
-  if(slideCodes.has(e.code)&&![...slideCodes].some(code=>keys.has(code)))slide(false);
+  if(jumpCodes.has(e.code))setInput('jump',e.code,false);
+  if(slideCodes.has(e.code))setInput('slide',e.code,false);
 });
-addEventListener('blur',()=>{keys.clear();releaseJump();slide(false);});
+addEventListener('blur',pause);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 
 function touchHold(id,start,end){
   const el=$(id);
   el.onpointerdown=e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);start();};
   el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{e?.preventDefault?.();end();};
 }
-touchHold('touch-jump',()=>jump(true),releaseJump);
-touchHold('touch-slide',()=>slide(true),()=>slide(false));
+touchHold('touch-jump',()=>setInput('jump','touch',true),()=>setInput('jump','touch',false));
+touchHold('touch-slide',()=>setInput('slide','touch',true),()=>setInput('slide','touch',false));
+$('dash-stage').addEventListener('contextmenu',event=>event.preventDefault());
+$('dash-stage').addEventListener('pointerdown',event=>{
+ if(event.pointerType!=='mouse'||state!=='running'||event.target.closest('button,a,select,input'))return;
+ if(event.button!==0&&event.button!==2)return;event.preventDefault();
+ setInput(event.button===0?'jump':'slide','mouse',true);
+});
+addEventListener('pointerup',event=>{if(event.pointerType==='mouse'){if(event.button===0)setInput('jump','mouse',false);if(event.button===2)setInput('slide','mouse',false);}});
+addEventListener('pointercancel',()=>{setInput('jump','mouse',false);setInput('slide','mouse',false);});
 
 $('dash-pause').onclick=()=>state==='paused'?resume():pause();
 $('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-start').onclick=startRun;
@@ -421,24 +450,28 @@ $('dash-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math
 $('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
 
 function pollGamepad(){
-  const p=[...(navigator.getGamepads?.()||[])].filter(Boolean)[0];if(!p)return;
-  const j=!!p.buttons?.[0]?.pressed,s=!!p.buttons?.[1]?.pressed||(p.axes?.[1]||0)>.55,start=!!p.buttons?.[9]?.pressed;
-  if(j&&!lastPadJump)jump(true);if(!j&&lastPadJump)releaseJump();
-  if(s!==lastPadSlide)slide(s);
-  if(start&&!lastPadPause)(state==='paused'?resume():pause());
-  lastPadJump=j;lastPadSlide=s;lastPadPause=start;
+ const p=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected);
+ const j=!!p&&(!!p.buttons?.[0]?.pressed||!!p.buttons?.[12]?.pressed||(p.axes?.[1]||0)<-.55);
+ const s=!!p&&(!!p.buttons?.[1]?.pressed||!!p.buttons?.[13]?.pressed||(p.axes?.[1]||0)>.55);
+ const start=!!p?.buttons?.[9]?.pressed;
+ setInput('jump','pad',j);setInput('slide','pad',s);
+ if(start&&!lastPadPause){if(state==='menu'||state==='over')startRun();else if(state==='paused')resume();else pause();}
+ lastPadJump=j;lastPadSlide=s;lastPadPause=start;
 }
 
 fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
   catalog=entries.filter(e=>e.url);
   for(const entry of catalog){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;$('lab-avatar').append(option);}
-  const saved=localStorage.getItem('chimpions-lab-avatar'),entry=catalog.find(e=>e.id===saved)||catalog.find(e=>e.id==='chimpion')||catalog[0];
+  let saved;try{saved=localStorage.getItem('chimpions-lab-avatar');}catch{}
+  const entry=catalog.find(e=>e.id===saved)||catalog.find(e=>e.id==='chimpion')||catalog[0];
   $('lab-avatar').value=entry.id;return loadAvatar(entry);
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable.';console.error(error);});
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
-  const frameDt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;pollGamepad();
+  const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
+  if(document.hidden)return;
+  if(elapsedFrame>.3&&state==='running')pause();pollGamepad();
   if(state==='running'){
     accumulator=Math.min(.12,accumulator+frameDt);
     let steps=0;
