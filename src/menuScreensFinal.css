@@ -1,0 +1,82 @@
+/* Final illustrated-entry hotfix: the artwork itself is the visible interface. */
+
+/* CHIMPIONS DASH — keep the approved art sharp, full-viewport and free of panel blur. */
+body[data-lab-state="menu"].dash-start-screen #dash-stage:before{
+  inset:0!important;
+  background:#06110a url('/screens/chimp-dash-start.png') center/100% 100% no-repeat!important;
+  filter:none!important;
+}
+body[data-lab-state="menu"].dash-start-screen #dash-menu{
+  inset:0!important;
+  left:0!important;top:0!important;transform:none!important;
+  width:100vw!important;height:100vh!important;
+  max-width:none!important;max-height:none!important;
+  padding:0!important;margin:0!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;filter:none!important;
+  overflow:hidden!important;
+}
+body[data-lab-state="menu"].dash-start-screen #dash-menu>.screen-primary,
+body[data-lab-state="menu"].dash-start-screen #dash-menu>.games-back{
+  display:block!important;position:absolute!important;
+  padding:0!important;margin:0!important;border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  color:transparent!important;text-shadow:none!important;font-size:0!important;line-height:0!important;
+  opacity:0!important;transform:none!important;pointer-events:auto!important;outline:0!important;
+}
+body[data-lab-state="menu"].dash-start-screen .screen-primary{
+  left:35.4%!important;top:52.3%!important;width:29.2%!important;height:13.8%!important;
+}
+body[data-lab-state="menu"].dash-start-screen .games-back{
+  left:35.4%!important;top:68.0%!important;width:29.2%!important;height:12.8%!important;
+}
+body[data-lab-state="menu"].dash-start-screen .screen-primary:hover,
+body[data-lab-state="menu"].dash-start-screen .games-back:hover,
+body[data-lab-state="menu"].dash-start-screen .screen-primary:focus-visible,
+body[data-lab-state="menu"].dash-start-screen .games-back:focus-visible,
+body[data-lab-state="menu"].dash-start-screen .screen-primary:active,
+body[data-lab-state="menu"].dash-start-screen .games-back:active{
+  filter:none!important;transform:none!important;box-shadow:none!important;opacity:0!important;outline:0!important;
+}
+#dash-character-picker::backdrop{
+  background:rgba(8,23,16,.72)!important;
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+}
+
+/* CARD ARENA — show the complete approved art in the normal browser viewport.
+   The two painted buttons are the only visible buttons; HTML provides hit areas only. */
+.arena-gate-screen,.arena-gate{background:#06110a!important}
+.arena-art{
+  position:fixed!important;inset:0!important;left:0!important;top:0!important;
+  transform:none!important;width:100vw!important;height:100vh!important;
+  background:#06110a url('/screens/card-arena-start.png') center/100% 100% no-repeat!important;
+}
+.arena-actions{position:absolute!important;inset:0!important}
+.arena-actions button{
+  position:absolute!important;padding:0!important;margin:0!important;
+  border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;
+  color:transparent!important;font-size:0!important;opacity:0!important;cursor:pointer!important;outline:0!important;
+}
+#enter-arena{left:36.8%!important;top:75.7%!important;width:26.4%!important;height:9.4%!important}
+#arena-back{left:36.8%!important;top:84.7%!important;width:26.4%!important;height:9.8%!important}
+.arena-actions button:hover,.arena-actions button:focus-visible,.arena-actions button:active{
+  opacity:0!important;outline:0!important;box-shadow:none!important;
+}
+
+/* CHIMP JUMP — keep bottom controls clear of the browser/taskbar area without F11. */
+.jump-start-screen[data-mode="menu"] #overlay .games-back{
+  bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px))!important;
+}
+.jump-start-screen[data-mode="menu"] #background-style{
+  visibility:visible!important;display:block!important;
+  right:24px!important;bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px))!important;
+  z-index:101!important;
+}
+@media(max-width:650px){
+  .jump-start-screen[data-mode="menu"] #overlay .games-back{
+    left:12px!important;bottom:max(66px,calc(env(safe-area-inset-bottom) + 56px))!important;
+  }
+  .jump-start-screen[data-mode="menu"] #background-style{
+    right:12px!important;bottom:max(66px,calc(env(safe-area-inset-bottom) + 56px))!important;
+  }
+}
