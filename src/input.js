@@ -8,9 +8,10 @@ export function readPad(pads){
  const rawY=Math.max(-1,Math.min(1,active.axes?.[1]||0));
  const axis=Number(buttons[15])-Number(buttons[14])||(Math.abs(rawX)>.2?Math.sign(rawX)*(Math.abs(rawX)-.2)/.8:0);
  const axisY=Number(buttons[13])-Number(buttons[12])||(Math.abs(rawY)>.2?Math.sign(rawY)*(Math.abs(rawY)-.2)/.8:0);
- // Menus and the character picker are handled by runtimeEnhancements so A activates
- // the currently focused control instead of always starting/confirming the game.
+ // Static UI confirmation is handled by runtimeEnhancements so A activates the
+ // currently focused control instead of a hard-coded start/retry action.
  const mode=document.body?.dataset?.mode||'';
- if(document.querySelector('#collection-dialog[open]')||mode==='menu'||mode==='paused')buttons[0]=false;
+ const uiDialog=document.querySelector('#collection-dialog[open],#results-dialog[open],#record-book[open]');
+ if(uiDialog||mode==='menu'||mode==='paused')buttons[0]=false;
  return {axis,axisY,buttons};
 }
