@@ -2,10 +2,13 @@
 /* Remove the flat screen-space haze/colour overlay; biome identity remains in scene fog/lights. */
 #world::before,#world>.mist{display:none!important}
 
-body[data-mode=menu] #choose{
+/* Match/exceed the specificity of the legacy menu rules so these positions are deterministic. */
+body[data-mode='menu']:not([data-dev-tools='true']) #choose,
+body[data-mode='menu'][data-dev-tools='true'] #choose{
   left:12%!important;top:62.2%!important;width:76%!important;height:5.5%!important;
 }
-body[data-mode=menu] #quality{
+body[data-mode='menu']:not([data-dev-tools='true']) #quality,
+body[data-mode='menu'][data-dev-tools='true'] #quality{
   left:24%!important;top:68.8%!important;width:52%!important;height:5.4%!important;
 }
 body[data-mode=menu] .keys{
@@ -50,7 +53,8 @@ body:not([data-mode=menu]) #community-links{display:none!important}
 body[data-mode=menu] .card{margin-bottom:92px}
 
 @media(max-width:600px){
-  body[data-mode=menu] #choose{left:11%!important;width:78%!important}
+  body[data-mode='menu']:not([data-dev-tools='true']) #choose,
+  body[data-mode='menu'][data-dev-tools='true'] #choose{left:11%!important;width:78%!important}
   body[data-mode=menu] .keys{left:10%!important;width:80%!important;font-size:1.6cqw!important}
   #community-links{grid-template-columns:1fr;gap:8px;top:101%;padding-bottom:28px}
   #community-links a{min-height:46px;font-size:14px}
