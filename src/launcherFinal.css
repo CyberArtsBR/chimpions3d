@@ -9,9 +9,9 @@
   max-width:none!important;max-height:88vh!important;
   height:auto!important;object-fit:contain!important;
   clip-path:none!important;
-  transform:scale(.26)!important;
+  transform:scale(.26);
   transform-origin:center center!important;
-  opacity:0!important;
+  opacity:0;
 }
 .app.launching .label-zoom img{animation:fullCartridgeZoom 2200ms cubic-bezier(.12,.84,.18,1) forwards!important}
 @keyframes fullCartridgeZoom{
