@@ -13,11 +13,10 @@ for(const age of [0,90,180,360])for(let seed=0;seed<100;seed++){
   assert(Math.abs(p.baseX-prev.baseX)>=1.09,'Avoid stacked branches');
   const test=new Game(seed);test.platforms=[{...p}];test.nextY=1000;
   test.nextJetAt=Infinity;test.time=age;test.y=prev.y;test.x=prev.x;test.vy=JUMP;test.height=prev.y;test.camera=Math.max(5,prev.y-.8);
-  // Plan the intercept at the actual descending crossing, including pace and
-  // the same within-step platform interpolation used by collision detection.
+  // Plan the intercept at the actual descending crossing with the restored gameplay pace.
   let flightY=test.y,flightVy=JUMP,flightTime=age,intercept=p.baseX;
   for(let tick=0;tick<180;tick++){
-   const nextTime=flightTime+STEP,dt=STEP;
+   const nextTime=flightTime+STEP,dt=STEP*paceAt(nextTime);
    const nextY=flightY+flightVy*dt-.5*GRAVITY*dt*dt,nextVy=flightVy-GRAVITY*dt;
    if(nextVy<0&&flightY>=p.y&&nextY<=p.y){
     const fraction=(flightY-p.y)/(flightY-nextY);
@@ -40,7 +39,7 @@ function fixture(type='solid'){
 const bounce=fixture();for(let i=0;i<120;i++)bounce.step(0);assert(bounce.bounces>0);
 const landing=fixture();landing.y=.05;landing.vy=-20;landing.step(0);assert.equal(landing.y,0);assert.equal(landing.vy,JUMP);
 landing.y=-.1;landing.vy=10;landing.step(0);assert(landing.vy<10&&landing.vy>0,'Pass upwards through branches');
-const wrap=new Game(2);wrap.x=WIDTH/2-VINE_INSET-.01;wrap.vx=4.4;const momentum=wrap.vx;const wrapEvents=wrap.step(1);assert(Math.abs(wrap.x-(-WIDTH/2+VINE_INSET-.01+wrap.vx*STEP))<1e-9);assert(wrap.vx>=momentum);assert(wrapEvents.some(e=>e.type==='wrap'&&e.side==='right'));
+const wrap=new Game(2);wrap.x=WIDTH/2-VINE_INSET-.01;wrap.vx=4.4;const momentum=wrap.vx;const wrapEvents=wrap.step(1);assert(Math.abs(wrap.x-(-WIDTH/2+VINE_INSET-.01+wrap.vx*STEP*paceAt(STEP)))<1e-9);assert(wrap.vx>=momentum);assert(wrapEvents.some(e=>e.type==='wrap'&&e.side==='right'));
 const a=new Game(44),b=new Game(44);for(let i=0;i<300;i++){a.step(i%80<40?1:-1);b.step(i%80<40?1:-1);}assert.deepEqual(a,b);
 const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);assert(!fall.dead&&fall.time===0);
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
@@ -55,7 +54,7 @@ for(const boundary of [30,60,180,360]){
 }
 const rates=[];for(const age of [0,180]){let moving=0,total=0;for(let seed=0;seed<100;seed++){const g=new Game(seed);g.time=age;g.camera=200;g.generate();for(const p of g.platforms.filter(p=>p.y>20&&p.route==='safe')){total++;if(p.type==='moving')moving++;}}rates.push(moving/total);}
 assert.equal(rates[0],0,'Safe route stays solid');assert.equal(rates[1],0,'Difficulty never converts safe supports');
-console.log('PASS physics: '+pairs+' generated transfers, larger gaps, near-apex arcs, wrap, landing, spring, fragile branches, retry');
+console.log('PASS physics: '+pairs+' generated transfers, larger gaps, paced arcs, wrap, landing, spring, fragile branches, retry');
 
 assert(SPRING_JUMP**2/15.5**2>=3,'Spring height at least triples');
 const jet=new Game(7);jet.time=29.99;jet.step(0);assert(jet.jetpack,'Thirty seconds spawns a jetpack');
@@ -74,7 +73,6 @@ for(const [i,width] of [1.1,1.7,2.45].entries())sizes.add(0,i*4,width,'moving');
 assert(sizes.platforms[0].moveSpeed<sizes.platforms[1].moveSpeed&&sizes.platforms[1].moveSpeed<sizes.platforms[2].moveSpeed,'Larger platforms move faster');
 for(const p of sizes.platforms)assert.equal(p.moveRange,1.65,'Lateral travel increased to 1.65 units');
 const initialSpeed=(platformPhaseAt(.000001)/.000001)*sizes.platforms[0].moveSpeed*1.65;
-const oldSpeed=1.1*sizes.platforms[0].moveSpeed*.55;
 assert(Math.abs(initialSpeed-.65*sizes.platforms[0].moveSpeed*1.65)<.000001,'Initial branch speed uses the bounded difficulty curve');
 console.log('PASS wider multi-platform layout, edge choices, small platforms and three motion speeds');
 
@@ -96,10 +94,9 @@ for(let seed=0;seed<300;seed++){
  densityCount+=g.platforms.filter(p=>p.y>=20&&p.y<200).length;
  for(const p of g.platforms)assert(Math.abs(p.baseX)+p.width/2+(p.type==='moving'?p.moveRange:0)<=WIDTH/2,'Full platform travel stays inside vines');
 }
-// Previous generator: 24,638 platforms over these same 300 seeds and altitude band.
 const averagePerRow=densityCount/(300*45);
-assert(averagePerRow>1&&averagePerRow<=4,'Keep optional choices within the new candidate budget: '+averagePerRow);
-console.log('PASS 30% higher arcs, current reduced platform dimensions, one-shot double rewards, collision-safe platform density of '+averagePerRow.toFixed(2)+' per row');
+assert(averagePerRow>1&&averagePerRow<=3.25,'Keep optional choices within the reduced candidate budget: '+averagePerRow);
+console.log('PASS 30% higher arcs, reduced platform density, one-shot double rewards, collision-safe platform density of '+averagePerRow.toFixed(2)+' per row');
 
 // Full travel envelopes, not a single sampled frame, must remain separated.
 for(let seed=0;seed<100;seed++){
@@ -118,5 +115,5 @@ for(const type of ['solid','spring']){
  assert(!g.platforms[0].broken,'Existing solid and spring platforms retain their type');
  assert.equal(g.vy,type==='spring'?SPRING_JUMP:JUMP,'Fragile spring still launches');
 }
-console.log('PASS swept separation, level acceleration, reduced dimensions and permanent safe supports');
+console.log('PASS swept separation, restored gameplay pace, reduced dimensions and permanent safe supports');
 
