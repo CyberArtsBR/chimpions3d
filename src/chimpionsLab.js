@@ -79,7 +79,30 @@ const TYPES=[
  {id:'canopy',name:'fallen canopy',family:'flex',action:'jump-or-slide',w:98,h:74,boxes:[[5,49,88,20]],minStage:4,difficulty:3,recovery:.72}
 ];
 
-const sprite=id=>OLD+'sprites-clean/'+(id==='log-pile'?'log':id)+'.png';
+const SPRITES='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/sprites-clean/';
+const sprite=id=>SPRITES+(id==='log-pile'?'log':id)+'.png';
+const spriteImages=new Map();
+function trimmedSprite(id){
+ const url=sprite(id);if(spriteImages.has(url))return spriteImages.get(url);
+ const promise=new Promise(resolve=>{
+  const image=new Image();image.crossOrigin='anonymous';
+  image.onload=()=>{
+   try{
+    const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);
+    const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    let left=canvas.width,top=canvas.height,right=-1,bottom=-1;
+    for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(data[(y*canvas.width+x)*4+3]>24){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
+    if(right<left){resolve(url);return;}
+    const cropped=document.createElement('canvas');cropped.width=right-left+1;cropped.height=bottom-top+1;
+    cropped.getContext('2d').drawImage(image,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
+    resolve(cropped.toDataURL('image/png'));
+   }catch{resolve(url);}
+  };
+  image.onerror=()=>resolve(OLD+'sprites-clean/'+(id==='log-pile'?'log':id)+'.png');image.src=url;
+ });
+ spriteImages.set(url,promise);return promise;
+}
 const objectLayer=$('dash-objects');
 const pools={hazard:[],banana:[]};
 const cache=new Map();
@@ -93,12 +116,13 @@ function metrics(){
   const scale=innerWidth/vw;
   return{vw,scale,groundScreen:innerHeight*.81,groundBottom:innerHeight*.19};
 }
+const WORLD_UNIT=1/40,AVATAR_HEIGHT=84;
 let viewH=12.5,viewW=12.5,runnerWorldX=-3,groundWorldY=-4;
 function resize3D(){
   const w=innerWidth,h=innerHeight,m=metrics();
   renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.2:1.6));
-  viewW=viewH*w/h;camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;camera.updateProjectionMatrix();
-  camera.position.set(0,.1,12);camera.lookAt(0,.1,0);
+  viewW=m.vw*WORLD_UNIT;viewH=h/m.scale*WORLD_UNIT;camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;camera.updateProjectionMatrix();
+  camera.position.set(0,0,12);camera.lookAt(0,0,0);
   runnerWorldX=-viewW/2+viewW*(PLAYER_X/m.vw);
   groundWorldY=viewH/2-viewH*(m.groundScreen/h);
 }
@@ -106,7 +130,7 @@ resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
 for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
-  const im=new Image();im.decoding='async';im.src=sprite(id);
+  trimmedSprite(id);
 }
 for(const src of [OLD+'jungle-v2.webp',OLD+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
 
@@ -151,8 +175,8 @@ function playerBox(){
   return{x:PLAYER_X-16,y:run.y+5,w:32,h:sliding?31:78,sliding};
 }
 function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
-function obstacleBoxes(o){
-  const sx=o.x-run.scroll;
+function obstacleBoxes(o,scroll=run.scroll){
+  const sx=o.x-scroll;
   return(o.boxes||[[0,0,o.w,o.h]]).map(b=>({x:sx+b[0],y:b[1],w:b[2],h:b[3]}));
 }
 function overheadBlocksStand(){
@@ -160,10 +184,29 @@ function overheadBlocksStand(){
   return obstacles.some(o=>!o.hit&&['overhead','flex'].includes(o.family)&&obstacleBoxes(o).some(b=>hit(stand,b)));
 }
 
+// Clip four linear overlap inequalities to find the first swept contact.
+// Both box heights can change as the player enters/exits a crouch.
+function sweptContact(a0,a1,b){
+ let enter=0,exit=1;
+ const constraints=[
+  [a0.x+a0.w-b.x,a1.x+a1.w-b.x],
+  [b.x+b.w-a0.x,b.x+b.w-a1.x],
+  [a0.y+a0.h-b.y,a1.y+a1.h-b.y],
+  [b.y+b.h-a0.y,b.y+b.h-a1.y]
+ ];
+ for(const [from,to] of constraints){
+  if(from<=0&&to<=0)return Infinity;
+  if(from<=0)enter=Math.max(enter,-from/(to-from));
+  else if(to<=0)exit=Math.min(exit,from/(from-to));
+ }
+ return enter<exit?enter:Infinity;
+}
 function acquire(kind,id,w,h){
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
+  const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
   el.src=sprite(id);el.dataset.kind=kind;el.dataset.id=id;
+  trimmedSprite(id).then(url=>{if(el.dataset.request===request&&!el.hidden){el.classList.remove('sprite-fallback');el.src=url;}});
   el.style.width=w+'px';el.style.height=h+'px';el.style.opacity='';
   el.onerror=()=>{el.classList.add('sprite-fallback');el.removeAttribute('src');};
   objectLayer.append(el);return el;
@@ -175,7 +218,10 @@ function recycle(el){
   if(pools[kind].length<32)pools[kind].push(el);
 }
 function spawnObstacle(type,x){
-  const o={...type,x,passed:false,hit:false,minClearance:999,el:acquire('hazard',type.id,type.w,type.h)};
+  const overhead=type.family==='overhead'||type.family==='flex';
+  const floor=overhead?Math.min(...type.boxes.map(b=>b[1])):0;
+  const top=overhead?Math.max(...type.boxes.map(b=>b[1]+b[3])):type.h;
+  const o={...type,visualY:floor,visualHeight:top-floor,x,passed:false,hit:false,minClearance:999,el:acquire('hazard',type.id,type.w,type.h)};
   obstacles.push(o);return o;
 }
 function spawnBanana(x,y,golden=false){
@@ -218,6 +264,18 @@ function chooseFamily(family,difficulty){
   const list=TYPES.filter(t=>t.family===family&&t.minStage<=run.stage&&t.difficulty<=difficulty+1);
   return list[Math.floor(randomValue(run)*list.length)]||TYPES[0];
 }
+// Reserve a complete held jump plus an input/recovery margin between hazards.
+function safeGap(previous,next,requested){
+ const needsLanding=previous.action!=='slide';
+ const transition=needsLanding?1.02:next.action==='slide'?.55:.72;
+ return Math.max(requested,transition);
+}
+function planningSpeed(x){
+ // Include the next speed step when this obstacle is likely to be reached.
+ const arrival=run.time+Math.max(0,x-run.scroll-PLAYER_X)/run.speed;
+ const stage=Math.max(run.stage,Math.floor((arrival+2)/30)+1);
+ return speedFor(stage);
+}
 function spawnPattern(){
   let options=patternCatalog(run.stage);
   if(run.lastDifficulty>=4)options=options.filter(p=>p.difficulty<=2);
@@ -225,13 +283,16 @@ function spawnPattern(){
   let x=spawnCursor;
   for(let i=0;i<def.items.length;i++){
     const[family,gap]=def.items[i],type=chooseFamily(family,def.difficulty);
-    if(i)x=created.at(-1).x+created.at(-1).w+run.speed*gap;
+    if(i){
+      const previous=created.at(-1);
+      x=previous.x+previous.w+planningSpeed(x)*safeGap(previous,type,gap);
+    }
     const o=spawnObstacle(type,x);created.push(o);
     if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
   const lastO=created.at(-1);
-  spawnCursor=(lastO?.x||x)+(lastO?.w||0)+run.speed*(def.recovery+.28+randomValue(run)*.24);
+  spawnCursor=(lastO?.x||x)+(lastO?.w||0)+planningSpeed(x)*(Math.max(1.02,def.recovery+.28)+randomValue(run)*.24);
   run.lastDifficulty=def.difficulty;
 }
 function seedWorld(){
@@ -260,9 +321,9 @@ function renderObjects(){
   for(const o of obstacles){
     const x=(o.x-run.scroll)*m.scale;
     o.el.style.width=Math.round(o.w*m.scale)+'px';
-    o.el.style.height=Math.round(o.h*m.scale)+'px';
+    o.el.style.height=Math.round(o.visualHeight*m.scale)+'px';
     o.el.style.transform=`translate3d(${Math.round(x)}px,0,0)`;
-    o.el.style.bottom=Math.round(m.groundBottom)+'px';
+    o.el.style.bottom=Math.round(m.groundBottom+o.visualY*m.scale)+'px';
   }
   for(const b of bananas){
     const size=(b.golden?38:34)*m.scale,x=(b.x-run.scroll)*m.scale;
@@ -338,32 +399,43 @@ function updatePhysics(dt){
   const stage=Math.floor((run.time+1e-7)/30)+1;
   if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');}
   run.speed=speedFor(run.stage);
+  const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
+  previousBox.x+=oldScroll;
   movePlayer(dt);
   run.scroll+=run.speed*dt;run.distance=run.scroll/100;
-  maintainWorld();
-  const p=playerBox();
+  let p=playerBox();p.x+=run.scroll;
+  let collision=null,contact=Infinity;
   for(const o of obstacles){
-    const sx=o.x-run.scroll;
-    if(!o.passed&&sx+o.w<PLAYER_X-18){
-      o.passed=true;run.combo++;run.longestCombo=Math.max(run.longestCombo,run.combo);run.flow=Math.min(100,run.flow+4);run.maxFlow=Math.max(run.maxFlow,run.flow);run.bonus+=Math.round(5*multiplier(run.flow));
+    if(o.hit)continue;
+    for(const box of obstacleBoxes(o,0)){
+      const t=sweptContact(previousBox,p,box);
+      if(t<contact){contact=t;collision=o;}
     }
-    if(o.hit||sx>PLAYER_X+90||sx+o.w<PLAYER_X-90)continue;
-    for(const b of obstacleBoxes(o)){
-      const vertical=p.y>=b.y+b.h?p.y-(b.y+b.h):b.y-(p.y+p.h);
-      o.minClearance=Math.min(o.minClearance,Math.max(0,vertical));
-      if(hit(p,b)){o.hit=true;run.combo=0;finishRun();return;}
+  }
+  if(collision){
+    run.scroll=oldScroll+(run.scroll-oldScroll)*contact;
+    run.y=oldY+(run.y-oldY)*contact;run.distance=run.scroll/100;
+    p=playerBox();p.x+=run.scroll;
+  }
+  for(const o of obstacles){
+    if(o!==collision&&!o.passed&&o.x+o.w<run.scroll+PLAYER_X-18){
+      o.passed=true;run.combo++;run.longestCombo=Math.max(run.longestCombo,run.combo);
+      run.flow=Math.min(100,run.flow+4);run.maxFlow=Math.max(run.maxFlow,run.flow);
+      run.bonus+=Math.round(5*multiplier(run.flow));
     }
   }
   for(const b of bananas){
     if(b.collected)continue;
-    const x=b.x-run.scroll,centerY=run.y+(p.sliding?18:48);
-    if(Math.abs(x-PLAYER_X)<27&&Math.abs(centerY-b.y)<31){
+    const pickup={x:b.x-15,y:b.y-15,w:30,h:30};
+    if(sweptContact(previousBox,p,pickup)!==Infinity){
       b.collected=true;voice.play(b.golden?'golden':'banana');run.bananaCount++;run.goldenBananas+=b.golden?1:0;
       run.flow=Math.min(100,run.flow+(b.golden?30:3));run.maxFlow=Math.max(run.maxFlow,run.flow);
-      run.bonus+=Math.round((b.golden?500:25)*multiplier(run.flow));
-      b.el.classList.add('collected');
+      run.bonus+=Math.round((b.golden?500:25)*multiplier(run.flow));b.el.classList.add('collected');
     }
   }
+  run.score=Math.floor(run.distance*10)+run.bonus;
+  if(collision){collision.hit=true;run.combo=0;finishRun();return;}
+  maintainWorld();
   voice.setDash(run.grounded&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked));
   run.flow=Math.max(0,run.flow-dt*2.2);
   run.score=Math.floor(run.distance*10)+run.bonus;
@@ -375,7 +447,7 @@ function renderUI(dt){
   document.documentElement.style.setProperty('--biome-bottom',biome[2]);
   document.documentElement.style.setProperty('--far-x',`${-(active.scroll*m.scale*.08)%1600}px`);
   document.documentElement.style.setProperty('--mid-x',`${-(active.scroll*m.scale*.18)%1600}px`);
-  document.documentElement.style.setProperty('--ground-x',`${-(active.scroll*m.scale*.82)%900}px`);
+  document.documentElement.style.setProperty('--ground-x',`${-(active.scroll*m.scale)%900}px`);
   hudText('dash-score',String(Math.floor(active.score)).padStart(6,'0'));
   hudText('dash-distance',(active.distance/1000).toFixed(2)+' KM');
   hudText('dash-best',String(best).padStart(6,'0'));
@@ -387,7 +459,8 @@ function renderUI(dt){
   if(character){
     const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
     character.update(dt,{state:animState,speed:active.speed/265,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
-    const jumpWorld=active.y*m.scale*viewH/innerHeight;
+    character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
+    const jumpWorld=active.y*WORLD_UNIT;
     character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
   }
   active.landed=false;
