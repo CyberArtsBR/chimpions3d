@@ -64,7 +64,7 @@ const endTexture=canvasTexture(512,512,(c,w,h)=>{
 const bananaTexture=canvasTexture(512,128,(c,w,h)=>{
  const r=rng(423),g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#b58a10');g.addColorStop(.24,'#ffd22c');g.addColorStop(.5,'#fff39a');g.addColorStop(.8,'#efb515');g.addColorStop(1,'#b98507');
  c.fillStyle=g;c.fillRect(0,0,w,h);
- if(background.visible&&ivy.visible)for(let i=0;i<(highQuality?110:48);i++){c.fillStyle='#825222';c.globalAlpha=.05+r()*.14;c.fillRect(r()*w,r()*h,1+r()*2,1+r()*2);}c.globalAlpha=1;
+ for(let i=0;i<110;i++){c.fillStyle='#825222';c.globalAlpha=.05+r()*.14;c.fillRect(r()*w,r()*h,1+r()*2,1+r()*2);}c.globalAlpha=1;
  for(const y of [21,60,103]){c.strokeStyle='#fff1a14a';c.lineWidth=2;c.beginPath();c.moveTo(0,y);c.lineTo(w,y+3);c.stroke();}
 });
 const mushroomTexture=canvasTexture(512,256,(c,w,h)=>{
@@ -368,7 +368,7 @@ export function createScenery(scene,renderer){
    trunk.position.y=cameraY;
    currentCamera=cameraY;if(background.visible&&treeImageMesh?.visible)fitTree();
    if(treeImageMesh)treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);
-   for(let i=0;i<110;i++){
+   if(background.visible&&ivy.visible)for(let i=0;i<(highQuality?110:48);i++){
     const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
     dummy.position.set(side*(1.2+Math.sin(i*6.7)*.2)+.35,cameraY+y,-2.75);
     dummy.rotation.set(.12,side*.2,side*(.55+Math.sin(time*.6+i)*.1));
