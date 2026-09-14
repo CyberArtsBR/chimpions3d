@@ -1,11 +1,11 @@
 const params=new URLSearchParams(location.search);
 if(!['dash','lab','rig','play','dev','arena'].some(key=>params.has(key))){
-  import('./launcher.js');
+  import('./launcherV2.js');
 }else if(params.has('arena')){
-  import('./menuScreens.js').then(({setupArenaGate})=>setupArenaGate());
+  import('./menuScreensV2.js').then(({setupArenaGate})=>setupArenaGate());
 }else if(params.has('dash')||params.has('lab')){
   import('./polish.css');
-  import('./chimpionsLab.js').then(()=>import('./menuScreens.js')).then(({setupDashMenu})=>setupDashMenu());
+  import('./chimpionsLab.js').then(()=>import('./menuScreensV2.js')).then(({setupDashMenu})=>setupDashMenu());
 }else if(params.has('rig')){
   import('./polish.css');
   document.body.innerHTML=`<main id="panel"><div>State: <output id="state">IDLE</output></div><div>Speed: <output id="speed">0</output></div><div>Grounded: <output id="grounded">true</output></div><nav><button data-state="IDLE">Idle</button><button data-state="WALK">Walk</button><button data-state="RUN">Run</button><button data-state="JUMP">Jump</button></nav><label><input id="skeleton" type="checkbox"> Show Skeleton</label><div><a href="/" style="color:#80e4dc">Back to Chimp Jump</a></div></main><p id="message" role="status">Loading character…</p>`;
@@ -26,6 +26,6 @@ if(!['dash','lab','rig','play','dev','arena'].some(key=>params.has(key))){
     await import('./game.js');
     setupBiomePolish();
     setupMenuExtras();
-    const {setupJumpMenu}=await import('./menuScreens.js');setupJumpMenu();
+    const {setupJumpMenu}=await import('./menuScreensV2.js');setupJumpMenu();
   });
 }

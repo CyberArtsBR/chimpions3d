@@ -1,0 +1,24 @@
+/* Final launcher polish: preserve current UI scale, let the room fill the viewport,
+   and transition through the complete cartridge instead of zooming into its label. */
+.room-bg{object-fit:cover!important;object-position:center center!important;background:#05070b!important}
+.label-zoom{display:grid!important;place-items:center!important;background:rgba(0,0,0,0)!important}
+.label-zoom img{
+  position:static!important;
+  left:auto!important;top:auto!important;
+  width:min(92vw,calc(88vh * 1.333333))!important;
+  max-width:none!important;max-height:88vh!important;
+  height:auto!important;object-fit:contain!important;
+  clip-path:none!important;
+  transform:scale(.26)!important;
+  transform-origin:center center!important;
+  opacity:0!important;
+}
+.app.launching .label-zoom img{animation:fullCartridgeZoom 2200ms cubic-bezier(.12,.84,.18,1) forwards!important}
+@keyframes fullCartridgeZoom{
+  0%{opacity:0;transform:scale(.26)}
+  12%{opacity:1;transform:scale(.34)}
+  62%{opacity:1;transform:scale(.86)}
+  100%{opacity:1;transform:scale(1)}
+}
+.app.launching .fade-cover{animation:finalFadeBlack 2400ms ease forwards!important}
+@keyframes finalFadeBlack{0%,76%{opacity:0}90%{opacity:.32}100%{opacity:1}}
