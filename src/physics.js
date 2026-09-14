@@ -2,14 +2,15 @@ export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_H
 export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=10, JET_SPEED=24;
 export const VINE_INSET=.24;
-export const RULESET='2026-09-expedition-v3';
+export const RULESET='2026-09-expedition-v4-paced';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>Math.abs(wrapX(a-b));
+// Progressive arcade pace restored: starts slightly below 1x and reaches 3x at five minutes.
 export const paceAt=time=>.92+2.08*Math.min(Math.max(time,0)/300,1);
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
 export const platformPhaseAt=time=>{
-  // Continuous, bounded acceleration affects branches only, never player physics.
+  // Continuous, bounded acceleration for moving branches, independent from the gameplay pace ramp.
   const t=Math.max(0,time),ramp=Math.min(t,300);
   return .65*(t+.6*(ramp*ramp/600+Math.max(0,t-300)));
 };
@@ -53,6 +54,7 @@ export class Game {
       const limit=WIDTH/2-VINE_INSET-.35-width*PLATFORM_LENGTH/2;
       // Descending flight time, with room to reverse full sideways momentum,
       // leave the far edge of the previous branch and still aim at the center.
+      // The pace multiplier changes real-time speed, not the spatial jump arc.
       const flight=(JUMP+Math.sqrt(JUMP*JUMP-2*GRAVITY*rise))/GRAVITY;
       const reach=Math.min(1.9+difficulty*.9,
         SPEED*(flight-STEP)-SPEED*SPEED/24-this.nextWidth/2-.5);
@@ -66,7 +68,9 @@ export class Game {
         Math.max(-limit,Math.min(limit,this.nextX));
       if(!this.add(x,y,width,'solid',true,'safe'))break;
       this.nextX=x;this.nextY=y;this.nextWidth=width*PLATFORM_LENGTH;
-      const extras=2+(this.random()<.51?1:0);
+      // Average total platforms per row drops from 3.51 to 2.81: about 20% fewer.
+      // The mandatory safe support is never removed; density is cut from optional routes.
+      const extras=1+(this.random()<.81?1:0);
       for(let i=0;i<extras;i++){
         const roll=this.random();
         const type=y<12?'solid':roll<.2+difficulty*.35?'moving':
@@ -105,9 +109,9 @@ export class Game {
   }
   step(input,dt=STEP){
     if(this.dead)return [];
-    const events=[];const realDt=dt;this.time+=dt;
-    // Active play time stays real: theme changes remain every 30 seconds.
-    this.bounceAge+=dt;
+    const events=[];const realDt=dt;this.time+=realDt;
+    // Restore the original increasing arcade pace while keeping clocks/items in real time.
+    dt*=paceAt(this.time);this.bounceAge+=dt;
     this.previousCamera=this.camera;
     const target=input*SPEED, amount=24*dt;
     this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
@@ -118,7 +122,7 @@ export class Game {
     else if(nextX<-vineX){this.x=wrapX(nextX);events.push({type:'wrap',side:'left',x:this.x,y:this.y});}
     else this.x=nextX;
     if(this.jetRemaining>0){
-      const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED;
+      const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
       if(this.jetRemaining===0){this.vy=JUMP;events.push({type:'jet-end'});}
     }else{this.y+=this.vy*dt-.5*GRAVITY*dt*dt;this.vy-=GRAVITY*dt;}
     if(this.time>=this.nextJetAt){
