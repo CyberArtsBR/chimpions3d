@@ -137,7 +137,7 @@ setInterval(()=>{
 },80);
 
 // Relative mouse steering: direction comes from movement delta, never cursor position.
-let mouseCode=null,mouseRelease=0;
+let mouseCode=null,mouseRelease=0,lockGraceUntil=0;
 const dispatchKey=(type,code)=>document.body.dispatchEvent(new KeyboardEvent(type,{code,key:code==='ArrowLeft'?'ArrowLeft':'ArrowRight',bubbles:true}));
 const releaseMouse=()=>{
  if(mouseCode)dispatchKey('keyup',mouseCode);mouseCode=null;clearTimeout(mouseRelease);mouseRelease=0;
@@ -160,13 +160,17 @@ document.addEventListener('pointerdown',event=>{
  if(canvas&&event.target===canvas&&document.pointerLockElement!==canvas)requestLock(canvas);
 },true);
 document.addEventListener('click',event=>{
- const target=event.target.closest?.('#confirm-chimpion,#try-again,#quick-retry');if(!target)return;
- const canvas=document.querySelector('#world canvas');if(canvas&&matchMedia('(pointer:fine)').matches&&document.pointerLockElement!==canvas)requestLock(canvas);
+ const mode=document.body?.dataset?.mode||'';
+ const target=event.target.closest?.('#confirm-chimpion,#try-again,#quick-retry,#play');
+ if(!target||target.id==='play'&&mode!=='paused')return;
+ const canvas=document.querySelector('#world canvas');
+ if(canvas&&matchMedia('(pointer:fine)').matches){lockGraceUntil=performance.now()+4000;if(document.pointerLockElement!==canvas)requestLock(canvas);}
 },true);
 document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement)releaseMouse();});
 setInterval(()=>{
- if(document.body?.dataset?.mode!=='playing'){
-  releaseMouse();
-  if(document.pointerLockElement===document.querySelector('#world canvas'))document.exitPointerLock?.();
- }
+ const mode=document.body?.dataset?.mode||'';
+ if(mode==='playing'){lockGraceUntil=0;return;}
+ if(performance.now()<lockGraceUntil)return;
+ releaseMouse();
+ if(document.pointerLockElement===document.querySelector('#world canvas'))document.exitPointerLock?.();
 },200);
