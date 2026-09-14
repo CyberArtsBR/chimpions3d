@@ -36,7 +36,7 @@ if(!renderPrototype.__chimpSimpleDeathPatched){
  };
  function patchedRender(scene,camera){
   const mode=document.body?.dataset?.mode||'';
-  const root=findAvatarRoot(scene);
+  const root=trackedRoot?.parent?trackedRoot:findAvatarRoot(scene);
   if(root!==trackedRoot)rebuild(root);
   if(root&&mode==='playing'){
    capture();
@@ -72,7 +72,7 @@ function moveCollection(dx,dy){
  const active=document.activeElement,grid=[...dialog.querySelectorAll('.avatar-option:not(:disabled)')].filter(isVisible);
  if(active?.classList?.contains('avatar-option')&&grid.length){
   const index=grid.indexOf(active),columns=3;
-  let target=index+(dx||dy*columns);
+  const target=index+(dx||dy*columns);
   if(target>=0&&target<grid.length)return focusElement(grid[target]);
   if(dy<0)return focusElement(dialog.querySelector('#avatar-list input[type="search"]'))||focusElement(dialog.querySelector('#random-chimpion'));
   if(dy>0)return focusElement([...dialog.querySelectorAll('.collection-nav button:not(:disabled)')][0]||dialog.querySelector('#confirm-chimpion'));
@@ -94,11 +94,14 @@ function moveMenu(direction){
 function activateFocused(){
  const dialog=document.querySelector('#collection-dialog[open]');
  const active=document.activeElement;
- if(dialog){if(active&&dialog.contains(active)&&isVisible(active)){active.click();return;}focusElement(dialog.querySelector('#random-chimpion'));return;}
+ if(dialog){
+  if(active&&dialog.contains(active)&&isVisible(active)){active.click();return;}
+  const random=dialog.querySelector('#random-chimpion');if(isVisible(random))random.click();return;
+ }
  const mode=document.body?.dataset?.mode||'';
  if(mode==='menu'||mode==='paused'){
   if(active&&document.querySelector('#overlay')?.contains(active)&&isVisible(active)){active.click();return;}
-  const play=document.querySelector('#play');if(isVisible(play))play.focus({preventScroll:true});
+  const play=document.querySelector('#play');if(isVisible(play))play.click();
  }
 }
 
@@ -106,7 +109,7 @@ let previousX=0,previousY=0,previousA=false,previousB=false;
 setInterval(()=>{
  const mode=document.body?.dataset?.mode||'';
  const pads=[...(navigator.getGamepads?.()||[])].filter(p=>p?.connected);
- if(!pads.length)return;
+ if(!pads.length){previousX=previousY=0;previousA=previousB=false;return;}
  const p=pads.find(p=>Math.abs(p.axes?.[0]||0)>.35||Math.abs(p.axes?.[1]||0)>.35||p.buttons?.some(b=>b.pressed))||pads[0];
  const x=Number(p.buttons?.[15]?.pressed)-Number(p.buttons?.[14]?.pressed)||(Math.abs(p.axes?.[0]||0)>.45?Math.sign(p.axes[0]):0);
  const y=Number(p.buttons?.[13]?.pressed)-Number(p.buttons?.[12]?.pressed)||(Math.abs(p.axes?.[1]||0)>.45?Math.sign(p.axes[1]):0);
@@ -138,14 +141,15 @@ document.addEventListener('pointermove',event=>{
  mouseCode=next;clearTimeout(mouseRelease);mouseRelease=setTimeout(releaseMouse,110);
 },true);
 
+const requestLock=canvas=>{try{const result=canvas?.requestPointerLock?.();result?.catch?.(()=>{});}catch{}};
 document.addEventListener('pointerdown',event=>{
  if(event.pointerType!=='mouse'||document.body?.dataset?.mode!=='playing')return;
  const canvas=document.querySelector('#world canvas');
- if(canvas&&event.target===canvas&&document.pointerLockElement!==canvas)canvas.requestPointerLock?.().catch?.(()=>{});
+ if(canvas&&event.target===canvas&&document.pointerLockElement!==canvas)requestLock(canvas);
 },true);
 document.addEventListener('click',event=>{
  const target=event.target.closest?.('#confirm-chimpion,#try-again,#quick-retry');if(!target)return;
- const canvas=document.querySelector('#world canvas');if(canvas&&matchMedia('(pointer:fine)').matches&&document.pointerLockElement!==canvas)canvas.requestPointerLock?.().catch?.(()=>{});
+ const canvas=document.querySelector('#world canvas');if(canvas&&matchMedia('(pointer:fine)').matches&&document.pointerLockElement!==canvas)requestLock(canvas);
 },true);
 document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement)releaseMouse();});
 setInterval(()=>{
