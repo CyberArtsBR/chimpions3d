@@ -16,7 +16,7 @@ document.body.innerHTML = "\n<div class=\"app\" id=\"app\">\n  <img class=\"room
     },
     {
       name: "Chimpions Card Arena",
-      url: "https://chimpions-attribute-arena.onrender.com/",
+      url: "/?arena=1",
       image: "/launcher/cartridge-arena.png"
     }
   ];

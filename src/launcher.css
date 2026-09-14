@@ -468,3 +468,7 @@ html, body {
 
 .cart-wrap:focus-visible,.music-toggle:focus-visible,.social-link:focus-visible{outline:3px solid #fbe36a;outline-offset:6px}
 @media(max-width:600px){.gamepad-status{bottom:76px}.music-status{bottom:76px}.music-toggle{bottom:102px}.controls{width:calc(100% - 16px)}.label-zoom img{width:90vw}.logo{width:48vw}.socials{width:32vw}}
+
+/* V7 gallery scale: preserve the full approved room artwork. */
+.room-bg{object-fit:contain;background:#05070b}.logo{width:min(465px,31.5vw);max-height:15vh}.socials{width:min(274px,20.25vw)}.cart-wrap{width:clamp(214px,21.75vw,356px);margin-left:calc(clamp(214px,21.75vw,356px)/-2);margin-top:calc((clamp(214px,21.75vw,356px)*1086/1448)/-2)}
+@media(max-width:1000px){.cart-wrap{width:clamp(160px,27.75vw,210px);margin-left:calc(clamp(160px,27.75vw,210px)/-2);margin-top:calc((clamp(160px,27.75vw,210px)*1086/1448)/-2)}.logo{width:min(308px,33vw)}.socials{width:min(188px,25.5vw)}}
