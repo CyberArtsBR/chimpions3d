@@ -1,10 +1,4 @@
 import './polish.css';
-import './runtimeEnhancements.js';
-import './visualCompletion.js';
-import './mobileVisualBudget.js';
-import './noBiomeBands.js';
-import {setupBiomePolish} from './biome-polish.js';
-import {setupMenuExtras} from './menuExtras.js';
 
 const params=new URLSearchParams(location.search);
 if(params.has('lab')){
@@ -14,5 +8,18 @@ if(params.has('lab')){
   import('./rig-lab.js');
 }else{
   if(params.has('dev'))document.body.dataset.devTools='true';
-  import('./game.js').then(()=>{setupBiomePolish();setupMenuExtras();});
+  Promise.all([
+    import('./runtimeEnhancements.js'),
+    import('./visualCompletion.js'),
+    import('./mobileVisualBudget.js'),
+    import('./noBiomeBands.js')
+  ]).then(async()=>{
+    const [{setupBiomePolish},{setupMenuExtras}]=await Promise.all([
+      import('./biome-polish.js'),
+      import('./menuExtras.js')
+    ]);
+    await import('./game.js');
+    setupBiomePolish();
+    setupMenuExtras();
+  });
 }
