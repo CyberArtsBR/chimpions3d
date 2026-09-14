@@ -78,7 +78,8 @@ const hudBest=document.createElement('div');hudBest.className='stat';hudBest.inn
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3;
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='chimpion';
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
-const results=createResults({retry:()=>start(),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();}}),recordBook=createRecordBook();
+const results=createResults({retry:()=>start(),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
+const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
 const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.19;music.preload='metadata';const audio=createAudio(music);
 addEventListener('chimp-record',()=>audio.play('record'));document.addEventListener('click',event=>{if(event.target.closest('button')&&mode!=='playing')audio.play('menu');});
@@ -111,7 +112,7 @@ function syncUI(){
  if(document.body.dataset.mode!==mode)document.body.dataset.mode=mode;$('pace').hidden=game.jetRemaining<=0;
  const boostLabel=game.jetRemaining>0?'JETPACK '+Math.ceil(game.jetRemaining)+'s':'';if($('pace').textContent!==boostLabel)$('pace').textContent=boostLabel;
  hudText('height',Math.floor(game.height));hudText('coins',game.bananas);hudText('hud-best',Math.floor(Math.max(best,game.height)));hudText('best','PERSONAL BEST  ·  '+Math.floor(best)+' m');
- $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';$('overlay').hidden=['playing','dying','over','starting'].includes(mode);
+ $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';$('rig-link').hidden=mode==='paused';recordsButton.hidden=mode==='paused';giveUpButton.hidden=mode!=='paused';$('overlay').hidden=['playing','dying','over','starting'].includes(mode);
 }
 function menu(kind){
  if(collectionDialog.open)collectionDialog.close();mode=kind;music.pause();mouseTarget=null;keys.clear();pointers.clear();acc=0;
@@ -132,7 +133,7 @@ async function start(){
  if(fresh){mode='starting';syncUI();runTicket=null;inputTrace=[];try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;game.reset(runTicket?.seed??Math.floor(Math.random()*4294967295));avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;music.currentTime=0;deathPoint=null;splashed=false;}
  mode='playing';music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();
 }
-$('play').onclick=start;$('pause').onclick=()=>menu('paused');
+$('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>menu('menu');
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');if(!muted)sound('coin');};$('mute').style.opacity=1;
 addEventListener('keydown',e=>{
  if(results.isOpen||recordBook.isOpen)return;if(mode==='dying'){if(e.code==='Enter'&&!e.repeat)quickRetry.click();return;}
@@ -179,7 +180,7 @@ function renderCollection(){
  const count=document.createElement('span');count.textContent=(collectionPage+1)+' / '+pages+' · '+entries.length+' chimps';nav.append(count);list.append(nav);
 }
 async function openSelection(){
- if(collectionDialog.open||!catalog.length)return;pendingEntry=randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
+ if(collectionDialog.open||!catalog.length)return;pendingEntry=catalog.find(entry=>entry.id===selectedId)||randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
  const list=$('avatar-list');list.hidden=false;collectionDialog.showModal();if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=await response.json();}catch{toast('Collection unavailable. Your chimp is ready.');}
  if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }

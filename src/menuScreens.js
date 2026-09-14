@@ -13,8 +13,8 @@ export function setupDashMenu(){
  const menu=document.querySelector('#dash-menu');if(!menu)return;
  document.body.classList.add('dash-start-screen');
  const trigger=document.querySelector('#dash-start');trigger.classList.add('original-dash-start');
- const start=document.createElement('button');start.className='screen-primary';start.textContent='Start Game';
- const back=backButton(menu);menu.append(start);
+ const start=document.createElement('button');start.className='screen-hotspot dash-start-hotspot';start.textContent='Start Game';start.setAttribute('aria-label','Start Game');
+ const back=backButton(menu);back.classList.add('screen-hotspot','dash-back-hotspot');menu.append(start);
  const dialog=document.createElement('dialog');dialog.id='dash-character-picker';
  dialog.innerHTML='<header><h2>Choose your Chimpion</h2><button class="picker-close" aria-label="Close">×</button></header><input class="picker-search" type="search" placeholder="Search chimp name" aria-label="Search characters"><div class="picker-grid"></div><footer><button class="picker-prev">Previous</button><button class="picker-random">Random Chimpion</button><span class="picker-page"></span><button class="picker-next">Next</button><button class="picker-play">Play with selected Chimpion</button></footer>';
  document.body.append(dialog);
@@ -42,7 +42,7 @@ export function setupDashMenu(){
 }
 export function setupArenaGate(){
  document.body.className='arena-gate-screen';document.title='Chimpions Card Arena';
- document.body.innerHTML='<main class="arena-gate"><div class="arena-actions"><button id="enter-arena">Enter the Arena</button><button id="arena-back">Back to Games Selection</button></div></main>';
+ document.body.innerHTML='<main class="arena-gate"><button class="arena-hotspot enter-arena" id="enter-arena" aria-label="Enter the Arena">Enter the Arena</button><button class="arena-hotspot arena-back" id="arena-back" aria-label="Back to the game selection">Back to the game selection</button></main>';
  document.querySelector('#enter-arena').onclick=()=>{location.href='https://chimpions-attribute-arena.onrender.com/'};
  document.querySelector('#arena-back').onclick=launcher;
 }
