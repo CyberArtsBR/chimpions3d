@@ -49,3 +49,67 @@ body[data-dev-tools='true']::before{
   letter-spacing:.12em;
   pointer-events:none;
 }
+
+/* Biome identity without floating creatures/particles. These are broad atmosphere
+   layers only, so platforms, bananas and the Chimpion stay crisp and readable. */
+#world::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  opacity:.28;
+  transition:background 1.4s ease,opacity 1.4s ease;
+  background:radial-gradient(ellipse at 62% 18%,#fff0b42b 0 18%,transparent 54%);
+  mix-blend-mode:soft-light;
+}
+#world canvas{z-index:1}
+#world>.sun,#world>.rays,#world>.hill,#world>.mist{z-index:0}
+
+body[data-biome='morning'] #world::before{
+  opacity:.30;
+  background:
+    radial-gradient(ellipse at 68% 11%,#fff2bd3d 0 13%,transparent 42%),
+    linear-gradient(180deg,#ffd89b0a 0 42%,#6ac3a008 100%);
+}
+body[data-biome='morning'] .sun{opacity:.84}
+body[data-biome='morning'] .rays{opacity:.48}
+body[data-biome='morning'] .mist{opacity:.42}
+
+body[data-biome='emerald'] #world::before{
+  opacity:.46;
+  background:
+    linear-gradient(180deg,#9ed9c126 0 34%,#0f6d6152 74%,#073e3a38 100%),
+    radial-gradient(ellipse at 50% 55%,#d4f1da28 0 21%,transparent 63%);
+}
+body[data-biome='emerald'] .sun{opacity:.42;filter:blur(8px)}
+body[data-biome='emerald'] .rays{opacity:.16;filter:blur(13px)}
+body[data-biome='emerald'] .mist{opacity:.88;background:linear-gradient(transparent 0,#b9ddd183 58%,#8fc7b44f 100%)}
+
+body[data-biome='golden'] #world::before{
+  opacity:.42;
+  background:
+    radial-gradient(ellipse at 62% 18%,#ffc76f52 0 18%,transparent 52%),
+    linear-gradient(180deg,#ffb95f22 0 38%,#b77c3320 75%,transparent 100%);
+}
+body[data-biome='golden'] .sun{opacity:.94;background:#fff0b2;box-shadow:0 0 105px 62px #ffc46a6b}
+body[data-biome='golden'] .rays{opacity:.68;filter:blur(6px)}
+body[data-biome='golden'] .mist{opacity:.28;background:linear-gradient(transparent,#e4b86f3d)}
+
+body[data-biome='moonlit'] #world::before{
+  opacity:.50;
+  background:
+    linear-gradient(180deg,#1e39735e 0 28%,#132d6250 54%,#0a27452e 100%),
+    radial-gradient(ellipse at 70% 12%,#bfd4ff2e 0 11%,transparent 36%);
+  mix-blend-mode:multiply;
+}
+body[data-biome='moonlit'] .sun{opacity:.24;background:#cfddff;box-shadow:0 0 95px 44px #8dafff4c}
+body[data-biome='moonlit'] .rays{opacity:.07}
+body[data-biome='moonlit'] .mist{opacity:.34;background:linear-gradient(transparent,#7890bd42)}
+
+@media(max-width:600px){
+  #world::before{opacity:.22}
+  body[data-biome='emerald'] #world::before,
+  body[data-biome='golden'] #world::before,
+  body[data-biome='moonlit'] #world::before{opacity:.30}
+}
