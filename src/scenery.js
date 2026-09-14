@@ -113,6 +113,19 @@ export function createScenery(scene,renderer){
  const cream=new THREE.MeshStandardMaterial({color:0xf2e4bf,roughness:.68});
  const gills=new THREE.MeshStandardMaterial({map:gillTexture,bumpMap:gillTexture,bumpScale:.035,roughness:.86,side:THREE.DoubleSide});
  const blue=new THREE.MeshStandardMaterial({color:0x55c4d0,emissive:0x17666f,emissiveIntensity:.35,roughness:.5});
+
+ // Static menus/results use DOM overlays. Render the WebGL world once when entering a
+ // static mode, then sleep GPU rendering until gameplay or a scenery change invalidates it.
+ let staticRenderDirty=true,lastRenderMode='';
+ const baseRender=renderer.render.bind(renderer);
+ const invalidateStaticFrame=()=>{staticRenderDirty=true;};
+ renderer.render=(renderScene,renderCamera)=>{
+  const mode=document.body?.dataset?.mode||'';
+  const active=mode==='playing'||mode==='dying'||mode==='starting';
+  if(active){staticRenderDirty=true;lastRenderMode=mode;return baseRender(renderScene,renderCamera);}
+  if(staticRenderDirty||mode!==lastRenderMode){staticRenderDirty=false;lastRenderMode=mode;return baseRender(renderScene,renderCamera);}
+ };
+
  const edgeVines=new THREE.Group();scene.add(edgeVines);
  const vineMaterial=new THREE.MeshStandardMaterial({color:0x365830,map:barkTexture,bumpMap:barkTexture,bumpScale:.13,roughness:.9});
  const vineMoss=new THREE.MeshStandardMaterial({color:0x7ca852,map:mossTexture,bumpMap:mossTexture,bumpScale:.08,roughness:.92});
@@ -133,6 +146,59 @@ export function createScenery(scene,renderer){
   for(let i=0;i<count;i++){dummy.position.set(0,0,0);dummy.rotation.set(0,0,0);dummy.scale.set(1,1,1);place(i,dummy);dummy.updateMatrix();batch.setMatrixAt(i,dummy.matrix);}
   batch.castShadow=batch.receiveShadow=true;return batch;
  }
+
+ // Branch groups are expensive because each contains several instanced decorative batches.
+ // The game already calls dispose() when a branch leaves the live window; intercept that
+ // signal and retain a bounded pool keyed by the branch's exact visual signature.
+ const branchPool=new Map();
+ const MAX_POOLED_BRANCHES=56;
+ let pooledBranchCount=0;
+ const variantFor=p=>(Math.imul(p.id+1,2654435761)>>>0)%4;
+ const poolKeyFor=(p,variant=variantFor(p))=>[p.type,p.fragile?1:0,p.reward===2?2:1,Number(p.width).toFixed(3),variant].join('|');
+ function permanentlyDisposeBranch(group){
+  group.traverse(o=>{
+   if(!o.isInstancedMesh)return;
+   const original=o.userData._poolOriginalDispose;
+   if(original)original();else THREE.InstancedMesh.prototype.dispose.call(o);
+  });
+ }
+ function trimBranchPool(){
+  while(pooledBranchCount>MAX_POOLED_BRANCHES){
+   const entry=[...branchPool.entries()].find(([,items])=>items.length);
+   if(!entry)break;
+   const [key,items]=entry,group=items.shift();pooledBranchCount--;
+   if(!items.length)branchPool.delete(key);
+   permanentlyDisposeBranch(group);
+  }
+ }
+ function releaseBranchToPool(group){
+  if(group.parent||group.userData._inBranchPool)return;
+  const key=group.userData._poolKey;if(!key)return;
+  group.visible=false;group.userData._inBranchPool=true;
+  const items=branchPool.get(key)||[];items.push(group);branchPool.set(key,items);pooledBranchCount++;trimBranchPool();
+ }
+ function armBranchPooling(group){
+  group.traverse(o=>{
+   if(!o.isInstancedMesh||o.userData._poolDisposeWrapped)return;
+   const original=o.dispose.bind(o);o.userData._poolDisposeWrapped=true;o.userData._poolOriginalDispose=original;
+   o.dispose=()=>{
+    if(group.userData._poolReleaseQueued||group.userData._inBranchPool)return;
+    group.userData._poolReleaseQueued=true;
+    queueMicrotask(()=>{group.userData._poolReleaseQueued=false;releaseBranchToPool(group);});
+   };
+  });
+ }
+ function restorePooledBranch(group,p,variant,key){
+  group.userData.platformWidth=p.width;group.userData.platformType=p.type;group.userData.fragile=!!p.fragile;group.userData.variant=variant;
+  group.userData.impactAt=undefined;group.userData._poolKey=key;group.userData._inBranchPool=false;group.userData._poolReleaseQueued=false;
+  group.visible=true;group.position.set(0,0,0);group.rotation.set(0,0,0);group.scale.set(1,1,1);
+  const authored=group.getObjectByName('authored-branch'),procedural=group.getObjectByName('procedural-branch');
+  if(authored)authored.visible=highQuality;
+  if(procedural)procedural.visible=!highQuality||!authored;
+  group.traverse(o=>{if(o.userData.desktopDetail)o.visible=highQuality;});
+  attachPlatform(group);armBranchPooling(group);return group;
+ }
+
  function attachPlatform(group){
   if(!platformTemplate||(group.userData.platformType==='cracked'||group.userData.fragile)||group.getObjectByName('authored-branch'))return;
   const model=platformTemplate.clone(true),authored=new THREE.Group();authored.name='authored-branch';const variant=group.userData.variant||0;
@@ -141,18 +207,18 @@ export function createScenery(scene,renderer){
   const width=group.userData.platformWidth;
   instances(mossGeo,moss,authored,9,(i,o)=>{o.position.set((i/8-.5)*width*.88,-.05*PLATFORM_SCALE,Math.sin(i*3)*.16*PLATFORM_SCALE);o.scale.set(.16*PLATFORM_SCALE,.05*PLATFORM_SCALE,.13*PLATFORM_SCALE);});
   instances(leafGeo,leaf,authored,10,(i,o)=>{o.position.set((i/9-.5)*width*.92,-.14*PLATFORM_SCALE,.22*PLATFORM_SCALE);o.scale.set(.10*PLATFORM_SCALE,.16*PLATFORM_SCALE,1);o.rotation.set(.18,Math.sin(i)*.3,Math.sin(i*4)*.8);});
-  group.getObjectByName('procedural-branch').visible=!highQuality;
+  group.getObjectByName('procedural-branch').visible=!highQuality;armBranchPooling(group);
  }
  function loadPlatform(){
   if(!highQuality||!platformConfig?.platformModel||platformLoading)return;platformLoading=true;
   new GLTFLoader().load(import.meta.env.BASE_URL+platformConfig.platformModel,gltf=>{
    const model=gltf.scene;model.rotation.set(...(platformConfig.platformRotation||[0,0,0]));model.updateMatrixWorld(true);
-   const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>0)){console.warn('Invalid branch bounds');return;}
+   const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>0)){console.warn('Invalid branch bounds');platformLoading=false;return;}
    const normalizer=new THREE.Group();normalizer.add(model);normalizer.scale.set(1/size.x,(platformConfig.platformHeight||.42)/size.y,(platformConfig.platformDepth||.65)/size.z);
    model.position.x-=(box.min.x+box.max.x)/2;model.position.z-=(box.min.z+box.max.z)/2;model.position.y-=box.max.y-(platformConfig.landingInset||0)*size.y;
    model.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true;for(const material of (Array.isArray(o.material)?o.material:[o.material]))if(material?.isMeshStandardMaterial&&!material.map&&!material.vertexColors&&o.geometry.attributes.uv){material.map=barkTexture;material.bumpMap=barkRelief;material.bumpScale=.055;material.roughness=.9;material.metalness=0;material.needsUpdate=true;}}});
-   platformTemplate=normalizer;const groups=[];scene.traverse(o=>{if(o.userData.platformWidth)groups.push(o);});groups.forEach(attachPlatform);
-  },undefined,error=>console.warn('Branch GLB unavailable; procedural branches remain.',error.message));
+   platformTemplate=normalizer;platformLoading=false;const groups=[];scene.traverse(o=>{if(o.userData.platformWidth)groups.push(o);});groups.forEach(attachPlatform);invalidateStaticFrame();
+  },undefined,error=>{platformLoading=false;console.warn('Branch GLB unavailable; procedural branches remain.',error.message);});
  }
 
  const background=new THREE.Group();scene.add(background);
@@ -168,6 +234,7 @@ export function createScenery(scene,renderer){
  function refreshBackground(){
   forest.forEach((m,i)=>{m.visible=background.visible&&(highQuality||i>0);});
   if(treeImageMesh)treeImageMesh.visible=background.visible&&highQuality&&!!treeImageMesh.material.map;
+  invalidateStaticFrame();
  }
  function fitTree(){
   if(!treeImageMesh?.material.map)return;const map=treeImageMesh.material.map,image=map.image;if(!image?.width||!image?.height)return;
@@ -183,7 +250,7 @@ export function createScenery(scene,renderer){
    treeImageMesh.material.map=treeTextures.get(kind);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
   }
   if(treeRequests.has(kind))return;treeRequests.add(kind);
-  new THREE.TextureLoader().load(import.meta.env.BASE_URL+url,map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
+  new THREE.TextureLoader().load(import.meta.env.BASE_URL+url,map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();invalidateStaticFrame();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
  }
  fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}).then(config=>{platformConfig=config;loadPlatform();loadTree();}).catch(()=>{});
 
@@ -192,8 +259,10 @@ export function createScenery(scene,renderer){
  const ring=new THREE.Mesh(new THREE.RingGeometry(.35,.4,28),new THREE.MeshBasicMaterial({color:0xd7eca6,transparent:true,opacity:0,depthWrite:false}));ring.visible=false;scene.add(ring);let ringAge=1;
 
  function branch(p){
-  const variant=(Math.imul(p.id+1,2654435761)>>>0)%4,branchBark=woodVariants[variant],branchMoss=mossVariants[variant];
-  const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;group.userData.fragile=!!p.fragile;group.userData.variant=variant;
+  const variant=variantFor(p),key=poolKeyFor(p,variant),items=branchPool.get(key);
+  if(items?.length){const group=items.pop();pooledBranchCount--;if(!items.length)branchPool.delete(key);return restorePooledBranch(group,p,variant,key);}
+  const branchBark=woodVariants[variant],branchMoss=mossVariants[variant];
+  const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;group.userData.fragile=!!p.fragile;group.userData.variant=variant;group.userData._poolKey=key;
   const fallback=new THREE.Group();fallback.name='procedural-branch';fallback.scale.set(1,PLATFORM_SCALE,PLATFORM_SCALE);group.add(fallback);
   if(p.type==='cracked'||p.fragile){
    for(const side of [-1,1]){const wood=mesh(logGeo,branchBark,fallback,side*p.width*.255,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.82+variant*.03,p.width*.49,.9+variant*.04);wood.castShadow=wood.receiveShadow=true;const splinter=mesh(logGeo,end,fallback,side*.045,-.31,.17);splinter.rotation.z=side*(.25+variant*.12);splinter.scale.set(.19,.38+.05*variant,.16);}
@@ -224,7 +293,7 @@ export function createScenery(scene,renderer){
   instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);});
   const roots=new THREE.Group();group.add(roots);instances(logGeo,branchBark,roots,2+variant,(i,o)=>{o.position.set((i/(variant+1)-.5)*p.width*.7,-.48,.02);o.scale.set(.1,.45+((i+variant)%3)*.1,.1);o.rotation.z=Math.sin(i+variant)*.25;});
   const offshoots=new THREE.Group();group.add(offshoots);instances(logGeo,branchBark,offshoots,1+(variant%3),(i,o)=>{const side=i%2?1:-1;o.position.set(side*p.width*(.24+i*.07),-.43,-.08+i*.05);o.scale.set(.11,.34+variant*.055,.11);o.rotation.z=side*(.62+variant*.13+i*.16);});
-  group.userData.coin=coin;attachPlatform(group);return group;
+  group.userData.coin=coin;attachPlatform(group);armBranchPooling(group);return group;
  }
 
  const mistMap=canvasTexture(128,64,(c,w,h)=>{const gradient=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);gradient.addColorStop(0,'#d2efdf77');gradient.addColorStop(1,'#d2efdf00');c.fillStyle=gradient;c.fillRect(0,0,w,h);});
@@ -244,7 +313,8 @@ export function createScenery(scene,renderer){
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return !!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
-  resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();},
+  get pooledBranches(){return pooledBranchCount;},
+  resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
    if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;ring.visible=true;}
    if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;wrapCues.visible=true;}
@@ -252,6 +322,8 @@ export function createScenery(scene,renderer){
    if(event.type==='coin'||event.spring)for(let i=0;i<12;i++)sparks.push({x:event.x,y:event.y+.4,z:.5,vx:(r()-.5)*3,vy:1+r()*2,age:0});if(sparks.length)particles.visible=true;
   },
   update(cameraY,time,dt,palette,night,biome=0,blend=1){
+   const mode=document.body?.dataset?.mode||'',active=mode==='playing'||mode==='dying'||mode==='starting';
+   if(!active&&!staticRenderDirty)return;
    edgeVines.position.y=cameraY;currentCamera=cameraY;
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
@@ -262,7 +334,8 @@ export function createScenery(scene,renderer){
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;},
-  setQuality(high){highQuality=high;loadPlatform();loadTree();scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});refreshBackground();}
+  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;invalidateStaticFrame();},
+  setQuality(high){highQuality=high;loadPlatform();loadTree();scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});refreshBackground();invalidateStaticFrame();},
+  invalidateRender(){invalidateStaticFrame();}
  };
 }
