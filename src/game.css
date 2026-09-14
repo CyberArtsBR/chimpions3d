@@ -127,3 +127,24 @@ body[data-mode=menu] #flip{top:97%}
 #record-book header{display:flex;justify-content:space-between;align-items:center;gap:10px}#record-book h2{margin:0;font-size:24px}
 body[data-mode=dying] #touch,body[data-mode=over] #touch,body[data-mode=starting] #touch{display:none}
 @media(max-width:500px){.selection-actions{grid-template-columns:1fr}.selection-actions .primary{grid-column:auto}#results-dialog,#record-book{padding:20px}.score-conversion{gap:14px}}
+
+/* Expedition UI: clear scores, short biome titles, direct retry. */
+[hidden]{display:none!important}
+#hud{font-variant-numeric:tabular-nums;gap:8px}
+#hud .stat strong{font-weight:900;letter-spacing:-.03em}
+#theme{transition:opacity .6s ease;pointer-events:none}
+#quick-retry{position:fixed;z-index:35;left:50%;bottom:15%;transform:translateX(-50%);padding:16px 36px;border:2px solid #ffe799;border-radius:14px;background:linear-gradient(#ffda65,#de9226);color:#261b0e;font:900 18px system-ui;box-shadow:0 8px 28px #0007;cursor:pointer}
+#selected-preview{grid-row:span 2;display:grid;place-items:center;min-height:110px}
+#selected-preview:empty{display:none}
+#selected-preview img{width:clamp(90px,20vw,170px);height:clamp(90px,20vw,170px);object-fit:contain;filter:drop-shadow(0 6px 16px #061b16)}
+#collection-dialog #avatar-list{max-height:48dvh}
+.avatar-option[aria-pressed=true]::after{content:'✓ SELECTED';display:block;color:#ffe59b;font-size:10px;letter-spacing:.08em}
+#result-best{color:#ffe39a;font-weight:800}
+#results-dialog .result-actions{position:sticky;bottom:-20px;background:#15332e;padding:12px 0;margin-bottom:0}
+#audio-settings{position:fixed;left:12px;bottom:12px;z-index:30;background:#14352fef;border:1px solid #9dac7a;border-radius:12px;color:#ffedc5;padding:10px 14px;font:13px system-ui}
+#audio-settings summary{cursor:pointer;font-weight:700}
+#audio-settings label{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:12px}
+#audio-settings input{width:120px;accent-color:#f4d27d}
+body[data-mode=playing] #audio-settings,body[data-mode=dying] #audio-settings{display:none}
+@media(max-width:500px){#hud .stat{padding:8px}#hud .stat strong{font-size:22px}#hud .stat small{font-size:9px}#selected-preview{grid-row:auto}.selection-actions{gap:8px;padding:10px}#selected-preview img{height:90px;width:90px}}
+@media(prefers-reduced-motion:reduce){#world .rays,#world .mist,#world .sun{animation:none}}

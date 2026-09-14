@@ -207,7 +207,7 @@ function applyPose({ pose, offset }, alpha) {
   model.position.x-=(box.min.x+box.max.x)/2;
   model.position.z-=(box.min.z+box.max.z)/2;
   model.position.y-=box.min.y;
-  model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=true;o.receiveShadow=true;}});
+  model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;o.castShadow=o.isSkinnedMesh;o.receiveShadow=false;}});
   inspect(model);
   const required=['hips','leftThigh','rightThigh','leftShin','rightShin','leftFoot','rightFoot'];
   const missing=required.filter(key=>!rig[key]);
@@ -220,14 +220,28 @@ function applyPose({ pose, offset }, alpha) {
   model.visible=true;
   return {
     root, model, boneCount:rest.size, triangles,
-    update(dt,time,velocity,bounceAge,active) {
+    update(dt,time,velocity,bounceAge,active,feel={}) {
       state=active?'JUMP':'IDLE';
       jumpStage=active?(bounceAge<0.09?'TAKEOFF':velocity>3?'TAKEOFF':'AIRBORNE'):'';
       if(active&&bounceAge<.04&&velocity>0)launchVelocity=Math.max(JUMP,velocity);
       const targetLift=active?(velocity>=0?1-Math.min(1,velocity/launchVelocity):Math.max(0,1+velocity/launchVelocity)):0;
       armLift=THREE.MathUtils.damp(armLift,targetLift,active?9:14,dt);
       stageTime=bounceAge; phase+=dt*7;
-      applyPose(makePose(time,0,armLift),1-Math.exp(-18*dt));
+      const posed=makePose(time,0,armLift);
+      const prep=active?Math.max(0,Math.min(1,feel.landing||0)):0;
+      for(const side of ['left','right']){
+        posed.pose[side+'Thigh'][0]-=prep*.18;
+        posed.pose[side+'Shin'][0]+=prep*.3;
+        posed.pose[side+'Foot'][0]-=prep*.12;
+        if(feel.dying){
+          posed.pose[side+'UpperArm'][0]=-1.1+Math.sin(time*15+(side==='left'?0:2))*.35;
+          posed.pose[side+'Shin'][0]=.5+Math.sin(time*12)*.2;
+        }
+      }
+      applyPose(posed,1-Math.exp(-18*dt));
+      const squash=active?Math.exp(-bounceAge*22)*.05:0;
+      visual.scale.set(1+squash*.4,1-squash,1+squash*.4);
+      visual.rotation.z=THREE.MathUtils.damp(visual.rotation.z,active?-(feel.vx||0)*.009:0,12,dt);
     }
   };
   }catch(error){disposeCharacter({root});throw error;}

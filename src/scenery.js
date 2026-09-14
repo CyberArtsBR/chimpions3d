@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WIDTH, PLATFORM_SCALE, ITEM_SCALE} from './physics.js';
+import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE} from './physics.js';
 
 // All scenery is generated locally. Shared geometry, instanced leaves and small
 // reusable textures keep the forest independent of downloaded art packs.
@@ -64,7 +64,7 @@ const endTexture=canvasTexture(512,512,(c,w,h)=>{
 const bananaTexture=canvasTexture(512,128,(c,w,h)=>{
  const r=rng(423),g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,'#b58a10');g.addColorStop(.24,'#ffd22c');g.addColorStop(.5,'#fff39a');g.addColorStop(.8,'#efb515');g.addColorStop(1,'#b98507');
  c.fillStyle=g;c.fillRect(0,0,w,h);
- for(let i=0;i<110;i++){c.fillStyle='#825222';c.globalAlpha=.05+r()*.14;c.fillRect(r()*w,r()*h,1+r()*2,1+r()*2);}c.globalAlpha=1;
+ if(background.visible&&ivy.visible)for(let i=0;i<(highQuality?110:48);i++){c.fillStyle='#825222';c.globalAlpha=.05+r()*.14;c.fillRect(r()*w,r()*h,1+r()*2,1+r()*2);}c.globalAlpha=1;
  for(const y of [21,60,103]){c.strokeStyle='#fff1a14a';c.lineWidth=2;c.beginPath();c.moveTo(0,y);c.lineTo(w,y+3);c.stroke();}
 });
 const mushroomTexture=canvasTexture(512,256,(c,w,h)=>{
@@ -121,7 +121,9 @@ export function createScenery(scene,renderer){
  const bark=new THREE.MeshStandardMaterial({color:0xc5a782,map:barkTexture,bumpMap:barkRelief,bumpScale:.055,roughness:.87});
  const moss=new THREE.MeshStandardMaterial({color:0xa8bd79,map:mossTexture,bumpMap:mossRelief,bumpScale:.045,roughness:.96});
  const leaf=new THREE.MeshStandardMaterial({map:leafTexture,alphaTest:.35,side:THREE.DoubleSide,roughness:.88});
- const end=new THREE.MeshStandardMaterial({map:endTexture,bumpMap:endTexture,bumpScale:.012,roughness:.76});
+ const end=new THREE.MeshStandardMaterial({map:endTexture,roughness:.76});
+ const woodVariants=[bark,...[0xaf916a,0x9c7856,0xd4b88b].map(color=>{const m=bark.clone();m.color.set(color);return m;})];
+ const mossVariants=[moss,...[0x83b65a,0xc1bc68,0x71a778].map(color=>{const m=moss.clone();m.color.set(color);return m;})];
  const dark=new THREE.MeshStandardMaterial({color:0x3f3023,roughness:1});
  const gold=new THREE.MeshStandardMaterial({color:0xffffff,map:bananaTexture,roughness:.33,metalness:.02,emissive:0x5f3800,emissiveIntensity:.18});
  const red=new THREE.MeshStandardMaterial({color:0xffffff,map:mushroomTexture,bumpMap:mushroomTexture,bumpScale:.016,roughness:.38});
@@ -135,12 +137,12 @@ export function createScenery(scene,renderer){
  for(const side of [-1,1]){
   for(let strand=0;strand<3;strand++){
    const points=[];
-   for(let i=0;i<=20;i++){const y=-13+i*1.3;points.push(new THREE.Vector3(side*(WIDTH/2+.02+strand*.045+Math.sin(i*.92+strand)*.07),y,.35+strand*.08+Math.cos(i*.73)*.035));}
+   for(let i=0;i<=20;i++){const y=-13+i*1.3;points.push(new THREE.Vector3(side*(WIDTH/2-VINE_INSET+.02+strand*.045+Math.sin(i*.92+strand)*.07),y,.35+strand*.08+Math.cos(i*.73)*.035));}
    const vine=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),120,.075-strand*.012,9,false),strand===1?vineMoss:vineMaterial);vine.castShadow=vine.receiveShadow=true;edgeVines.add(vine);
   }
   for(let i=0;i<28;i++){
    const y=-12.2+i*.92,leafMesh=new THREE.Mesh(leafGeo,leaf);
-   leafMesh.position.set(side*(WIDTH/2-.02+Math.sin(i*1.7)*.09),y,.48);
+   leafMesh.position.set(side*(WIDTH/2-VINE_INSET-.02+Math.sin(i*1.7)*.09),y,.48);
    leafMesh.rotation.set(.15,side*.28,side*(.7+Math.sin(i*.8)*.35));leafMesh.scale.set(.13,.24+Math.sin(i)*.035,1);edgeVines.add(leafMesh);
   }
  }
@@ -210,7 +212,7 @@ export function createScenery(scene,renderer){
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
   const active=highQuality&&!!treeImageMesh?.material.map;
-  trunk.visible=highQuality&&!active;ivy.visible=highQuality&&!active;
+  trunk.visible=!active;ivy.visible=!active;
   forest.forEach((m,i)=>{m.visible=!active&&(highQuality||i>0);});
   if(treeImageMesh)treeImageMesh.visible=active;
  }
@@ -233,7 +235,7 @@ export function createScenery(scene,renderer){
   }
   if(treeRequests.has(kind))return;treeRequests.add(kind);
   new THREE.TextureLoader().load(import.meta.env.BASE_URL+url,map=>{
-   map.colorSpace=THREE.SRGBColorSpace;map.wrapT=THREE.RepeatWrapping;map.anisotropy=4;
+   map.colorSpace=THREE.SRGBColorSpace;map.wrapT=THREE.MirroredRepeatWrapping;map.anisotropy=4;
    treeTextures.set(kind,map);loadTree();
   },undefined,()=>console.warn('Tree image unavailable; procedural tree remains.'));
  }
@@ -259,28 +261,30 @@ export function createScenery(scene,renderer){
   batch.castShadow=batch.receiveShadow=true;return batch;
  }
  function branch(p){
+  const variant=(Math.imul(p.id+1,2654435761)>>>0)%4;
+  const branchBark=woodVariants[variant],branchMoss=mossVariants[variant];
   const group=new THREE.Group();group.userData.platformWidth=p.width;group.userData.platformType=p.type;group.userData.fragile=!!p.fragile;
   const fallback=new THREE.Group();fallback.name='procedural-branch';fallback.scale.set(1,PLATFORM_SCALE,PLATFORM_SCALE);group.add(fallback);
   // Physics already enlarged width; scale only thickness and depth here.
   if((p.type==='cracked'||p.fragile)){
    // Two pieces and exposed grain communicate fragility without moving the landing plane.
    for(const side of [-1,1]){
-    const wood=mesh(logGeo,bark,fallback,side*p.width*.255,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.88,p.width*.49,1);wood.castShadow=wood.receiveShadow=true;
-    const splinter=mesh(logGeo,end,fallback,side*.045,-.31,.17);splinter.rotation.z=side*.35;splinter.scale.set(.19,.38,.16);
+    const wood=mesh(logGeo,branchBark,fallback,side*p.width*.255,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.88,p.width*.49,1);wood.castShadow=wood.receiveShadow=true;
+    const splinter=mesh(logGeo,end,fallback,side*.045,-.31,.17);splinter.rotation.z=side*(.25+variant*.12);splinter.scale.set(.19,.38,.16);
    }
   }else{
-   const wood=mesh(logGeo,bark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(1,p.width,1);wood.castShadow=wood.receiveShadow=true;
+   const wood=mesh(logGeo,branchBark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.88+variant*.08,p.width,.88+variant*.06);wood.castShadow=wood.receiveShadow=true;
   }
   for(const side of [-1,1]){
    const cut=mesh(capGeo,end,fallback,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;
-   const twig=mesh(logGeo,bark,fallback,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
+   const twig=mesh(logGeo,branchBark,fallback,side*(p.width*.34),-.36,-.04);twig.scale.set(.38,.5,.38);twig.rotation.z=side*1.05;
   }
   for(const side of ((p.type==='cracked'||p.fragile)?[-1,1]:[0])){
-   const top=mesh(mossGeo,moss,fallback,side*p.width*.26,-.085);top.scale.set(p.width/(side?4:2),.085,.32);top.receiveShadow=true;
+   const top=mesh(mossGeo,branchMoss,fallback,side*p.width*.26,-.085);top.scale.set(p.width/(side?4:2),.085,.32);top.receiveShadow=true;
   }
   const detail=new THREE.Group();fallback.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
   instances(knotGeo,dark,detail,5,(i,o)=>{o.position.set((i/4-.5)*p.width*.85,-.27,.205);o.scale.set(.6+i%2*.25,.5,1);});
-  instances(mossGeo,moss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
+  instances(mossGeo,branchMoss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
   instances(leafGeo,leaf,detail,7,(i,o)=>{o.position.set((i/6-.5)*p.width*.85,-.31,.05);o.scale.set(.11,.22,1);o.rotation.z=(i%2?1:-1)*.6;});
   instances(leafGeo,leaf,fallback,14,(i,o)=>{
    o.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);o.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);o.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);
@@ -288,17 +292,17 @@ export function createScenery(scene,renderer){
   if(p.type==='moving'){
    const paddles=new THREE.Group();group.add(paddles);group.userData.paddles=paddles;
    for(const side of [-1,1]){
-    const fin=mesh(arrowGeo,blue,paddles,side*(p.width*.5-.2),-.23*PLATFORM_SCALE,.48);
+    const fin=mesh(arrowGeo,blue,paddles,side*(p.width*(.36+variant%3*.04)),-.23*PLATFORM_SCALE,.48);
     fin.rotation.z=side<0?Math.PI:0;fin.scale.setScalar(.24*PLATFORM_SCALE);
    }
-   instances(knotGeo,cream,group,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.3,-.24*PLATFORM_SCALE,0);o.rotation.y=Math.PI/2;o.scale.set(2.4,2.4,1.4);});
+   instances(knotGeo,cream,group,2+variant%2,(i,o)=>{o.position.set((i?1:-1)*p.width*.3,-.24*PLATFORM_SCALE,0);o.rotation.y=Math.PI/2;o.scale.set(2.4,2.4,1.4);});
   }
   if((p.type==='cracked'||p.fragile))instances(logGeo,dark,group,3,(i,o)=>{o.position.set((i-1)*.13*PLATFORM_SCALE,-.19*PLATFORM_SCALE,.38*PLATFORM_SCALE);o.scale.set(.07*PLATFORM_SCALE,.38*PLATFORM_SCALE,.07*PLATFORM_SCALE);o.rotation.z=(i%2?-.5:.5);});
   if(p.type==='spring'){
    const mushroom=new THREE.Group();mushroom.scale.setScalar(ITEM_SCALE);group.add(mushroom);group.userData.mushroom=mushroom;
    const stem=mesh(stemGeo,cream,mushroom,0,.12);stem.castShadow=true;
    const under=mesh(capGeo,gills,mushroom,0,.25);under.rotation.x=-Math.PI/2;under.scale.set(2,1.6,1);
-   const cap=mesh(mushroomGeo,red,mushroom,0,.25);cap.scale.set(.42,.23,.34);cap.castShadow=cap.receiveShadow=true;
+   const cap=mesh(mushroomGeo,red,mushroom,0,.25);cap.scale.set(.40+variant*.015,.19+variant*.025,.34);cap.castShadow=cap.receiveShadow=true;
    instances(mossGeo,cream,mushroom,7,(i,o)=>{
     const angle=i*2.399,rad=i===0?0:.23;o.position.set(Math.cos(angle)*rad,.25+.23*Math.sqrt(1-(rad/.42)**2),Math.sin(angle)*rad*.8);
     o.scale.set(.046,.012,.039);o.rotation.z=-Math.cos(angle)*.4;
@@ -316,10 +320,32 @@ export function createScenery(scene,renderer){
   instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{
    const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);
   });
+  // Secondary hanging roots vary the silhouette below the unchanged landing plane.
+  const roots=new THREE.Group();roots.userData.desktopDetail=true;roots.visible=highQuality;group.add(roots);
+  instances(logGeo,branchBark,roots,2+variant,(i,o)=>{o.position.set((i/(variant+1)-.5)*p.width*.7,-.48,.02);o.scale.set(.1,.45+((i+variant)%3)*.1,.1);o.rotation.z=Math.sin(i+variant)*.25;});
   group.userData.coin=coin;attachPlatform(group);return group;
  }
+ // Biome accents share geometry and change only presentation.
+ const atmosphere=new THREE.Group();background.add(atmosphere);
+ const butterflyMaterial=new THREE.MeshBasicMaterial({color:0xffd971,side:THREE.DoubleSide,transparent:true,depthWrite:false});
+ const butterflies=new THREE.InstancedMesh(leafGeo,butterflyMaterial,20);butterflies.frustumCulled=false;atmosphere.add(butterflies);
+ const fallingMaterial=new THREE.MeshStandardMaterial({map:leafTexture,color:0xf5b94c,alphaTest:.35,side:THREE.DoubleSide,transparent:true,depthWrite:false});
+ const fallingLeaves=new THREE.InstancedMesh(leafGeo,fallingMaterial,28);fallingLeaves.frustumCulled=false;atmosphere.add(fallingLeaves);
+ const glowMaterial=new THREE.MeshStandardMaterial({color:0x64dfe6,emissive:0x27bcca,emissiveIntensity:.7,roughness:.5,transparent:true});
+ const fungi=new THREE.InstancedMesh(mushroomGeo,glowMaterial,14);fungi.frustumCulled=false;atmosphere.add(fungi);
+ const mistMap=canvasTexture(128,64,(c,w,h)=>{const gradient=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);gradient.addColorStop(0,'#d2efdf77');gradient.addColorStop(1,'#d2efdf00');c.fillStyle=gradient;c.fillRect(0,0,w,h);});
+ const mistMaterial=new THREE.MeshBasicMaterial({map:mistMap,transparent:true,depthWrite:false,opacity:0});
+ const mistLayers=new THREE.Group();atmosphere.add(mistLayers);
+ for(let i=0;i<3;i++){const cloud=new THREE.Mesh(new THREE.PlaneGeometry(22,5),mistMaterial);cloud.position.set(i%2?3:-3,(i-1)*5,-2.7);mistLayers.add(cloud);}
+ let wrapAge=1;
+ const wrapCues=new THREE.Group();scene.add(wrapCues);
+ const cueMaterial=new THREE.MeshBasicMaterial({color:0xb9ffdb,transparent:true,opacity:0,depthWrite:false});
+ for(const side of [-1,1]){const cue=new THREE.Mesh(new THREE.RingGeometry(.26,.32,20),cueMaterial);cue.position.x=side*(WIDTH/2-VINE_INSET);cue.position.z=.8;wrapCues.add(cue);}
+ const forestTint=new THREE.Color(0x25483e);
  return {branch,
   animateBranch(group,p,time){
+   const impact=group.userData.impactAt===undefined?10:time-group.userData.impactAt;
+   group.position.y=p.y-Math.sin(Math.min(1,impact/.25)*Math.PI)*.06;
    const paddles=group.userData.paddles;
    if(paddles){paddles.position.x=Math.sin(time*(p.moveSpeed||1)*3+p.phase)*.045;paddles.scale.y=1+Math.sin(time*3+p.phase)*.06;}
    const mushroom=group.userData.mushroom;
@@ -332,13 +358,15 @@ export function createScenery(scene,renderer){
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();},
   burst(event){
    if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;}
+   if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;}
+   if(event.type==='wrap'||event.type==='bounce')for(let i=0;i<6;i++)sparks.push({x:event.x,y:event.y+.1,z:.6,vx:(r()-.5)*2,vy:.8+r(),age:0});
    if(event.type==='coin'||event.spring)for(let i=0;i<12;i++)sparks.push({x:event.x,y:event.y+.4,z:.5,vx:(r()-.5)*3,vy:1+r()*2,age:0});
   },
-  update(cameraY,time,dt,palette,night){
+  update(cameraY,time,dt,palette,night,biome=0,blend=1){
    edgeVines.position.y=cameraY;
-   forest.forEach((m,i)=>{m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(new THREE.Color(0x25483e),.4+i*.12);});
+   forest.forEach((m,i)=>{if(!background.visible||!m.visible)return;m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
    trunk.position.y=cameraY;
-   currentCamera=cameraY;fitTree();
+   currentCamera=cameraY;if(background.visible&&treeImageMesh?.visible)fitTree();
    if(treeImageMesh)treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);
    for(let i=0;i<110;i++){
     const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
@@ -347,17 +375,42 @@ export function createScenery(scene,renderer){
     dummy.scale.set(.25+Math.sin(i)*.08,.25,1);dummy.updateMatrix();ivy.setMatrixAt(i,dummy.matrix);
    }ivy.instanceMatrix.needsUpdate=true;
    motes.position.set(Math.sin(time*.12)*.4,cameraY+Math.sin(time*.17),0);
-   moteMaterial.opacity=.35+night*.55;
+   moteMaterial.opacity=.35+night*.45;
+   if(background.visible){
+    const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0));
+    const morning=weight(0),mist=weight(1),golden=weight(2),moon=weight(3);
+    butterflies.visible=morning>.01;butterflyMaterial.opacity=morning*.7;butterflies.count=highQuality?20:8;
+    if(butterflies.visible)for(let i=0;i<butterflies.count;i++){
+     const pair=Math.floor(i/2),side=i%2?1:-1;
+     dummy.position.set(Math.sin(pair*3.1+time*.15)*6+side*.04,cameraY+Math.sin(pair+time*.22)*7,-2);
+     dummy.rotation.set(0,side*Math.sin(time*9+pair)*.9,side*.65);dummy.scale.set(.08,.08,1);dummy.updateMatrix();butterflies.setMatrixAt(i,dummy.matrix);
+    }if(butterflies.visible)butterflies.instanceMatrix.needsUpdate=true;
+    fallingLeaves.visible=golden>.01;fallingMaterial.opacity=golden;fallingLeaves.count=highQuality?28:10;
+    if(fallingLeaves.visible)for(let i=0;i<fallingLeaves.count;i++){
+     dummy.position.set(Math.sin(i*8.2)*8+Math.sin(time+i)*.3,cameraY+((i*2.39-time*.55)%18+18)%18-9,-2.1);
+     dummy.rotation.set(time*.4+i,time*.3,i);dummy.scale.set(.06,.1,1);dummy.updateMatrix();fallingLeaves.setMatrixAt(i,dummy.matrix);
+    }if(fallingLeaves.visible)fallingLeaves.instanceMatrix.needsUpdate=true;
+    fungi.visible=mist+moon>.01;fungi.count=highQuality?14:6;glowMaterial.opacity=mist+moon;glowMaterial.emissiveIntensity=.1+moon*.7;
+    if(fungi.visible)for(let i=0;i<fungi.count;i++){
+     dummy.position.set((i%2?1:-1)*(4.6+Math.sin(i)*1.1),cameraY+((i*2.7-cameraY*.18)%18+18)%18-9,-2.8);
+     dummy.rotation.set(0,0,Math.sin(i)*.1);dummy.scale.set(.23,.18,.18);dummy.updateMatrix();fungi.setMatrixAt(i,dummy.matrix);
+    }if(fungi.visible)fungi.instanceMatrix.needsUpdate=true;
+    mistLayers.position.y=cameraY;mistMaterial.opacity=.16+mist*.5;mistLayers.visible=mistMaterial.opacity>.01;
+    moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
+    moteMaterial.color.set(moon>.5?0x9ffff0:golden>.5?0xffc14f:0xffedb5);
+   }
+   wrapAge+=dt;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;
+   for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);
    ringAge+=dt;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);
    for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}
    while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();
    for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}
    particleGeo.attributes.position.needsUpdate=true;
   },
-  reset(){sparks.length=0;ringAge=1;},
+  reset(){sparks.length=0;ringAge=1;wrapAge=1;cueMaterial.opacity=0;},
   setQuality(high){highQuality=high;loadPlatform();loadTree();
    scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});
-   motes.visible=high;trunk.geometry=high?detailedTrunkGeo:trunkGeo;refreshBackground();
+   motes.visible=true;moteGeo.setDrawRange(0,high?90:24);ivy.count=high?110:48;trunk.geometry=high?detailedTrunkGeo:trunkGeo;refreshBackground();
   }
  };
 }

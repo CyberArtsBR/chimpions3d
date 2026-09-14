@@ -12,15 +12,18 @@ import {createJetpack,animateJetpack} from './jetpackVisual.js';
 import {leaderboard} from './leaderboard.js';
 import {createResults,createRecordBook} from './results.js';
 import {createFallSplash} from './fallSplash.js';
+import {createAudio} from './audio.js';
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
 <header id="hud"><div class="stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Mute sound">♪</button><button id="pause" aria-label="Pause game" hidden>Ⅱ</button></div></header>
 <div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace">PACE 1.06×</div>
-<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>The canopy gets faster as you climb.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>Small branch · 2× bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
+<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>Small branch · 2× bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
 const $=id=>document.getElementById(id);
+$('pace').hidden=true;
+$('description').innerHTML='Read the branches. Time your landing.<br>Choose your route. Climb higher.';
 document.querySelector('.gamepad-callout').setAttribute('aria-label','Play with a controller');
 document.querySelector('.gamepad-callout span').textContent='Play with a controller';
 const pixelBackdrop=createPixelBackdrop($('world'));
@@ -84,7 +87,12 @@ jetVisual.visible=jetEquipped.visible=false;
 
 const FACE_ANGLE=Math.PI/4;
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FACE_ANGLE;
-let facingFlip=0;
+let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0;
+const hudCache=new Map();
+function hudText(id,value){value=String(value);if(hudCache.get(id)!==value){$(id).textContent=value;hudCache.set(id,value);}}
+const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
+quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
+const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3;
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='chimpion';
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
@@ -92,6 +100,9 @@ const results=createResults({retry:()=>start(),choose:()=>{selectionConfirmed=fa
 const recordBook=createRecordBook();
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
 const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.19;music.preload='metadata';
+const audio=createAudio(music);
+addEventListener('chimp-record',()=>audio.play('record'));
+document.addEventListener('click',event=>{if(event.target.closest('button')&&mode!=='playing')audio.play('menu');});
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
 const keys=new Set(),pointers=new Map();
 let mouseTarget=null,padPrevious=[];
@@ -115,7 +126,7 @@ function pollPad(){
  if(results.isOpen||recordBook.isOpen){if(results.isOpen&&pad.buttons[0]&&!padPrevious[0])document.getElementById('try-again').click();padPrevious=pad.buttons;return;}
  if(pad.axis)mouseTarget=null;
  if(pad.buttons[9]&&!padPrevious[9]){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
- if(pad.buttons[0]&&!padPrevious[0]&&mode!=='playing'&&!collectionDialog.open)start();
+ if(pad.buttons[0]&&!padPrevious[0]){if(mode==='dying')quickRetry.click();else if(mode!=='playing'&&!collectionDialog.open)start();}
  padPrevious=pad.buttons;
 }
 const themes=[
@@ -126,30 +137,21 @@ const themes=[
 ];
 const color=new THREE.Color(),other=new THREE.Color();
 function toast(text){$('toast').textContent=text;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,1800);}
-function sound(type){
- if(muted)return;
- try{
- audioContext??=new AudioContext();audioContext.resume();
- const o=audioContext.createOscillator(),g=audioContext.createGain(),t=audioContext.currentTime;
- o.type=type==='death'?'square':'sine';o.frequency.setValueAtTime(type==='coin'?900:type==='death'?640:420,t);
- if(type==='death'){for(let i=1;i<=8;i++)o.frequency.setValueAtTime(640/2**(i*.48),t+i*.065);g.gain.setValueAtTime(.025,t);g.gain.exponentialRampToValueAtTime(.001,t+.65);o.connect(g);g.connect(audioContext.destination);o.start();o.stop(t+.66);return;}
- o.frequency.exponentialRampToValueAtTime(type==='death'?70:type==='coin'?1400:700,t+.12);
- g.gain.setValueAtTime(.035,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);
- o.connect(g);g.connect(audioContext.destination);o.start();o.stop(t+.17);
- }catch{}
-}
+function sound(type){audio.play(type);}
 function syncUI(){
- document.body.dataset.mode=mode;
- $('pace').textContent=game.jetRemaining>0?'JETPACK '+game.jetRemaining.toFixed(1)+'s':'PACE '+paceAt(game.time).toFixed(2)+'×';
- $('height').textContent=Math.floor(game.height);$('coins').textContent=game.bananas;
- $('best').textContent='PERSONAL BEST  ·  '+Math.floor(best)+' m';
+ if(document.body.dataset.mode!==mode)document.body.dataset.mode=mode;
+ $('pace').hidden=game.jetRemaining<=0;
+ const boostLabel=game.jetRemaining>0?'JETPACK '+Math.ceil(game.jetRemaining)+'s':'';
+ if($('pace').textContent!==boostLabel)$('pace').textContent=boostLabel;
+ hudText('height',Math.floor(game.height));hudText('coins',game.bananas);hudText('hud-best',Math.floor(Math.max(best,game.height)));
+ hudText('best','PERSONAL BEST  ·  '+Math.floor(best)+' m');
  $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';
  $('overlay').hidden=['playing','dying','over','starting'].includes(mode);
 }
 function menu(kind){
  if(collectionDialog.open)collectionDialog.close();
  mode=kind;music.pause();mouseTarget=null;keys.clear();pointers.clear();acc=0;
- $('avatar-list').hidden=true;$('choose').hidden=false;$('upload').hidden=kind==='paused';$('flip').hidden=kind==='paused'||!ready;
+ $('avatar-list').hidden=true;$('choose').hidden=false;$('upload').hidden=kind==='paused';
  if(kind==='over'){
  $('eyebrow').textContent=game.height>best?'A new personal best!':'One more branch. One more try.';
  best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}
@@ -161,23 +163,25 @@ function menu(kind){
  $('description').textContent='Your climb is paused.';$('play').textContent='KEEP CLIMBING';$('choose').hidden=true;
  }else{
  $('eyebrow').textContent='A little chimp. A big climb.';$('title').innerHTML='CHIMP<br><span>JUMP</span>';
- $('description').innerHTML='Read the branches. Time your landing.<br>The canopy gets faster as you climb.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
+ $('description').innerHTML='Read the branches. Time your landing.<br>Choose your route. Climb higher.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
  }
  syncUI();
 }
 async function start(){
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
  if(mode==='menu'&&!selectionConfirmed){openSelection();return;}
+ audio.unlock();
  const fresh=mode!=='paused';
- if(fresh){mode='starting';syncUI();runTicket=null;inputTrace=[];try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();fallSplash.clear();game.reset(runTicket?.seed??Math.floor(Math.random()*4294967295));avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;music.currentTime=0;}
+ if(fresh){mode='starting';syncUI();runTicket=null;inputTrace=[];try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;game.reset(runTicket?.seed??Math.floor(Math.random()*4294967295));avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;music.currentTime=0;}
  mode='playing';music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();
 }
 $('play').onclick=start;
 $('pause').onclick=()=>menu('paused');
-$('mute').onclick=()=>{muted=!muted;music.muted=muted;$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');if(!muted)sound('coin');};
+$('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');if(!muted)sound('coin');};
 $('mute').style.opacity=1;
 addEventListener('keydown',e=>{
  if(results.isOpen||recordBook.isOpen)return;
+ if(mode==='dying'){if(e.code==='Enter'&&!e.repeat)quickRetry.click();return;}
  if(collectionDialog.open){if(e.code==='Escape'){e.preventDefault();collectionDialog.close();}return;}
  if(e.target.matches('input,textarea,select'))return;
  if(e.code==='Enter'&&e.target.closest('button,a'))return;
@@ -202,7 +206,7 @@ async function selectAvatar(entry){
  if(request!==avatarRequest){disposeCharacter(next);return;}
  if(avatar){characterLayer.remove(avatar.root);disposeCharacter(avatar);}
  for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();game.reset(7);lastTheme=-1;
- avatar=next;avatar.model.traverse(o=>{if(o.isMesh)o.layers.enable(1);});selectedId=entry.id||'';facingFlip=0;avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;characterLayer.add(avatar.root);ready=true;
+ avatar=next;avatar.model.traverse(o=>{if(o.isMesh)o.layers.enable(1);});selectedId=entry.id||'';avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw;characterLayer.add(avatar.root);ready=true;
  $('play').disabled=false;menu('menu');
  $('avatar-status').textContent=entry.name+' · '+avatar.boneCount+' bones'+(entry.buffer?' · local file':'');
  return true;
@@ -222,10 +226,18 @@ $('avatar-file').onchange=async e=>{
   await selectAvatar({name:file.name.replace(/\.glb$/i,''),buffer});
  }catch(error){$('avatar-status').textContent=error.message;}
 };
-$('flip').onclick=()=>{facingFlip=facingFlip?0:Math.PI;toast('Avatar front direction reversed');};
+$('flip').remove();
 let collectionPage=0,collectionQuery='';
+const selectedPreview=document.createElement('div');selectedPreview.id='selected-preview';selectionActions.prepend(selectedPreview);
 function randomEntry(){const entries=catalog.filter(e=>e.url&&e.id!=='chimpion');const pool=entries.length?entries:catalog;return pool[Math.floor(Math.random()*pool.length)];}
-function showPending(){if(!pendingEntry)return;$('selected-chimpion').textContent='Selected: '+pendingEntry.name;$('confirm-chimpion').textContent='Play as '+pendingEntry.name;}
+function showPending(){
+ if(!pendingEntry)return;
+ const metadata=collection.find(e=>e.id===pendingEntry.id||e.name===pendingEntry.name)||pendingEntry;
+ selectedPreview.replaceChildren();
+ if(metadata.image||pendingEntry.image){const img=document.createElement('img');img.src=metadata.image||pendingEntry.image;img.alt=pendingEntry.name;img.referrerPolicy='no-referrer';img.onerror=()=>img.remove();selectedPreview.append(img);}
+ $('selected-chimpion').textContent=pendingEntry.name+(metadata.tribe?' · '+metadata.tribe:'');
+ $('confirm-chimpion').textContent='Play with '+pendingEntry.name;
+}
 $('random-chimpion').onclick=()=>{pendingEntry=randomEntry();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry?.id)/12));showPending();renderCollection();};
 $('confirm-chimpion').onclick=async()=>{
  if(!pendingEntry||$('confirm-chimpion').disabled)return;
@@ -259,7 +271,7 @@ async function openSelection(){
  pendingEntry=randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
  const list=$('avatar-list');list.hidden=false;collectionDialog.showModal();
  if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=await response.json();}catch{toast('Collection unavailable. Your chimp is ready.');}
- if(collectionDialog.open){renderCollection();list.querySelector('input')?.focus();}
+ if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }
 $('choose').onclick=()=>{selectionConfirmed=false;openSelection();};
 fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();})
@@ -277,20 +289,22 @@ function drawWorld(dt=0){
  for(const [id,m]of platformMeshes){if(!live.has(id)){removeBranch(m);platformMeshes.delete(id);}}
  for(const p of game.platforms){
   let m=platformMeshes.get(p.id);if(m&&m.userData.fragile!==!!p.fragile){removeBranch(m);platformMeshes.delete(p.id);m=null;}if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
-  m.position.set(p.x,p.y,0);m.visible=!p.broken;scenery.animateBranch(m,p,visualTime);
+  m.position.set(p.x,p.y,0);m.visible=!p.broken&&Math.abs(p.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateBranch(m,p,visualTime);
   m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=1+Math.sin(visualTime*2+p.id)*.07;
  }
  const idx=Math.floor(game.time/30)%4, blend=THREE.MathUtils.smoothstep(game.time%30,0,4);
  if(pixelMode)pixelBackdrop.draw(idx,game.time<30?1:blend);
  const current=themes[idx],previousTheme=themes[(idx+3)%4],from=game.time<30?current:previousTheme;
- if(lastTheme!==idx){lastTheme=idx;$('theme').textContent=current.name;if(game.time>=30)toast(current.name);}
+ if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}
+ if(mode==='playing')themeAge+=dt;
+ $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
  const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle();
  const bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();
  $('world').style.background='linear-gradient('+top+','+bottom+')';
  const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone();
  scene.fog.color.copy(palette);
  const night=THREE.MathUtils.lerp(from===themes[3]?1:0,idx===3?1:0,blend);
- scenery.update(game.camera,visualTime,dt,palette,night);
+ scenery.update(game.camera,visualTime,dt,palette,night,idx,game.time<30?1:blend);
  $('world').classList.toggle('night',night>.5);
  $('world').style.setProperty('--night-strength',night);
  sun.color.set(from.light).lerp(other.set(current.light),blend);
@@ -303,13 +317,31 @@ function tick(dt,control=input()){
  const distance=targetYaw-yaw;
  yaw+=Math.sign(distance)*Math.min(Math.abs(distance),Math.PI/0.28*dt);
  const events=game.step(control,dt);
- for(const e of events){scenery.burst(e);if(e.type==='death'){sound('death');music.pause();mode='dying';deathAge=0;splashed=false;deathPoint={x:game.x,y:game.camera-VIEW_HEIGHT/2};keys.clear();pointers.clear();avatar.root.visible=false;syncUI();}else if(e.type==='coin'){sound('coin');if(e.value===2)toast('+2 bananas!');}else if(e.type==='jet'){sound('coin');toast('JETPACK · 10 seconds!');}else if(e.type==='jet-spawn'){toast('Jetpack nearby! Find it in the canopy');}else if(e.type==='bounce'){sound('bounce');if(e.spring)toast('Spring boost!');}}
+ for(const e of events){
+  scenery.burst(e);
+  if(e.type==='death'){
+   sound('death');music.pause();mode='dying';deathAge=0;splashed=false;
+   best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}
+   // Presentation starts inside the frame; the shared gameplay collider is untouched.
+   deathPoint={x:game.x,y:camera.position.y-(camera.top-camera.bottom)/camera.zoom/2+.7,visualY:camera.position.y-(camera.top-camera.bottom)/camera.zoom/2+2.2};
+   keys.clear();pointers.clear();avatar.root.visible=true;syncUI();
+  }else if(e.type==='wrap'){
+   sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE VINES TO WRAP AROUND');}
+  }else if(e.type==='coin'){sound('coin');}
+  else if(e.type==='jet'){sound('jet');toast('JETPACK · 10 seconds!');}
+  else if(e.type==='jet-spawn'){toast('Jetpack nearby! Find it in the canopy');}
+  else if(e.type==='bounce'){
+   sound(e.spring?'spring':e.fragile?'fragile':'bounce');landingImpulse=.025;
+   const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;
+   if(e.spring){boostZoom=.94;toast('Spring boost!');}
+  }
+ }
 }
 function updateEnding(dt){
  fallSplash.update(dt);results.update(dt);
- if(mode!=='dying')return;deathAge+=dt;
- if(deathAge>=1&&!splashed){splashed=true;fallSplash.start(deathPoint.x,deathPoint.y);}
- if(deathAge>=2){mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}results.open({id:runTicket?.id,trace:inputTrace,meters:Math.floor(game.height),bananas:game.bananas});syncUI();}
+ if(mode!=='dying')return;deathAge+=dt;quickRetry.hidden=deathAge<.65;
+ if(deathAge>=1&&!splashed){splashed=true;fallSplash.start(deathPoint.x,deathPoint.y);sound('splash');}
+ if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}results.open({id:runTicket?.id,trace:inputTrace,meters:Math.floor(game.height),bananas:game.bananas,best});syncUI();}
 }
 function resize(){
  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);
@@ -327,19 +359,35 @@ function resize(){
 addEventListener('resize',quality);quality();applyBackdrop();menu('menu');
 function renderFrame(now){
  pollPad();
+ if(document.hidden){previous=now;return;}
+ if(!['playing','dying'].includes(mode)&&now-lastIdleFrame<1000/20)return;
+ lastIdleFrame=now;
  const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);
  if(raw>0.75&&mode==='playing')menu('paused');
- visualTime+=dt;
+ if(mode==='playing'||mode==='dying')visualTime+=dt;
  updateEnding(dt);
  if(mode==='playing'){acc+=dt;while(acc>=STEP){tick(STEP);acc-=STEP;if(mode!=='playing'){acc=0;break;}}}
  if(avatar){
-  avatar.root.position.set(game.x,game.y,0);avatar.root.rotation.y=yaw*(facingFlip?-1:1)+facingFlip;
-  heroLight.position.set(game.x+2.4,game.y+4.5,7);heroFill.position.set(game.x-3,game.y+2,5);heroTarget.position.set(game.x,game.y+1,0);
-  avatar.update(dt,visualTime,game.vy,game.bounceAge,mode==='playing');
+  avatar.root.position.set(game.x,mode==='dying'?deathPoint.visualY-deathAge*.9-deathAge*deathAge*1.4:game.y,0);avatar.root.rotation.y=yaw;
+  avatar.root.rotation.z=mode==='dying'?Math.sin(deathAge*9)*.14:0;
+  heroLight.position.set(game.x+2.4,avatar.root.position.y+4.5,7);heroFill.position.set(game.x-3,avatar.root.position.y+2,5);heroTarget.position.set(game.x,avatar.root.position.y+1,0);
+  let landing=0;
+  if(mode==='playing'&&game.vy<0){
+   for(const p of game.platforms)if(!p.broken&&p.y<=game.y&&Math.abs(p.x-game.x)<p.width/2+.4){
+    const time=(game.y-p.y)/Math.max(1,-game.vy);landing=Math.max(landing,1-time/.18);
+   }
+  }
+  avatar.update(dt,visualTime,game.vy,game.bounceAge,mode==='playing',{landing,vx:game.vx,dying:mode==='dying'});
  }
  if(mode==='playing'&&introTime<3)introTime=Math.min(3,introTime+dt);
  const intro=THREE.MathUtils.smoothstep(introTime,0,3);
- camera.zoom=THREE.MathUtils.lerp(1.72,1,intro);camera.position.y=THREE.MathUtils.lerp(game.y+1.05,game.camera,intro);camera.updateProjectionMatrix();
+ boostZoom=THREE.MathUtils.damp(boostZoom,game.jetRemaining>0?.93:1,3,dt);
+ landingImpulse*=Math.exp(-18*dt);
+ if(mode!=='dying'&&mode!=='over'){
+  camera.zoom=THREE.MathUtils.lerp(1.72,boostZoom,intro);
+  camera.position.y=THREE.MathUtils.lerp(game.y+1.05,game.camera,intro)+landingImpulse;
+  camera.updateProjectionMatrix();
+ }
  sun.position.set(-5,game.camera+9,12);sun.target.position.set(0,game.camera,0);
  drawWorld(dt);syncUI();renderer.render(scene,camera);
 }

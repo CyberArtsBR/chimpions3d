@@ -10,6 +10,13 @@ const dbPath=resolve(process.env.SCORES_DB||'data/scores.sqlite');mkdirSync(dirn
 const db=new DatabaseSync(dbPath);db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
 CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,seed INTEGER NOT NULL,started INTEGER NOT NULL,finished INTEGER,meters INTEGER,bananas INTEGER,score INTEGER,name TEXT,ruleset TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS ranking ON runs(score DESC,finished ASC,id ASC);`);
+// Recalculate completed records once; preserve all names, heights and history.
+db.exec(`CREATE TABLE IF NOT EXISTS migrations(id TEXT PRIMARY KEY);`);
+db.exec(`BEGIN IMMEDIATE;
+UPDATE runs SET score=MAX(0,meters)+MAX(0,bananas)*10
+WHERE finished IS NOT NULL AND NOT EXISTS(SELECT 1 FROM migrations WHERE id='altitude-plus-bananas-v1');
+INSERT OR IGNORE INTO migrations(id) VALUES('altitude-plus-bananas-v1');
+COMMIT;`);
 const origins=new Set((process.env.ALLOWED_ORIGINS||'http://localhost:5173,http://127.0.0.1:4173').split(',').map(s=>s.trim()));
 const board=()=>db.prepare('SELECT name,meters,bananas,score FROM runs WHERE name IS NOT NULL ORDER BY score DESC,finished ASC,id ASC LIMIT 10').all();
 const place=row=>1+db.prepare('SELECT count(*) AS n FROM runs WHERE name IS NOT NULL AND (score>? OR (score=? AND (finished<? OR (finished=? AND id<?))))').get(row.score,row.score,row.finished,row.finished,row.id).n;
