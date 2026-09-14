@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 
-function parseGLB(path){
-  const b=fs.readFileSync(path);
-  assert(b.length>=20,`${path}: incomplete GLB`);
-  assert.equal(b.toString('ascii',0,4),'glTF',`${path}: invalid GLB magic`);
-  assert.equal(b.readUInt32LE(4),2,`${path}: expected glTF 2.0`);
-  assert.equal(b.readUInt32LE(8),b.length,`${path}: header length mismatch`);
+function parseGLB(filePath){
+  const b=fs.readFileSync(filePath);
+  assert(b.length>=20,`${filePath}: incomplete GLB`);
+  assert.equal(b.toString('ascii',0,4),'glTF',`${filePath}: invalid GLB magic`);
+  assert.equal(b.readUInt32LE(4),2,`${filePath}: expected glTF 2.0`);
+  assert.equal(b.readUInt32LE(8),b.length,`${filePath}: header length mismatch`);
   const jsonLength=b.readUInt32LE(12);
-  assert(20+jsonLength<=b.length,`${path}: incomplete JSON chunk`);
-  assert.equal(b.readUInt32LE(16),0x4e4f534a,`${path}: first chunk must be JSON`);
+  assert(20+jsonLength<=b.length,`${filePath}: incomplete JSON chunk`);
+  assert.equal(b.readUInt32LE(16),0x4e4f534a,`${filePath}: first chunk must be JSON`);
   const json=JSON.parse(b.subarray(20,20+jsonLength).toString().trim());
   return {bytes:b.length,json};
 }
@@ -41,15 +43,44 @@ function assetInfo(name,bytes,json){
   };
 }
 
+function walk(dir){
+  const out=[];
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    const full=path.join(dir,entry.name);
+    if(entry.isDirectory())out.push(...walk(full));
+    else out.push(full.replaceAll('\\','/'));
+  }
+  return out;
+}
+
+function sha256(filePath){
+  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+}
+
+function collectTextReferences(){
+  const roots=['src','server','public','index.html','package.json'];
+  const allowed=/\.(?:js|mjs|cjs|ts|tsx|jsx|css|html|json|md)$/i;
+  let text='';
+  for(const root of roots){
+    if(!fs.existsSync(root))continue;
+    const files=fs.statSync(root).isDirectory()?walk(root):[root];
+    for(const file of files){
+      if(!allowed.test(file)||file.endsWith('assets-report.json'))continue;
+      try{text+='\n'+fs.readFileSync(file,'utf8');}catch{}
+    }
+  }
+  return text;
+}
+
 const avatars=JSON.parse(fs.readFileSync('public/avatars.json','utf8'));
 assert(avatars.filter(a=>a.url).length>200,'Expected complete uploaded collection');
 assert.equal(new Set(avatars.map(a=>a.id)).size,avatars.length,'Unique IDs');
 
 const avatarReport=[];
 for(const avatar of avatars.slice(1).filter(a=>a.url)){
-  const path='public/'+decodeURIComponent(avatar.url);
-  assert(fs.existsSync(path),`${avatar.name}: missing ${path}`);
-  const {bytes,json}=parseGLB(path);
+  const filePath='public/'+decodeURIComponent(avatar.url);
+  assert(fs.existsSync(filePath),`${avatar.name}: missing ${filePath}`);
+  const {bytes,json}=parseGLB(filePath);
   const info=assetInfo(avatar.name,bytes,json);
   assert(info.skins>0,`${avatar.name}: no skin`);
   assert(info.joints>0,`${avatar.name}: skin has no joints`);
@@ -65,5 +96,75 @@ const branchReport=assetInfo('branch-moss.glb',branch.bytes,branch.json);
 assert(branchReport.meshes>0,'branch-moss.glb has no mesh');
 console.log('BRANCH_ASSET_REPORT:'+JSON.stringify(branchReport));
 
-fs.writeFileSync('checks/assets-report.json',JSON.stringify({avatars:avatarReport,branch:branchReport},null,2));
-console.log('PASS assets: uploaded Chimpions and branch-moss.glb are structurally valid GLB 2.0 assets');
+const publicFiles=walk('public').map(file=>({
+  path:file,
+  bytes:fs.statSync(file).size,
+  ext:path.extname(file).toLowerCase()||'(none)'
+}));
+const totalBytes=publicFiles.reduce((n,f)=>n+f.bytes,0);
+const byExtension={};
+for(const file of publicFiles){
+  byExtension[file.ext]??={count:0,bytes:0};
+  byExtension[file.ext].count++;
+  byExtension[file.ext].bytes+=file.bytes;
+}
+
+const rootGlbs=publicFiles.filter(f=>f.ext==='.glb'&&path.dirname(f.path)==='public');
+const audioFiles=publicFiles.filter(f=>/\.(?:mp3|wav|ogg|m4a)$/i.test(f.path));
+const imageFiles=publicFiles.filter(f=>/\.(?:png|jpe?g|webp|gif|avif)$/i.test(f.path));
+const environmentFiles=publicFiles.filter(f=>f.path.startsWith('public/environment/'));
+const largestFiles=[...publicFiles].sort((a,b)=>b.bytes-a.bytes).slice(0,25);
+
+// Hash only likely duplicate candidates (audio/images/configs), not hundreds of large avatar GLBs.
+const duplicateCandidates=publicFiles.filter(f=>/\.(?:mp3|wav|ogg|m4a|png|jpe?g|webp|gif|avif|json)$/i.test(f.path));
+const hashes=new Map();
+for(const file of duplicateCandidates){
+  const key=sha256(file.path);
+  if(!hashes.has(key))hashes.set(key,[]);
+  hashes.get(key).push(file);
+}
+const duplicateGroups=[...hashes.entries()]
+  .filter(([,files])=>files.length>1)
+  .map(([hash,files])=>({hash,bytes:files[0].bytes,files:files.map(f=>f.path)}));
+
+const references=collectTextReferences();
+const runtimeCandidates=[...audioFiles,...imageFiles,...environmentFiles.filter(f=>f.ext!=='.glb')];
+const possiblyUnreferenced=runtimeCandidates.filter(file=>{
+  const rel=file.path.replace(/^public\//,'');
+  const base=path.basename(file.path);
+  return !references.includes(rel)&&!references.includes(base);
+});
+
+const audioUsage=audioFiles.map(file=>({
+  ...file,
+  referenced:references.includes(file.path.replace(/^public\//,''))||references.includes(path.basename(file.path))
+}));
+
+const audit={
+  summary:{
+    publicFiles:publicFiles.length,
+    totalBytes,
+    totalMiB:Number((totalBytes/1024/1024).toFixed(2)),
+    avatarCount:avatarReport.length,
+    rootGlbCount:rootGlbs.length,
+    audioCount:audioFiles.length,
+    imageCount:imageFiles.length,
+    duplicateGroupCount:duplicateGroups.length,
+    possiblyUnreferencedCount:possiblyUnreferenced.length
+  },
+  byExtension,
+  branch:branchReport,
+  avatars:avatarReport,
+  rootGlbs,
+  audioUsage,
+  duplicateGroups,
+  possiblyUnreferenced,
+  largestFiles
+};
+
+fs.writeFileSync('checks/assets-report.json',JSON.stringify(audit,null,2));
+console.log('ASSET_AUDIT_SUMMARY:'+JSON.stringify(audit.summary));
+if(rootGlbs.length)console.log('ROOT_GLB_REVIEW:'+JSON.stringify(rootGlbs));
+if(duplicateGroups.length)console.log('DUPLICATE_ASSET_GROUPS:'+JSON.stringify(duplicateGroups));
+if(possiblyUnreferenced.length)console.log('POSSIBLY_UNREFERENCED:'+JSON.stringify(possiblyUnreferenced));
+console.log('PASS assets: uploaded Chimpions and branch-moss.glb are valid; audit report generated without deleting assets');
