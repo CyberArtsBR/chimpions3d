@@ -9,7 +9,13 @@ export function setupMenuExtras(){
   lab.type='button';
   lab.textContent='Chimpions Lab';
   lab.setAttribute('aria-label','Open Chimpions Lab and Chimpion Dash');
-  lab.onclick=()=>{location.href='?lab=1';};
+  lab.onclick=()=>{
+    try{
+      const selected=window.chimpJump?.().selectedId;
+      if(selected)localStorage.setItem('chimpions-lab-avatar',String(selected));
+    }catch{}
+    location.href='?lab=1';
+  };
   card.append(lab);
 
   const links=document.createElement('nav');
