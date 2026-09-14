@@ -1,0 +1,58 @@
+/* Player-facing title menu layout fixes and community navigation. */
+/* Remove the flat screen-space haze/colour overlay; biome identity remains in scene fog/lights. */
+#world::before,#world>.mist{display:none!important}
+
+body[data-mode=menu] #choose{
+  left:12%!important;top:62.2%!important;width:76%!important;height:5.5%!important;
+}
+body[data-mode=menu] #quality{
+  left:24%!important;top:68.8%!important;width:52%!important;height:5.4%!important;
+}
+body[data-mode=menu] .keys{
+  left:12%!important;top:75.2%!important;width:76%!important;height:5.4%!important;
+}
+body[data-mode=menu] #chimpions-lab-button{
+  position:absolute;left:28%;top:82.35%;width:44%;height:5.2%;margin:0;padding:0;
+  border:0;border-radius:16px;background:transparent;color:#fff6e7;
+  display:flex;align-items:center;justify-content:center;
+  font:850 2.05cqw/1.2 ui-rounded,'Trebuchet MS',system-ui,sans-serif;
+  text-shadow:0 2px 3px #130b06;cursor:pointer;
+}
+body[data-mode=menu] #chimpions-lab-button:hover{background:#ffdc8525}
+body[data-mode=menu] .gamepad-callout{top:88.25%!important}
+body[data-mode=menu] #records-button{
+  left:24%!important;top:93.05%!important;width:52%!important;height:4.2%!important;
+  padding:0!important;display:flex;align-items:center;justify-content:center;
+}
+body:not([data-mode=menu]) #chimpions-lab-button,
+body:not([data-mode=menu]) #community-links{display:none!important}
+
+/* The three official links deliberately live just below the illustrated board instead of
+   being squeezed over the wooden artwork. The title overlay already scrolls safely. */
+#community-links{
+  position:absolute;z-index:40;left:50%;top:101.5%;transform:translateX(-50%);
+  width:min(94vw,900px);display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:12px;
+  padding:0 8px 22px;
+}
+#community-links a{
+  min-height:54px;padding:11px 14px;border-radius:17px;border:1px solid #4c708e;
+  background:linear-gradient(180deg,#0c1b2b,#08131f);color:#f0f6ff;text-decoration:none;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font:850 clamp(13px,1.4vw,18px)/1.15 ui-rounded,'Trebuchet MS',system-ui,sans-serif;
+  box-shadow:0 8px 24px #0006,inset 0 1px #ffffff12;white-space:nowrap;
+}
+#community-links a:first-child{color:#91f4ed;border-color:#2f7287}
+#community-links a:nth-child(2){color:#f4f5ff}
+#community-links a:nth-child(3){color:#ada4ff;border-color:#514f92}
+#community-links a:hover,#community-links a:focus-visible{transform:translateY(-2px);filter:brightness(1.12)}
+#community-links .community-icon{font-size:1.25em;line-height:1}
+
+body[data-mode=menu] .card{margin-bottom:92px}
+
+@media(max-width:600px){
+  body[data-mode=menu] #choose{left:11%!important;width:78%!important}
+  body[data-mode=menu] .keys{left:10%!important;width:80%!important;font-size:1.6cqw!important}
+  #community-links{grid-template-columns:1fr;gap:8px;top:101%;padding-bottom:28px}
+  #community-links a{min-height:46px;font-size:14px}
+  body[data-mode=menu] .card{margin-bottom:190px}
+}
