@@ -208,7 +208,7 @@ export function createScenery(scene,renderer){
   detailedPos.setX(i,x+Math.cos(angle)*relief);detailedPos.setZ(i,z+Math.sin(angle)*relief);
  }detailedTrunkGeo.computeVertexNormals();
  const trunk=new THREE.Mesh(trunkGeo,bark);trunk.position.set(.35,0,-4);trunk.receiveShadow=true;background.add(trunk);
- // High-detail image is now one layer of the canopy rather than replacing all procedural depth.
+ // High-detail image is a distant canopy plate. It crops to the viewport and never tiles vertically.
  let viewWidth=20,viewHeight=14,currentCamera=5;
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
@@ -219,24 +219,30 @@ export function createScenery(scene,renderer){
  }
  function fitTree(){
   if(!treeImageMesh?.material.map)return;
-  const map=treeImageMesh.material.map,tileHeight=viewWidth*map.image.height/map.image.width;
-  treeImageMesh.scale.set(viewWidth,viewHeight+4,1);
+  const map=treeImageMesh.material.map,image=map.image;
+  if(!image?.width||!image?.height)return;
+  const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;
+  let repeatX=1,repeatY=1;
+  if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;
+  else repeatY=imageAspect/viewAspect;
+  const marginX=(1-repeatX)/2,marginY=(1-repeatY)/2;
+  map.repeat.set(repeatX,repeatY);
+  map.offset.set(marginX,marginY+Math.sin(currentCamera*.012)*Math.min(.035,marginY*.65));
+  treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);
   treeImageMesh.position.set(0,currentCamera,-8);
-  map.repeat.set(1,(viewHeight+4)/tileHeight);
-  map.offset.y=(currentCamera-(viewHeight+4)/2)/tileHeight;
  }
  function loadTree(){
   if(!highQuality||!platformConfig?.treeImages)return;
   const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];
   if(!url)return;
   if(treeTextures.has(kind)){
-   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xd4d4d4,toneMapped:false,fog:false,transparent:true,opacity:.76,depthWrite:false}));background.add(treeImageMesh);}
+   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xd4d4d4,toneMapped:false,fog:false,transparent:true,opacity:.72,depthWrite:false}));background.add(treeImageMesh);}
    treeImageMesh.material.map=treeTextures.get(kind);treeImageMesh.material.needsUpdate=true;
    fitTree();refreshBackground();return;
   }
   if(treeRequests.has(kind))return;treeRequests.add(kind);
   new THREE.TextureLoader().load(import.meta.env.BASE_URL+url,map=>{
-   map.colorSpace=THREE.SRGBColorSpace;map.wrapT=THREE.MirroredRepeatWrapping;map.anisotropy=4;
+   map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;
    treeTextures.set(kind,map);loadTree();
   },undefined,()=>console.warn('Tree image unavailable; procedural tree remains.'));
  }
@@ -250,9 +256,9 @@ export function createScenery(scene,renderer){
  const particleGeo=new THREE.BufferGeometry(),particlePositions=new Float32Array(48*3);
  particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
  const particles=new THREE.Points(particleGeo,new THREE.PointsMaterial({color:0xffdf79,size:.07,transparent:true,opacity:.85,depthWrite:false}));
- particles.frustumCulled=false;scene.add(particles);const sparks=[];
+ particles.frustumCulled=false;particles.visible=false;scene.add(particles);const sparks=[];
  const ring=new THREE.Mesh(new THREE.RingGeometry(.35,.4,28),new THREE.MeshBasicMaterial({color:0xd7eca6,transparent:true,opacity:0,depthWrite:false}));
- scene.add(ring);let ringAge=1;
+ ring.visible=false;scene.add(ring);let ringAge=1;
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
  function instances(geometry,material,parent,count,place){
   const batch=new THREE.InstancedMesh(geometry,material,count);parent.add(batch);
@@ -334,7 +340,7 @@ export function createScenery(scene,renderer){
  const mistLayers=new THREE.Group();background.add(mistLayers);
  for(let i=0;i<3;i++){const cloud=new THREE.Mesh(new THREE.PlaneGeometry(22,5),mistMaterial);cloud.position.set(i%2?3:-3,(i-1)*5,-2.7);mistLayers.add(cloud);}
  let wrapAge=1;
- const wrapCues=new THREE.Group();scene.add(wrapCues);
+ const wrapCues=new THREE.Group();wrapCues.visible=false;scene.add(wrapCues);
  const cueMaterial=new THREE.MeshBasicMaterial({color:0xb9ffdb,transparent:true,opacity:0,depthWrite:false});
  for(const side of [-1,1]){const cue=new THREE.Mesh(new THREE.RingGeometry(.26,.32,20),cueMaterial);cue.position.x=side*(WIDTH/2-VINE_INSET);cue.position.z=.8;wrapCues.add(cue);}
  const forestTint=new THREE.Color(0x25483e);
@@ -353,38 +359,50 @@ export function createScenery(scene,renderer){
   get treeVisible(){return trunk.visible||ivy.visible||!!treeImageMesh?.visible;},
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();},
   burst(event){
-   if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;}
-   if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;}
+   if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;ring.visible=true;}
+   if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;wrapCues.visible=true;}
    if(event.type==='wrap'||event.type==='bounce')for(let i=0;i<6;i++)sparks.push({x:event.x,y:event.y+.1,z:.6,vx:(r()-.5)*2,vy:.8+r(),age:0});
    if(event.type==='coin'||event.spring)for(let i=0;i<12;i++)sparks.push({x:event.x,y:event.y+.4,z:.5,vx:(r()-.5)*3,vy:1+r()*2,age:0});
+   if(sparks.length)particles.visible=true;
   },
   update(cameraY,time,dt,palette,night,biome=0,blend=1){
    edgeVines.position.y=cameraY;
-   forest.forEach((m,i)=>{if(!background.visible||!m.visible)return;m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
-   trunk.position.y=cameraY;
-   currentCamera=cameraY;if(background.visible&&treeImageMesh?.visible)fitTree();
-   if(treeImageMesh)treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);
-   if(background.visible&&ivy.visible)for(let i=0;i<(highQuality?110:48);i++){
-    const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
-    dummy.position.set(side*(1.2+Math.sin(i*6.7)*.2)+.35,cameraY+y,-2.75);
-    dummy.rotation.set(.12,side*.2,side*(.55+Math.sin(time*.6+i)*.1));
-    dummy.scale.set(.25+Math.sin(i)*.08,.25,1);dummy.updateMatrix();ivy.setMatrixAt(i,dummy.matrix);
-   }ivy.instanceMatrix.needsUpdate=true;
+   currentCamera=cameraY;
    if(background.visible){
+    forest.forEach((m,i)=>{if(!m.visible)return;m.position.y=cameraY+2-Math.sin(cameraY*.012)*(i+1);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
+    trunk.position.y=cameraY;
+    if(treeImageMesh?.visible){fitTree();treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}
+    if(ivy.visible){
+     for(let i=0;i<(highQuality?110:48);i++){
+      const side=i%2?1:-1,y=((i*1.17-cameraY*.4+40)%28+28)%28-14;
+      dummy.position.set(side*(1.2+Math.sin(i*6.7)*.2)+.35,cameraY+y,-2.75);
+      dummy.rotation.set(.12,side*.2,side*(.55+Math.sin(time*.6+i)*.1));
+      dummy.scale.set(.25+Math.sin(i)*.08,.25,1);dummy.updateMatrix();ivy.setMatrixAt(i,dummy.matrix);
+     }
+     ivy.instanceMatrix.needsUpdate=true;
+    }
     const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0));
     const mist=weight(1);
     mistLayers.position.y=cameraY;mistMaterial.opacity=.12+mist*.46;mistLayers.visible=mistMaterial.opacity>.01;
     moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
+   }else mistLayers.visible=false;
+
+   wrapAge+=dt;
+   if(wrapAge<.45){wrapCues.visible=true;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);}
+   else{wrapCues.visible=false;cueMaterial.opacity=0;}
+   ringAge+=dt;
+   if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}
+   else{ring.visible=false;ring.material.opacity=0;}
+   if(sparks.length){
+    for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}
+    while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();
+    if(sparks.length){
+     for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}
+     particleGeo.attributes.position.needsUpdate=true;particles.visible=true;
+    }else particles.visible=false;
    }
-   wrapAge+=dt;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;
-   for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);
-   ringAge+=dt;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);
-   for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}
-   while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();
-   for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}
-   particleGeo.attributes.position.needsUpdate=true;
   },
-  reset(){sparks.length=0;ringAge=1;wrapAge=1;cueMaterial.opacity=0;},
+  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;},
   setQuality(high){highQuality=high;loadPlatform();loadTree();
    scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});
    ivy.count=high?110:48;trunk.geometry=high?detailedTrunkGeo:trunkGeo;refreshBackground();
