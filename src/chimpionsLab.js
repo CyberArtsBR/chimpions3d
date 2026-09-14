@@ -1,223 +1,153 @@
 import * as THREE from 'three';
-import {loadCharacter,disposeCharacter} from './character.js';
+import {createLabRunnerCharacter} from './labRunnerCharacter.js';
 import './chimpionsLab.css';
 
 const BASE=import.meta.env.BASE_URL;
+const OLD='https://chimpions-dash.stephaniem-rehfeld.chatgpt.site/assets/';
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 document.body.dataset.mode='lab';
 document.body.innerHTML=`
-<div id="lab-world"></div><div id="lab-vignette"></div><div id="lab-crosshair"></div>
-<header id="lab-hud">
-  <div id="lab-title">CHIMPIONS LAB · CHIMPION DASH</div>
-  <div class="lab-stat"><small>DISTANCE</small><strong id="lab-distance">0 m</strong></div>
-  <div class="lab-stat"><small>BANANAS</small><strong id="lab-bananas">0</strong></div>
-  <div class="lab-stat"><small>SCORE</small><strong id="lab-score">0</strong></div>
-</header>
-<aside id="lab-panel">
-  <h1>Chimpions Lab<span>THIRD-PERSON MOTION + DASH TEST</span></h1>
-  <p>Walk, run and jump with a real Chimpion GLB, then turn the motion test into a playable jungle dash.</p>
-  <select id="lab-avatar" aria-label="Choose Chimpion"></select>
-  <div class="lab-buttons">
-    <button id="lab-start" class="primary">START CHIMPION DASH</button>
-    <button id="lab-random">Random Chimpion</button>
-    <a href="./">Back to Chimp Jump</a>
-  </div>
-  <p id="lab-help"><b>W / ↑</b> walk · <b>Shift</b> run · <b>A/D</b> steer · <b>Space</b> jump · Gamepad: left stick + A + RT</p>
-  <div id="lab-message" role="status">Loading Chimpion…</div>
-</aside>
-<div id="lab-state">IDLE · 0.0 m/s</div>
-<div id="lab-touch" aria-label="Touch controls">
-  <button id="lab-left" aria-label="Move left">←</button>
-  <button id="lab-run" class="wide" aria-label="Run forward">RUN</button>
-  <button id="lab-walk" class="wide" aria-label="Walk forward">WALK</button>
-  <button id="lab-jump" class="wide" aria-label="Jump">JUMP</button>
-  <button id="lab-right" aria-label="Move right">→</button>
-</div>
-<div id="lab-gameover"><section><h2>RUN OVER</h2><p id="lab-result"></p><button id="lab-retry">RUN AGAIN</button></section></div>`;
+<main id="dash-stage" aria-label="Chimpions Lab - Chimpion Dash">
+  <div id="dash-sky"></div><div id="dash-far"></div><div id="dash-mid"></div><div id="dash-light"></div>
+  <div id="dash-objects"></div><div id="dash-ground"></div><div id="dash-shadow"></div><div id="lab-3d"></div>
+  <header id="dash-hud">
+    <div class="brand"><small>CHIMPIONS LAB</small><strong>CHIMPION DASH</strong></div>
+    <div><small>SCORE</small><strong id="dash-score">000000</strong></div>
+    <div><small>DISTANCE</small><strong id="dash-distance">0.00 KM</strong></div>
+    <div><small>BEST</small><strong id="dash-best">000000</strong></div>
+    <button id="dash-pause" aria-label="Pause">Ⅱ</button>
+  </header>
+  <div id="dash-stage-label">01 / THE EMERALD WILDS</div>
+  <div id="dash-flow">🍌 <b id="dash-bananas">0</b><span>FLOW <b id="dash-mult">1.00×</b></span></div>
+  <div id="dash-tip">SPACE / W / ↑ JUMP&nbsp;&nbsp; · &nbsp;&nbsp;↓ / SHIFT / S / A SLIDE</div>
+  <section id="dash-menu" class="dash-panel">
+    <span class="eyebrow">THE JUNGLE IS CALLING</span>
+    <h1>CHIMPIONS <em>LAB</em></h1>
+    <h2>CHIMPION DASH · 2.5D</h2>
+    <p>This version uses the lateral runner logic and visual language of the original Chimpions Dash, with your rigged 3D Chimpion as the runner.</p>
+    <label>YOUR RUNNING MATE<select id="lab-avatar" aria-label="Choose Chimpion"></select></label>
+    <div id="lab-message" role="status">Loading Chimpion…</div>
+    <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><a href="./">Back to Chimp Jump</a></div>
+    <p class="controls"><kbd>SPACE</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> jump · <kbd>↓</kbd>/<kbd>SHIFT</kbd>/<kbd>S</kbd>/<kbd>A</kbd> slide · <kbd>P</kbd> pause</p>
+  </section>
+  <section id="dash-over" class="dash-panel modal" hidden><span class="eyebrow">RUN COMPLETE</span><h2>THE JUNGLE WON THIS ROUND</h2><p id="dash-result"></p><div class="dash-menu-actions"><button id="dash-retry" class="primary">RUN AGAIN</button><button id="dash-change">Change Chimpion</button><a href="./">Back to Chimp Jump</a></div></section>
+  <section id="dash-paused" class="dash-panel modal" hidden><span class="eyebrow">TAKE A BREATHER</span><h2>PAUSED</h2><div class="dash-menu-actions"><button id="dash-resume" class="primary">RESUME</button><button id="dash-quit">MAIN MENU</button></div></section>
+  <div id="dash-touch"><button id="touch-slide">⇣<small>SLIDE</small></button><button id="touch-jump">↥<small>JUMP</small></button></div>
+  <div id="dash-stage-flash"></div>
+</main>`;
 
-const $=id=>document.getElementById(id);
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x739f8e);scene.fog=new THREE.Fog(0x739f8e,18,72);
-const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.05,140);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
-renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.04;$('lab-world').append(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdff5e8,0x193a2d,2.2));
-const sun=new THREE.DirectionalLight(0xffe1a6,3.1);sun.position.set(-6,10,-4);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-8;sun.shadow.camera.right=8;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-6;sun.shadow.camera.near=.5;sun.shadow.camera.far=36;sun.shadow.normalBias=.035;scene.add(sun,sun.target);
+// Transparent Three.js layer: only the actual rigged GLB lives here. The scenery and
+// hazards stay in fast 2D layers, producing the requested lateral 2.5D presentation.
+const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-6,6,6,-6,.01,40);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setClearColor(0x000000,0);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('lab-3d').append(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xe9f6df,0x31402c,2.2));const key=new THREE.DirectionalLight(0xffe5aa,3);key.position.set(-4,8,7);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=6;key.shadow.camera.bottom=-3;scene.add(key,key.target);
+let viewH=12.5,viewW=12.5,runnerWorldX=-3,groundWorldY=-4;
+function resize3D(){
+  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.25:1.6));viewW=viewH*w/h;camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;camera.updateProjectionMatrix();camera.position.set(0,.1,12);camera.lookAt(0,.1,0);runnerWorldX=-viewW*.28;groundWorldY=-viewH*.32;
+}
+resize3D();addEventListener('resize',resize3D);
 
-const trackMat=new THREE.MeshStandardMaterial({color:0x6f4a2f,roughness:.92});
-const railMat=new THREE.MeshStandardMaterial({color:0x3d2c21,roughness:1});
-const mossMat=new THREE.MeshStandardMaterial({color:0x56884b,roughness:.96});
-const leafMat=new THREE.MeshStandardMaterial({color:0x2e724d,roughness:.9});
-const dangerMat=new THREE.MeshStandardMaterial({color:0x8d3b27,roughness:.78});
-const rockMat=new THREE.MeshStandardMaterial({color:0x657169,roughness:1});
-const bananaMat=new THREE.MeshStandardMaterial({color:0xffca27,emissive:0x5e3600,emissiveIntensity:.2,roughness:.34});
-const darkMat=new THREE.MeshStandardMaterial({color:0x33231b,roughness:1});
-const trackGeo=new THREE.BoxGeometry(8.6,.22,12);
-const railGeo=new THREE.CylinderGeometry(.08,.11,12,8);
-const leafGeo=new THREE.IcosahedronGeometry(.8,1);
-const logGeo=new THREE.CylinderGeometry(.38,.48,2.2,14,3);
-const stumpGeo=new THREE.CylinderGeometry(.55,.68,1.3,14,3);
-const rockGeo=new THREE.DodecahedronGeometry(.65,0);
-const bananaGeo=new THREE.TorusGeometry(.22,.065,7,18,Math.PI*1.35);
-const tipGeo=new THREE.SphereGeometry(.07,7,5);
-
-const course=new THREE.Group();scene.add(course);
-const trackSegments=[];
-function makeSegment(index){
-  const g=new THREE.Group(),floor=new THREE.Mesh(trackGeo,trackMat);floor.receiveShadow=true;g.add(floor);
-  const moss=new THREE.Mesh(new THREE.BoxGeometry(8.7,.035,12),mossMat);moss.position.y=.125;moss.scale.x=.98;moss.material=mossMat;g.add(moss);
-  for(const side of [-1,1]){
-    const rail=new THREE.Mesh(railGeo,railMat);rail.rotation.x=Math.PI/2;rail.position.set(side*4.18,.45,0);rail.castShadow=true;g.add(rail);
-    for(let j=0;j<5;j++){
-      const cluster=new THREE.Group();cluster.position.set(side*(5.5+(j%2)*1.6),.8,(j-2)*2.6+(index%2));
-      for(let k=0;k<3;k++){const leaf=new THREE.Mesh(leafGeo,leafMat);leaf.position.set((k-1)*.42,k*.35,Math.sin(k*2)*.3);leaf.scale.set(1.15,.8,1);cluster.add(leaf);}g.add(cluster);
-    }
-  }
-  course.add(g);trackSegments.push(g);return g;
-}
-for(let i=0;i<11;i++)makeSegment(i);
-
-let seed=(Date.now()>>>0)||1;const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
-const laneX=[-2.45,0,2.45],obstacles=[],pickups=[];
-function addBanana(x,z,y=.85){
-  const group=new THREE.Group(),fruit=new THREE.Mesh(bananaGeo,bananaMat);fruit.rotation.z=-.45;fruit.castShadow=true;group.add(fruit);
-  for(const side of [-1,1]){const tip=new THREE.Mesh(tipGeo,darkMat);tip.position.set(side*.18,.12,0);group.add(tip);}
-  group.position.set(x,y,z);course.add(group);pickups.push({mesh:group,collected:false});
-}
-function addObstacle(lane,z,type=Math.floor(rand()*3)){
-  const group=new THREE.Group();let height=.72;
-  if(type===0){const log=new THREE.Mesh(logGeo,dangerMat);log.rotation.z=Math.PI/2;log.position.y=.4;log.castShadow=true;group.add(log);height=.85;}
-  else if(type===1){const stump=new THREE.Mesh(stumpGeo,trackMat);stump.position.y=.65;stump.castShadow=true;group.add(stump);height=1.35;}
-  else{for(const x of [-.38,.25]){const rock=new THREE.Mesh(rockGeo,rockMat);rock.position.set(x,.48,0);rock.scale.set(1,.75,1);rock.castShadow=true;group.add(rock);}height=.95;}
-  group.position.set(laneX[lane],0,z);course.add(group);obstacles.push({mesh:group,height,hit:false});
-}
-let nextRow=18;
-function spawnUntil(z){
-  while(nextRow<z+78){
-    const difficulty=Math.min(1,nextRow/350),gap=11-difficulty*2+rand()*3;
-    nextRow+=gap;
-    const first=Math.floor(rand()*3),double=difficulty>.38&&rand()<.28,blocked=new Set([first]);addObstacle(first,nextRow);
-    if(double){let second=(first+1+(rand()<.5?0:1))%3;if(second===first)second=(second+1)%3;blocked.add(second);addObstacle(second,nextRow+.25,Math.floor(rand()*3));}
-    const safe=[0,1,2].filter(i=>!blocked.has(i));const reward=safe[Math.floor(rand()*safe.length)];
-    for(let i=0;i<4;i++)addBanana(laneX[reward],nextRow-3+i*1.45,.75+Math.sin(i/3*Math.PI)*.8);
-  }
-}
-function cleanupBehind(z){
-  for(let i=obstacles.length-1;i>=0;i--)if(obstacles[i].mesh.position.z<z-12){course.remove(obstacles[i].mesh);obstacles.splice(i,1);}
-  for(let i=pickups.length-1;i>=0;i--)if(pickups[i].mesh.position.z<z-12){course.remove(pickups[i].mesh);pickups.splice(i,1);}
-}
-
-let avatar=null,rig={},rest=new Map(),catalog=[],loading=false;
-function boneParts(name){
-  const spaced=name.replace(/([a-z0-9])([A-Z])/g,'$1 $2').toLowerCase().replace(/mixamorig\d*[:_ ]*/g,'').replace(/cc[_ ]*base[_ ]*/g,'').replace(/[^a-z0-9]+/g,' ').trim();
-  const words=spaced.split(/\s+/),side=words.includes('left')||words.includes('l')?'left':words.includes('right')||words.includes('r')?'right':'';
-  return {side,core:words.filter(w=>!['left','right','l','r','bone','def','bip','bip001'].includes(w)).join('')};
-}
-const aliases={hips:['hips','hip','pelvis'],spine:['spine','spine0','spine1','spine01'],chest:['chest','upperchest','spine2','spine02','spine3'],head:['head'],UpperArm:['upperarm','arm','uparm'],Forearm:['forearm','lowerarm','elbow'],Thigh:['thigh','upleg','upperleg'],Shin:['shin','calf','leg','lowerleg','knee'],Foot:['foot','ankle']};
-function mapRig(model){
-  const bones=[];model.traverse(o=>{if(o.isBone)bones.push(o);});rig={};rest=new Map();
-  const find=(key,side='')=>{
-    const matches=bones.filter(b=>{const p=boneParts(b.name);return p.side===side&&(aliases[key]||[]).includes(p.core);});
-    if(!matches.length)return null;
-    if(key==='spine')return matches[0];if(key==='chest')return matches.at(-1);return matches[0];
-  };
-  rig.hips=find('hips');rig.spine=find('spine');rig.chest=find('chest');rig.head=find('head');
-  for(const side of ['left','right'])for(const key of ['UpperArm','Forearm','Thigh','Shin','Foot'])rig[side+key]=find(key,side);
-  for(const bone of bones)rest.set(bone,bone.quaternion.clone());
-}
-const poseQ=new THREE.Quaternion();
-function poseBone(key,x=0,y=0,z=0,alpha=1){
-  const bone=rig[key],base=bone&&rest.get(bone);if(!bone||!base)return;
-  poseQ.setFromEuler(new THREE.Euler(x,y,z,'XYZ'));const target=base.clone().multiply(poseQ);bone.quaternion.slerp(target,alpha);
-}
-let animPhase=0,animTime=0;
-function animateCharacter(dt,state,speed,vy){
-  if(!avatar)return;animTime+=dt;const moving=state==='WALK'||state==='RUN',run=state==='RUN',gait=moving?Math.min(1,Math.abs(speed)/(run?7.2:3.2)):0;
-  animPhase+=dt*(run?11:6.5)*Math.max(.25,gait);const swing=Math.sin(animPhase),breath=Math.sin(animTime*1.8),blend=1-Math.exp(-14*dt);
-  poseBone('hips',run?.09*gait:0,swing*.03*gait,0,blend);poseBone('spine',(run?.10:0)+breath*.008,0,-swing*.035*gait,blend);poseBone('chest',breath*.008,0,swing*.025*gait,blend);poseBone('head',0,Math.sin(animTime*.55)*.018,0,blend);
-  for(const [side,sign] of [['left',1],['right',-1]]){
-    const cycle=swing*sign;
-    if(state==='JUMP'){
-      const tuck=Math.min(1,.3+Math.abs(vy)*.05);poseBone(side+'UpperArm',-.55,0,0,blend);poseBone(side+'Forearm',-.32,0,0,blend);poseBone(side+'Thigh',-.4*tuck,0,0,blend);poseBone(side+'Shin',.75*tuck,0,0,blend);poseBone(side+'Foot',-.25*tuck,0,0,blend);
-    }else{
-      poseBone(side+'UpperArm',cycle*(run?.62:.3)*gait,0,0,blend);poseBone(side+'Forearm',-.12-Math.max(0,cycle)*.28*gait,0,0,blend);poseBone(side+'Thigh',-cycle*(run?.78:.45)*gait,0,0,blend);poseBone(side+'Shin',.08+Math.max(0,-cycle)*(run?.9:.55)*gait,0,0,blend);poseBone(side+'Foot',-.04-Math.max(0,-cycle)*.16*gait,0,0,blend);
-    }
-  }
-  avatar.model.updateWorldMatrix(true,true);
-}
+const BIOMES=[['THE EMERALD WILDS','#73c897','#174e3d'],['CANOPY RUN','#5bb98d','#123e34'],['WATERFALL GORGE','#83cbd3','#24556a'],['LOST TEMPLE','#d6b978','#4c553c'],['MOONLIT JUNGLE','#797ac7','#161f4e'],['STORM FOREST','#708799','#172b37'],['VOLCANIC WILDS','#e98a58','#49262d'],['CHIMPION DREAMSCAPE','#d78bd0','#293066']];
+const TYPES=[
+ {id:'log',family:'short',action:'jump',w:64,h:38,boxes:[[9,0,46,28]],minStage:1,difficulty:1},
+ {id:'mushroom',family:'short',action:'jump',w:58,h:38,boxes:[[11,0,36,27]],minStage:1,difficulty:1},
+ {id:'thorns',family:'short',action:'jump',w:60,h:44,boxes:[[11,1,38,31]],minStage:2,difficulty:2},
+ {id:'stump',family:'high',action:'high-jump',w:58,h:98,boxes:[[7,0,44,84]],minStage:2,difficulty:2},
+ {id:'spike',family:'high',action:'high-jump',w:55,h:94,boxes:[[8,0,39,76]],minStage:3,difficulty:3},
+ {id:'log-pile',family:'wide',action:'high-jump',w:138,h:40,boxes:[[7,0,124,19]],minStage:1,difficulty:2},
+ {id:'puddle',family:'wide',action:'high-jump',w:132,h:24,boxes:[[3,0,126,12]],minStage:2,difficulty:2},
+ {id:'spike-patch',family:'wide',action:'high-jump',w:148,h:38,boxes:[[5,0,138,22]],minStage:3,difficulty:3},
+ {id:'branch',family:'overhead',action:'slide',w:115,h:78,boxes:[[5,52,105,22]],minStage:2,difficulty:2},
+ {id:'vine',family:'overhead',action:'slide',w:96,h:82,boxes:[[7,50,82,25]],minStage:3,difficulty:2},
+ {id:'canopy',family:'flex',action:'jump-or-slide',w:98,h:74,boxes:[[5,49,88,20]],minStage:4,difficulty:3}
+];
+const sprite=id=>OLD+'sprites-clean/'+(id==='log-pile'?'log':id)+'.png';
+const objectLayer=$('dash-objects');
+let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
-  if(!entry?.url||loading)return;loading=true;$('lab-message').textContent='Loading '+entry.name+'…';$('lab-avatar').disabled=true;
+  if(!entry?.url||loading)return;loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
   try{
-    const next=await loadCharacter(BASE+entry.url);
-    if(avatar){scene.remove(avatar.root);disposeCharacter(avatar);}avatar=next;avatar.root.scale.multiplyScalar(1.12);scene.add(avatar.root);mapRig(avatar.model);
-    localStorage.setItem('chimpions-lab-avatar',entry.id);$('lab-message').textContent=entry.name+' · '+avatar.boneCount+' bones · ready';resetPlayerTransform();
-  }catch(error){console.error(error);$('lab-message').textContent='This GLB could not be animated: '+error.message;}
+    const next=await createLabRunnerCharacter(BASE+entry.url);if(character){scene.remove(character.root);character.dispose();}character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);localStorage.setItem('chimpions-lab-avatar',entry.id);$('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones';$('dash-start').disabled=false;
+  }catch(error){console.error(error);$('lab-message').textContent='Rig rejected safely: '+error.message;}
   finally{loading=false;$('lab-avatar').disabled=false;}
 }
 
-const keys=new Set(),touch={left:false,right:false,walk:false,run:false};
-let running=false,dead=false,grounded=true,vy=0,speed=0,distance=0,bananas=0,best=Number(localStorage.getItem('chimpions-lab-best'))||0,gameTime=0,lastA=false;
-const player={x:0,y:0,z:0};
-function resetPlayerTransform(){if(!avatar)return;avatar.root.position.set(player.x,player.y,player.z);avatar.root.rotation.y=0;}
-function resetRun(){
-  running=true;dead=false;grounded=true;vy=0;speed=0;distance=0;bananas=0;gameTime=0;player.x=player.y=player.z=0;seed=(Date.now()>>>0)||1;nextRow=18;
-  for(const o of obstacles)course.remove(o.mesh);for(const b of pickups)course.remove(b.mesh);obstacles.length=pickups.length=0;spawnUntil(0);resetPlayerTransform();
-  $('lab-panel').style.display='none';$('lab-gameover').classList.remove('open');
+const BASE_SPEED=265,MAX_SPEED=535,GRAVITY=2200,JUMP_IMPULSE=600,HOLD_TIME=.22,LOW_HEIGHT=70;
+let run=null,state='menu',last=performance.now(),spawnCursor=0,best=Number(localStorage.getItem('chimpions-lab-best-score'))||0,stageFlashTimer=0,lastPadJump=false,lastPadSlide=false;
+const keys=new Set(),obstacles=[],bananas=[];
+function makeRun(){return{time:0,stage:1,speed:BASE_SPEED,scroll:0,y:0,vy:0,jumpHeld:false,jumpAge:0,slideHeld:false,slideTime:0,grounded:true,dead:false,bananaCount:0,flow:0,maxFlow:0,combo:0,score:0,landed:false};}
+function speedFor(stage){const s=Math.max(0,stage-1);return Math.min(MAX_SPEED,BASE_SPEED+s*27+Math.max(0,s-2)*8);}
+function multiplier(flow){return flow>=100?5:flow>=80?3:flow>=60?2:flow>=40?1.5:flow>=20?1.25:1;}
+function playerX(){return Math.max(115,innerWidth*.22);}
+function playerBox(){const sliding=run.y===0&&(run.slideHeld||run.slideTime>0);return{x:playerX()-17,y:run.y+5,w:34,h:sliding?31:78};}
+function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+function obstacleBoxes(o){const sx=o.x-run.scroll;return(o.boxes||[[0,0,o.w,o.h]]).map(b=>({x:sx+b[0],y:b[1],w:b[2],h:b[3]}));}
+function createObjectElement(kind,id,w,h){
+  const el=document.createElement('img');el.className=kind+' '+(id||'');el.alt='';el.draggable=false;el.src=kind==='banana'?sprite(id):sprite(id);el.style.width=w+'px';el.style.height=h+'px';el.onerror=()=>{el.classList.add('sprite-fallback');el.removeAttribute('src');};objectLayer.append(el);return el;
 }
-function finishRun(){
-  if(dead)return;dead=true;running=false;speed=0;best=Math.max(best,Math.floor(distance));localStorage.setItem('chimpions-lab-best',best);
-  const score=Math.floor(distance)+bananas*10;$('lab-result').textContent=`${Math.floor(distance)} m · ${bananas} bananas · ${score} points · best ${best} m`;$('lab-gameover').classList.add('open');
+function spawnObstacle(type,x){const o={...type,x,passed:false,hit:false,el:createObjectElement('hazard',type.id,type.w,type.h)};obstacles.push(o);return o;}
+function spawnBanana(x,y,golden=false){const b={x,y,golden,collected:false,el:createObjectElement('banana',golden?'golden':'banana',golden?38:34,golden?38:34)};bananas.push(b);}
+function bananaArc(start,end,apex=105,count=5){for(let i=0;i<count;i++){const t=count===1?.5:i/(count-1),arch=1-Math.pow(t*2-1,2);spawnBanana(start+(end-start)*t,24+arch*(apex-24),false);}}
+function lowTrail(start,end,count=5){for(let i=0;i<count;i++)spawnBanana(start+(i+.5)*(end-start)/count,23,false);}
+function chooseFamily(family,stage){const list=TYPES.filter(t=>t.family===family&&t.minStage<=stage);return list[Math.floor(Math.random()*list.length)]||TYPES[0];}
+function patternFor(stage){
+  const options=[['short'],['short'],['wide']];if(stage>=2)options.push(['high'],['overhead']);if(stage>=3)options.push(['short','high'],['overhead','short']);if(stage>=4)options.push(['flex'],['wide','overhead']);if(stage>=5)options.push(['overhead','overhead'],['high','overhead']);return options[Math.floor(Math.random()*options.length)];
 }
-function jump(){if(!running||dead||!grounded)return;grounded=false;vy=5.7;}
+function spawnPattern(){
+  const families=patternFor(run.stage),start=spawnCursor,created=[];let x=start;
+  for(let i=0;i<families.length;i++){const type=chooseFamily(families[i],run.stage),o=spawnObstacle(type,x);created.push(o);if(type.action==='slide')lowTrail(x-55,x+type.w+35,5);else bananaArc(x-55,x+type.w+45,type.family==='high'?145:105,type.family==='wide'?6:5);x+=type.w+run.speed*(families.length>1?.88:1.02);}
+  const lastO=created.at(-1);spawnCursor=(lastO?.x||x)+(lastO?.w||0)+run.speed*(.95+Math.random()*.5);
+}
+function seedWorld(){spawnCursor=innerWidth+360;while(spawnCursor<innerWidth*2.3)spawnPattern();}
+function clearWorld(){for(const o of obstacles)o.el.remove();for(const b of bananas)b.el.remove();obstacles.length=0;bananas.length=0;objectLayer.textContent='';}
+function updateObjects(){
+  const groundPx=Math.max(58,innerHeight*.18);
+  for(let i=obstacles.length-1;i>=0;i--){const o=obstacles[i],x=o.x-run.scroll;o.el.style.transform=`translate3d(${Math.round(x)}px,0,0)`;o.el.style.bottom=(groundPx+(o.family==='overhead'||o.family==='flex'?50:0))+'px';if(x<-220){o.el.remove();obstacles.splice(i,1);}}
+  for(let i=bananas.length-1;i>=0;i--){const b=bananas[i],x=b.x-run.scroll;b.el.style.transform=`translate3d(${Math.round(x)}px,${Math.round(-b.y)}px,0) rotate(${run.time*90%360}deg)`;b.el.style.bottom=groundPx+'px';if(x<-100){b.el.remove();bananas.splice(i,1);}}
+  while(spawnCursor-run.scroll<innerWidth+800)spawnPattern();
+}
+function jump(){if(!run||state!=='running'||!run.grounded)return;run.slideHeld=false;run.slideTime=0;run.vy=JUMP_IMPULSE;run.y=.01;run.grounded=false;run.jumpHeld=true;run.jumpAge=0;}
+function releaseJump(){if(!run)return;if(run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0&&run.y<LOW_HEIGHT)run.vy=Math.min(run.vy,Math.sqrt(Math.max(0,2*GRAVITY*(LOW_HEIGHT-run.y))));run.jumpHeld=false;}
+function slide(on){if(!run||state!=='running')return;run.slideHeld=on;if(on&&run.grounded)run.slideTime=Math.max(run.slideTime,.24);}
+function setState(next){state=next;document.body.dataset.labState=next;$('dash-menu').hidden=next!=='menu';$('dash-over').hidden=next!=='over';$('dash-paused').hidden=next!=='paused';}
+function startRun(){if(!character)return;clearWorld();run=makeRun();seedWorld();setState('running');$('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;$('dash-tip').classList.add('show');setTimeout(()=>$('dash-tip')?.classList.remove('show'),4500);last=performance.now();}
+function finishRun(){if(!run||run.dead)return;run.dead=true;state='over';best=Math.max(best,Math.floor(run.score));localStorage.setItem('chimpions-lab-best-score',best);$('dash-best').textContent=String(best).padStart(6,'0');$('dash-result').textContent=`${Math.floor(run.score)} points · ${(run.scroll/100000).toFixed(2)} km · ${run.bananaCount} bananas · stage ${run.stage}`;setState('over');}
+function pause(){if(state!=='running')return;setState('paused');}
+function resume(){if(state!=='paused')return;setState('running');last=performance.now();}
+function quit(){clearWorld();run=makeRun();setState('menu');}
 
-addEventListener('keydown',e=>{if(['KeyW','KeyA','KeyD','ArrowUp','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)){e.preventDefault();keys.add(e.code);}if(e.code==='Space'&&!e.repeat)jump();if(e.code==='Escape'){running=false;$('lab-panel').style.display='block';}});
-addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
-function bindHold(id,key){const b=$(id);b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);touch[key]=true;};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>touch[key]=false;}
-bindHold('lab-left','left');bindHold('lab-right','right');bindHold('lab-walk','walk');bindHold('lab-run','run');$('lab-jump').onpointerdown=e=>{e.preventDefault();jump();};
-
-function readGamepad(){
-  const pads=[...(navigator.getGamepads?.()||[])].filter(Boolean);if(!pads.length)return {x:0,forward:0,run:false,a:false};const p=pads[0];
-  const x=Math.abs(p.axes?.[0]||0)>.18?p.axes[0]:0,forward=Math.max(0,-(p.axes?.[1]||0));return{x,forward,run:(p.buttons?.[7]?.value||0)>.35||!!p.buttons?.[5]?.pressed,a:!!p.buttons?.[0]?.pressed};
+function updatePhysics(dt){
+  if(state!=='running'||!run)return;run.landed=false;run.time+=dt;const stage=Math.floor(run.time/30)+1;if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;}
+  run.speed=THREE.MathUtils.damp(run.speed,speedFor(run.stage),2.3,dt);run.slideTime=Math.max(0,run.slideTime-dt);
+  if(!run.grounded){const gravity=run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0?0:(run.vy<0?GRAVITY*1.14:GRAVITY);run.jumpAge+=dt;run.y+=run.vy*dt-gravity*dt*dt/2;run.vy-=gravity*dt;if(run.y<=0){run.y=0;run.vy=0;run.grounded=true;run.jumpHeld=false;run.landed=true;}}
+  run.scroll+=run.speed*dt;updateObjects();const p=playerBox();
+  for(const o of obstacles){const sx=o.x-run.scroll;if(!o.passed&&sx+o.w<playerX()){o.passed=true;run.combo++;run.flow=Math.min(100,run.flow+4);run.maxFlow=Math.max(run.maxFlow,run.flow);}if(o.hit||sx>playerX()+80||sx+o.w<playerX()-80)continue;if(obstacleBoxes(o).some(b=>hit(p,b))){o.hit=true;finishRun();return;}}
+  for(const b of bananas){if(b.collected)continue;const x=b.x-run.scroll;if(Math.abs(x-playerX())<31&&Math.abs((run.y+52)-b.y)<55){b.collected=true;b.el.classList.add('collected');run.bananaCount++;run.flow=Math.min(100,run.flow+(b.golden?18:3));setTimeout(()=>b.el.remove(),120);}}
+  run.flow=Math.max(0,run.flow-dt*1.5);run.score=run.scroll*.08+run.bananaCount*35+run.combo*12*multiplier(run.flow);
 }
-function controls(){
-  const pad=readGamepad();const left=keys.has('KeyA')||keys.has('ArrowLeft')||touch.left,right=keys.has('KeyD')||keys.has('ArrowRight')||touch.right;
-  const keyboardForward=keys.has('KeyW')||keys.has('ArrowUp')||touch.walk||touch.run;const run=keys.has('ShiftLeft')||keys.has('ShiftRight')||touch.run||pad.run;
-  return{x:Math.max(-1,Math.min(1,Number(right)-Number(left)+pad.x)),forward:Math.max(keyboardForward?1:0,pad.forward),run,a:pad.a};
-}
-
-function updateTrack(){
-  const base=Math.floor(player.z/12)*12;
-  trackSegments.forEach((segment,i)=>{segment.position.z=base+(i-3)*12;});
-}
-function updateGame(dt){
-  const c=controls();if(c.a&&!lastA)jump();lastA=c.a;if(!running||dead||!avatar)return;
-  gameTime+=dt;const target=c.forward*(c.run?7.2:3.2);speed=THREE.MathUtils.damp(speed,target,8,dt);player.x+=c.x*4.4*dt;player.x=THREE.MathUtils.clamp(player.x,-3.25,3.25);player.z+=speed*dt;
-  if(!grounded){vy-=12.5*dt;player.y+=vy*dt;if(player.y<=0){player.y=0;vy=0;grounded=true;}}
-  distance=Math.max(distance,player.z);spawnUntil(player.z);cleanupBehind(player.z);updateTrack();
-  for(const item of pickups){if(item.collected)continue;item.mesh.rotation.y+=dt*2.4;item.mesh.position.y+=Math.sin(gameTime*3+item.mesh.position.z)*.0015;if(Math.abs(item.mesh.position.z-player.z)<.65&&Math.abs(item.mesh.position.x-player.x)<.7&&Math.abs(item.mesh.position.y-(player.y+.8))<1.05){item.collected=true;item.mesh.visible=false;bananas++;}}
-  for(const obstacle of obstacles){if(obstacle.hit)continue;if(Math.abs(obstacle.mesh.position.z-player.z)<.66&&Math.abs(obstacle.mesh.position.x-player.x)<.72&&player.y<obstacle.height-.1){obstacle.hit=true;finishRun();break;}}
-  avatar.root.position.set(player.x,player.y,player.z);avatar.root.rotation.y=0;
-  const state=!grounded?'JUMP':Math.abs(speed)<.08?'IDLE':c.run&&speed>4?'RUN':'WALK';animateCharacter(dt,state,speed,vy);
-  $('lab-state').textContent=`${state} · ${Math.abs(speed).toFixed(1)} m/s`;
-  $('lab-distance').textContent=Math.floor(distance)+' m';$('lab-bananas').textContent=bananas;$('lab-score').textContent=Math.floor(distance)+bananas*10;
-}
-function updateCamera(dt){
-  const target=new THREE.Vector3(player.x*.28,3.05,player.z-6.6),look=new THREE.Vector3(player.x*.32,1.0+player.y*.22,player.z+5.8);
-  camera.position.lerp(target,1-Math.exp(-5.5*dt));camera.lookAt(look);sun.position.set(player.x-6,player.z?10:10,player.z-4);sun.target.position.set(player.x,0,player.z+5);
+function renderUI(dt){
+  const active=run||makeRun(),biome=BIOMES[(active.stage-1)%BIOMES.length];document.documentElement.style.setProperty('--biome-top',biome[1]);document.documentElement.style.setProperty('--biome-bottom',biome[2]);
+  document.documentElement.style.setProperty('--far-x',`${-(active.scroll*.08)%1200}px`);document.documentElement.style.setProperty('--mid-x',`${-(active.scroll*.18)%1200}px`);document.documentElement.style.setProperty('--ground-x',`${-(active.scroll*.82)%900}px`);
+  $('dash-score').textContent=String(Math.floor(active.score)).padStart(6,'0');$('dash-distance').textContent=(active.scroll/100000).toFixed(2)+' KM';$('dash-best').textContent=String(best).padStart(6,'0');$('dash-bananas').textContent=active.bananaCount;$('dash-mult').textContent=multiplier(active.flow).toFixed(2)+'×';$('dash-stage-label').textContent=String(active.stage).padStart(2,'0')+' / '+biome[0];
+  if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
+  if(character){const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';character.update(dt,{state:animState,speed:active.speed/BASE_SPEED,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});character.root.position.set(runnerWorldX,groundWorldY+active.y/78,0);const scale=sliding?1:1;character.root.scale.setScalar(scale);}
+  const shadow=$('dash-shadow');if(shadow){const jump=active.y;shadow.style.left=playerX()+'px';shadow.style.opacity=String(clamp(1-jump/150,.18,.72));shadow.style.transform=`translateX(-50%) scale(${clamp(1-jump/180,.55,1)})`;}
 }
 
-$('lab-start').onclick=()=>{if(avatar)resetRun();};$('lab-retry').onclick=resetRun;
-$('lab-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math.floor(Math.random()*catalog.length)];$('lab-avatar').value=entry.id;loadAvatar(entry);};
-$('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
-
-fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
-  catalog=entries.filter(e=>e.url);const select=$('lab-avatar');
-  for(const entry of catalog){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;select.append(option);}
-  const saved=localStorage.getItem('chimpions-lab-avatar');const entry=catalog.find(e=>e.id===saved)||catalog.find(e=>e.id==='chimpion')||catalog[0];select.value=entry.id;return loadAvatar(entry);
-}).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable.';console.error(error);});
-
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<700?1.25:1.6));});
-spawnUntil(0);updateTrack();camera.position.set(0,3,-6.5);
-let previous=performance.now();renderer.setAnimationLoop(now=>{
-  const dt=Math.min(.034,Math.max(0,(now-previous)/1000));previous=now;updateGame(dt);updateCamera(dt);renderer.render(scene,camera);
+const jumpCodes=new Set(['Space','KeyW','ArrowUp']),slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS','KeyA']);
+addEventListener('keydown',e=>{
+  if(jumpCodes.has(e.code)||slideCodes.has(e.code)||e.code==='KeyP'){e.preventDefault();keys.add(e.code);}if(jumpCodes.has(e.code)&&!e.repeat)jump();if(slideCodes.has(e.code))slide(true);if(e.code==='KeyP'&&!e.repeat)(state==='paused'?resume():pause());if(e.code==='Escape'&&state!=='menu')quit();
 });
-window.chimpionsLab=()=>({ready:!!avatar,running,dead,state:$('lab-state').textContent,distance,bananas,score:Math.floor(distance)+bananas*10,best,obstacles:obstacles.length,pickups:pickups.length,selected:$('lab-avatar').value});
+addEventListener('keyup',e=>{keys.delete(e.code);if(jumpCodes.has(e.code))releaseJump();if(slideCodes.has(e.code)&&![...slideCodes].some(code=>keys.has(code)))slide(false);});addEventListener('blur',()=>{keys.clear();releaseJump();slide(false);});
+function touchHold(id,start,end){const el=$(id);el.onpointerdown=e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);start();};el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{e?.preventDefault?.();end();};}
+touchHold('touch-jump',jump,releaseJump);touchHold('touch-slide',()=>slide(true),()=>slide(false));
+$('dash-pause').onclick=()=>state==='paused'?resume():pause();$('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-start').onclick=startRun;
+$('dash-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math.floor(Math.random()*catalog.length)];$('lab-avatar').value=entry.id;loadAvatar(entry);};$('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
+
+function pollGamepad(){const p=[...(navigator.getGamepads?.()||[])].filter(Boolean)[0];if(!p)return;const j=!!p.buttons?.[0]?.pressed,s=!!p.buttons?.[1]?.pressed||(p.axes?.[1]||0)>.55;if(j&&!lastPadJump)jump();if(!j&&lastPadJump)releaseJump();if(s!==lastPadSlide)slide(s);lastPadJump=j;lastPadSlide=s;}
+fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{catalog=entries.filter(e=>e.url);for(const entry of catalog){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;$('lab-avatar').append(option);}const saved=localStorage.getItem('chimpions-lab-avatar'),entry=catalog.find(e=>e.id===saved)||catalog.find(e=>e.id==='chimpion')||catalog[0];$('lab-avatar').value=entry.id;return loadAvatar(entry);}).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable.';console.error(error);});
+
+setState('menu');run=makeRun();
+renderer.setAnimationLoop(now=>{const dt=Math.min(.033,Math.max(0,(now-last)/1000));last=now;pollGamepad();updatePhysics(dt);renderUI(dt);renderer.render(scene,camera);});
+window.chimpionsLab=()=>({state,ready:!!character,selected:currentEntry?.id,score:Math.floor(run?.score||0),distance:run?.scroll||0,stage:run?.stage||1,bananas:run?.bananaCount||0,best,obstacles:obstacles.length});
