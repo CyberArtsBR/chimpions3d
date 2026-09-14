@@ -43,12 +43,16 @@ if(!renderPrototype.__chimpContinuousDeathPatched){
   }
  };
  const beginDeath=(root,camera,now)=>{
-  deathStartedAt=now;deathStartX=snapshot[0];deathStartY=snapshot[1];deathStartZ=snapshot[2];deathAnnounced=false;
+  deathStartedAt=now;deathStartX=snapshot[0];deathStartZ=snapshot[2];deathAnnounced=false;
   const dt=Math.max(.001,(lastPlayAt-previousPlayAt)/1000);
   const measured=(lastPlayY-previousPlayY)/dt;
   // The last two rendered gameplay frames provide the actual visual fall speed.
   // Never reverse direction and never accelerate after gameplay has ended.
   deathVelocity=Number.isFinite(measured)&&measured<-.35?measured:-8;
+  // Extrapolate from the previous rendered frame to 'now'. This removes the last
+  // possible one-frame upward snap when game.js switches into its dying state.
+  const sinceLast=Math.max(0,(now-lastPlayAt)/1000);
+  deathStartY=lastPlayY+deathVelocity*sinceLast;
   restore();root.position.set(deathStartX,deathStartY,deathStartZ);root.updateWorldMatrix(true,true);
   bounds.setFromObject(root,true);
   const bottom=camera.position.y+camera.bottom/camera.zoom;
@@ -56,8 +60,7 @@ if(!renderPrototype.__chimpContinuousDeathPatched){
  };
  const announceOffscreen=(root,camera,bottom)=>{
   if(deathAnnounced)return;deathAnnounced=true;
-  const x=root.position.x;
-  const y=bottom+.12;
+  const x=root.position.x,y=bottom+.12;
   window.dispatchEvent(new CustomEvent('chimp-death-offscreen',{detail:{x,y}}));
  };
  function patchedRender(scene,camera){
@@ -66,8 +69,7 @@ if(!renderPrototype.__chimpContinuousDeathPatched){
   if(root!==trackedRoot)rebuild(root);
   if(root&&mode==='playing'){
    previousPlayY=lastPlayY;previousPlayAt=lastPlayAt;
-   lastPlayY=root.position.y;lastPlayAt=now;
-   capture();
+   lastPlayY=root.position.y;lastPlayAt=now;capture();
   }else if(root&&mode==='dying'&&snapshot.length){
    if(lastMode!=='dying')beginDeath(root,camera,now);
    restore();
