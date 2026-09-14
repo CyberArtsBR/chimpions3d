@@ -1,0 +1,51 @@
+/* Final player-facing polish kept separate from the large legacy stylesheet. */
+#hud .stat{
+  font-family:Impact,'Arial Black','Trebuchet MS',system-ui,sans-serif;
+  letter-spacing:.035em;
+}
+#hud .stat small{
+  font-family:'Trebuchet MS',system-ui,sans-serif;
+  font-weight:900;
+  letter-spacing:.18em;
+  text-shadow:0 2px 5px #001c18a8;
+}
+#hud .stat strong{
+  font-weight:900;
+  letter-spacing:.035em;
+  text-shadow:0 2px 0 #092925,0 5px 12px #0019168f;
+}
+#hud .coins strong{color:#ffe584;text-shadow:0 2px 0 #6b4e12,0 5px 12px #0019168f}
+#theme{
+  font-family:'Arial Black','Trebuchet MS',system-ui,sans-serif;
+  font-weight:900;
+  letter-spacing:.18em;
+}
+
+/* Player menu stays clean. Development-only controls are available at /?dev=1. */
+body[data-mode='menu']:not([data-dev-tools='true']) #upload,
+body[data-mode='menu']:not([data-dev-tools='true']) #rig-link{
+  display:none!important;
+}
+body[data-mode='menu']:not([data-dev-tools='true']) #choose{
+  left:35.5%!important;
+  width:29%!important;
+}
+body[data-mode='menu']:not([data-dev-tools='true']) #quality{
+  top:66.6%!important;
+}
+
+body[data-dev-tools='true']::before{
+  content:'DEVELOPER TOOLS';
+  position:fixed;
+  z-index:9999;
+  left:12px;
+  top:12px;
+  padding:6px 9px;
+  border-radius:8px;
+  background:#071d1be8;
+  border:1px solid #bfe5c24a;
+  color:#d9efcb;
+  font:800 10px/1.2 'Trebuchet MS',system-ui,sans-serif;
+  letter-spacing:.12em;
+  pointer-events:none;
+}
