@@ -113,3 +113,13 @@ body[data-biome='moonlit'] .mist{opacity:.34;background:linear-gradient(transpar
   body[data-biome='golden'] #world::before,
   body[data-biome='moonlit'] #world::before{opacity:.30}
 }
+
+/* Mouse gameplay is relative/directional, so the absolute cursor is intentionally hidden. */
+body[data-mode='playing'],body[data-mode='playing'] *{cursor:none!important}
+
+/* Programmatic gamepad focus stays obvious even when the browser reserves :focus-visible for keyboards. */
+#overlay button:focus,#overlay a:focus,#collection-dialog button:focus,#collection-dialog input:focus{
+  outline:3px solid #fff2a6;
+  outline-offset:3px;
+  box-shadow:0 0 0 2px #173b31,0 0 18px #ffe88999;
+}
