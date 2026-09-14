@@ -1,4 +1,5 @@
 import './polish.css';
+import {setupBiomePolish} from './biome-polish.js';
 
 const params=new URLSearchParams(location.search);
 if(params.has('rig')){
@@ -6,5 +7,5 @@ if(params.has('rig')){
   import('./rig-lab.js');
 }else{
   if(params.has('dev'))document.body.dataset.devTools='true';
-  import('./game.js');
+  import('./game.js').then(setupBiomePolish);
 }
