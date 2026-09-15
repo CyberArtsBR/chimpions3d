@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/avatars.mjs && vite build",
+    "postbuild": "node scripts/portals-sanitize.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
