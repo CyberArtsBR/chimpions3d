@@ -25,9 +25,7 @@ if (!fs.existsSync(avatarsPath)) {
   throw new Error(`Expected built avatar catalog was not found: ${avatarsPath}`);
 }
 
-// ---------------------------------------------------------------------------
 // 1) Portals-safe GLB filenames inside dist only. Source GLBs stay untouched.
-// ---------------------------------------------------------------------------
 const files = fs.readdirSync(charactersDir, { withFileTypes: true })
   .filter(entry => entry.isFile())
   .map(entry => entry.name);
@@ -45,7 +43,6 @@ for (const originalName of files) {
   renameMap.set(originalName, safeName);
 }
 
-// Rename via temporary names first so case-only or cross-name changes are safe.
 const pending = [];
 let tempIndex = 0;
 for (const [originalName, safeName] of renameMap) {
@@ -54,7 +51,7 @@ for (const [originalName, safeName] of renameMap) {
   const tempName = `.portals-tmp-${tempIndex++}.glb`;
   const tempPath = path.join(charactersDir, tempName);
   fs.renameSync(originalPath, tempPath);
-  pending.push({ tempPath, safeName, originalName });
+  pending.push({ tempPath, safeName });
 }
 for (const { tempPath, safeName } of pending) {
   fs.renameSync(tempPath, path.join(charactersDir, safeName));
@@ -67,9 +64,7 @@ for (const entry of avatars) {
   const encodedName = entry.url.slice('model/characters/'.length);
   const originalName = decodeURIComponent(encodedName);
   const safeName = renameMap.get(originalName);
-  if (!safeName) {
-    throw new Error(`Avatar catalog points to missing built GLB: ${entry.url}`);
-  }
+  if (!safeName) throw new Error(`Avatar catalog points to missing built GLB: ${entry.url}`);
   entry.url = `model/characters/${safeName}`;
   rewritten++;
 }
@@ -77,30 +72,12 @@ fs.writeFileSync(avatarsPath, JSON.stringify(avatars, null, 2) + '\n');
 
 const invalid = fs.readdirSync(charactersDir)
   .filter(name => /[^A-Za-z0-9._-]/.test(name));
-if (invalid.length) {
-  throw new Error(`Portals-unsafe avatar filenames remain: ${invalid.join(', ')}`);
-}
+if (invalid.length) throw new Error(`Portals-unsafe avatar filenames remain: ${invalid.join(', ')}`);
 
-// ---------------------------------------------------------------------------
 // 2) Portals hosts the game below its own URL path. Root-absolute public paths
-//    such as /launcher/logo.png therefore point outside the game. Rewrite only
-//    known local project paths in the built output; do not touch external URLs.
-// ---------------------------------------------------------------------------
-const localRoots = [
-  'audio',
-  'environment',
-  'launcher',
-  'model',
-  'screens',
-  'ui'
-];
-const localFiles = [
-  'avatars.json',
-  'characters.json',
-  'environment.json',
-  'avatar-report.json',
-  'avatar-overrides.json'
-];
+// such as /launcher/logo.png must become document-relative paths.
+const localRoots = ['audio', 'environment', 'launcher', 'model', 'screens', 'ui'];
+const localFiles = ['avatars.json', 'characters.json', 'environment.json', 'avatar-report.json', 'avatar-overrides.json'];
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -111,25 +88,33 @@ function walk(dir, out = []) {
   return out;
 }
 
+function replaceAllLiteral(text, from, to) {
+  return text.split(from).join(to);
+}
+
 function rewriteRuntimeRootPaths(text) {
   let result = text;
   for (const root of localRoots) {
-    // Root paths embedded in JS/HTML strings or HTML attributes resolve against
-    // the document, so ./ keeps them inside the Portals game directory.
-    const re = new RegExp(`(^|[\\"'\\`=:(\\s])\\/${root}\\/`, 'g');
-    result = result.replace(re, `$1./${root}/`);
+    for (const quote of ['"', "'"]) {
+      result = replaceAllLiteral(result, `${quote}/${root}/`, `${quote}./${root}/`);
+    }
+    result = replaceAllLiteral(result, `=/${root}/`, `=./${root}/`);
+    result = replaceAllLiteral(result, `(/${root}/`, `(./${root}/`);
   }
   for (const file of localFiles) {
-    const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`(^|[\\"'\\`=:(\\s])\\/${escaped}`, 'g');
-    result = result.replace(re, `$1./${file}`);
+    for (const quote of ['"', "'"]) {
+      result = replaceAllLiteral(result, `${quote}/${file}`, `${quote}./${file}`);
+    }
+    result = replaceAllLiteral(result, `=/${file}`, `=./${file}`);
+    result = replaceAllLiteral(result, `(/${file}`, `(./${file}`);
   }
 
-  // Internal launcher routes such as /?dash=1 must stay inside the embedded
-  // Portals game path instead of navigating to the Portals domain root.
+  for (const quote of ['"', "'"]) {
+    result = replaceAllLiteral(result, `${quote}/?`, `${quote}./?`);
+  }
   result = result
-    .replace(/([\"'`=:(\s])\/\?/g, '$1./?')
-    .replace(/location\.href\s*=\s*([\"'`])\/\1/g, 'location.href=$1./$1');
+    .replace(/location\.href\s*=\s*"\/"/g, 'location.href="./"')
+    .replace(/location\.href\s*=\s*'\/'/g, "location.href='./'");
 
   return result;
 }
@@ -145,16 +130,12 @@ function rewriteCssRootPaths(text, cssPath) {
 }
 
 let pathFilesChanged = 0;
-let pathRefsChanged = 0;
 for (const filePath of walk(distDir)) {
   const ext = path.extname(filePath).toLowerCase();
   if (!['.js', '.html', '.css'].includes(ext)) continue;
   const before = fs.readFileSync(filePath, 'utf8');
-  let after = before;
-  if (ext === '.css') after = rewriteCssRootPaths(after, filePath);
-  else after = rewriteRuntimeRootPaths(after);
+  const after = ext === '.css' ? rewriteCssRootPaths(before, filePath) : rewriteRuntimeRootPaths(before);
   if (after !== before) {
-    pathRefsChanged += (before.match(/\/(?:launcher|audio|environment|model|screens|ui)\//g) || []).length;
     fs.writeFileSync(filePath, after);
     pathFilesChanged++;
   }
@@ -162,6 +143,6 @@ for (const filePath of walk(distDir)) {
 
 console.log(
   `Portals sanitizer: ${pending.length} built GLB filenames sanitized; ` +
-  `${rewritten} avatar URLs rewritten; ${pathFilesChanged} built text files made subdirectory-safe ` +
-  `(${pathRefsChanged} local path references inspected). Source files and source GLBs were not modified.`
+  `${rewritten} avatar URLs rewritten; ${pathFilesChanged} built text files made subdirectory-safe. ` +
+  `Source files and source GLBs were not modified.`
 );
