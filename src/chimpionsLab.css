@@ -13,7 +13,7 @@ button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #f6e
 #dash-stage::after{content:"";position:absolute;inset:0;z-index:17;pointer-events:none;background:radial-gradient(ellipse at 46% 48%,transparent 35%,#03130f33 73%,#020d0a70 100%);box-shadow:inset 0 -90px 130px #03120d66}
 #dash-sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--biome-top) 0,var(--biome-bottom) 78%);transition:background 1.2s ease}
 #dash-far,#dash-mid{
-  position:absolute;pointer-events:none;background-image:url('https://chimpions-dash.stephaniem-rehfeld.chatgpt.site/assets/jungle-v2.webp');
+  position:absolute;pointer-events:none;background-image:url('https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/jungle-v2.webp');
   background-repeat:repeat-x;will-change:background-position
 }
 #dash-far{
@@ -35,7 +35,7 @@ body[data-lab-state=running] #dash-light::after{animation:dashWind .7s linear in
 
 #dash-ground{
   position:absolute;z-index:5;left:0;right:0;bottom:0;height:19%;pointer-events:none;
-  background:#25462d url('https://chimpions-dash.stephaniem-rehfeld.chatgpt.site/assets/ground-green.png') repeat-x var(--ground-x) top/auto 76px;
+  background:#25462d url('https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/ground-green.png') repeat-x var(--ground-x) top/auto 76px;
   box-shadow:0 -7px 20px #061a1255,inset 0 54px 74px #587b3438
 }
 #dash-ground::before{content:"";position:absolute;left:0;right:0;top:0;height:14px;background:linear-gradient(#a8bf4a55,#35572a00);filter:blur(2px)}
