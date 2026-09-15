@@ -3,10 +3,10 @@ import {createLabRunnerCharacter} from './labRunnerCharacter.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
 const voice=new GameAudio(true);
-voice.musicSrc='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/main/dist/assets/chimpions-army.mp3';
+const DASH_ASSETS='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/';
+voice.musicSrc=DASH_ASSETS+'chimpions-army.mp3';
 
 const BASE=import.meta.env.BASE_URL;
-const OLD='https://chimpions-dash.stephaniem-rehfeld.chatgpt.site/assets/';
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -79,7 +79,7 @@ const TYPES=[
  {id:'canopy',name:'fallen canopy',family:'flex',action:'jump-or-slide',w:98,h:74,boxes:[[5,49,88,20]],minStage:4,difficulty:3,recovery:.72}
 ];
 
-const SPRITES='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/sprites-clean/';
+const SPRITES=DASH_ASSETS+'sprites-clean/';
 const sprite=id=>SPRITES+(id==='log-pile'?'log':id)+'.png';
 const spriteImages=new Map();
 function trimmedSprite(id){
@@ -99,7 +99,7 @@ function trimmedSprite(id){
     resolve(cropped.toDataURL('image/png'));
    }catch{resolve(url);}
   };
-  image.onerror=()=>resolve(OLD+'sprites-clean/'+(id==='log-pile'?'log':id)+'.png');image.src=url;
+  image.onerror=()=>resolve(SPRITES+(id==='log-pile'?'log':id)+'.png');image.src=url;
  });
  spriteImages.set(url,promise);return promise;
 }
@@ -132,7 +132,7 @@ addEventListener('resize',()=>{resize3D();renderObjects();});
 for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
   trimmedSprite(id);
 }
-for(const src of [OLD+'jungle-v2.webp',OLD+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
+for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
 
 let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
