@@ -1,0 +1,27 @@
+.games-back{border:2px solid #ffe69a;border-radius:14px;background:linear-gradient(#8b5528,#3c1d0d);box-shadow:0 8px 20px #0008;color:#fff5d1;font:800 clamp(13px,1.2vw,20px)/1.1 system-ui;padding:14px 28px;cursor:pointer;text-transform:uppercase}
+#give-up{background:#6a291d;color:#fff;border-color:#d79a72}
+.jump-start-screen[data-mode="menu"] #menu-backdrop{background:url('/screens/chimp-jump-start.png') center/cover no-repeat!important;opacity:1!important}
+.jump-start-screen[data-mode="menu"] #world,.jump-start-screen[data-mode="menu"] #hud,.jump-start-screen[data-mode="menu"] #theme,.jump-start-screen[data-mode="menu"] #background-style,.jump-start-screen[data-mode="menu"] .footer{visibility:hidden}
+.jump-start-screen[data-mode="menu"] #overlay{background:transparent}
+.jump-start-screen[data-mode="menu"] #overlay .card{position:absolute;inset:0;max-width:none;background:transparent;border:0;box-shadow:none;backdrop-filter:none}
+.jump-start-screen[data-mode="menu"] #overlay .card>*{display:none!important}
+.jump-start-screen[data-mode="menu"] #overlay #play,.jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons,.jump-start-screen[data-mode="menu"] #overlay .games-back{display:flex!important;position:absolute}
+.jump-start-screen[data-mode="menu"] #overlay #play{left:50%;top:50%;transform:translate(-50%,-50%);width:min(31vw,520px);justify-content:center;font-size:0;opacity:.94}
+.jump-start-screen[data-mode="menu"] #overlay #play:after{content:'START GAME';font-size:clamp(18px,2.2vw,36px)}
+.jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons{left:50%;top:61%;transform:translateX(-50%);width:min(35vw,570px)}
+.jump-start-screen[data-mode="menu"] #overlay .games-back{left:50%;top:75%;transform:translateX(-50%)}
+body[data-lab-state="menu"].dash-start-screen #dash-stage:before{content:'';position:fixed;inset:0;z-index:80;background:url('/screens/chimp-dash-start-853ee5d1.png') center/cover no-repeat}
+body[data-lab-state="menu"].dash-start-screen #dash-menu{position:fixed;inset:0;z-index:81;max-width:none;background:transparent;border:0;box-shadow:none;backdrop-filter:none}
+body[data-lab-state="menu"].dash-start-screen #dash-menu>*{display:none}
+body[data-lab-state="menu"].dash-start-screen #dash-menu>.screen-hotspot{display:block;position:absolute;left:50%;transform:translateX(-50%);width:min(35vw,590px);border:0;background:transparent;box-shadow:none;color:transparent;cursor:pointer;opacity:.001;padding:0}
+.dash-start-hotspot{top:53%;height:12%}.dash-back-hotspot{top:67%;height:11%}.original-dash-start{display:none!important}
+#dash-character-picker{width:min(94vw,1050px);max-height:88vh;border:2px solid #d8ae5d;border-radius:18px;background:#15251c;color:#fff;padding:18px}
+#dash-character-picker::backdrop{background:#06100bd9}
+#dash-character-picker header,#dash-character-picker footer{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+#dash-character-picker .picker-close{font-size:28px}.picker-search{width:100%;padding:13px;margin:10px 0;border-radius:10px}
+.picker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;overflow:auto;max-height:55vh}
+.picker-option{min-height:125px;background:#253c2b;color:#fff;border:2px solid transparent;border-radius:12px;padding:7px}.picker-option[aria-pressed="true"]{border-color:#ffd44b;background:#3d542d}.picker-option img{width:100%;height:90px;object-fit:contain;display:block}
+#dash-character-picker footer button{padding:10px 14px}.picker-play{background:#eaa629;font-weight:900}
+.arena-gate-screen{margin:0;overflow:hidden;background:#06110a}.arena-gate{width:100vw;height:100vh;background:url('/screens/card-arena-start-0920443d.png') center/cover no-repeat;position:relative}
+.arena-hotspot{position:absolute;left:50%;transform:translateX(-50%);width:min(42vw,700px);border:0;background:transparent;color:transparent;box-shadow:none;cursor:pointer;opacity:.001}.enter-arena{top:77%;height:11%}.arena-back{top:89%;height:8%}
+@media(max-width:650px){.jump-start-screen[data-mode="menu"] #menu-backdrop,body[data-lab-state="menu"].dash-start-screen #dash-stage:before,.arena-gate{background-size:cover}.jump-start-screen[data-mode="menu"] #overlay #play,.jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons,.jump-start-screen[data-mode="menu"] #overlay .games-back{width:76vw}.screen-hotspot,.arena-hotspot{width:76vw!important}.picker-grid{grid-template-columns:repeat(3,1fr)}}

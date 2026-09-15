@@ -14,6 +14,7 @@ const aliases={
   Shoulder:['shoulder','clavicle','collar'],UpperArm:['upperarm','arm','uparm'],Forearm:['forearm','lowerarm','elbow'],Hand:['hand','wrist'],
   Thigh:['thigh','upleg','upperleg'],Shin:['shin','calf','leg','lowerleg','knee'],Foot:['foot','ankle'],
 };
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function nameParts(name){
   let s=name.replace(/([a-z0-9])([A-Z])/g,'$1 $2').toLowerCase().replace(/mixamorig\d*[:_ ]*/g,'').replace(/cc[_ ]*base[_ ]*/g,'').replace(/[^a-z0-9]+/g,' ').trim();
   let words=s.split(/\s+/),side=words.includes('left')||words.includes('l')?'left':words.includes('right')||words.includes('r')?'right':'';
@@ -27,8 +28,8 @@ function worldDirection(a,b){return b.getWorldPosition(new THREE.Vector3()).sub(
 export async function createLabRunnerCharacter(url){
   const gltf=await new GLTFLoader().loadAsync(url),model=gltf.scene,root=new THREE.Group(),visual=new THREE.Group();
   root.add(visual);visual.add(model);model.visible=false;
-  const rig={},rest=new Map(),bases=new Map(),axes=new Map(),used=new Set(),q=new THREE.Quaternion(),delta=new THREE.Quaternion();
-  let phase=0,elapsed=0,bodyOffset=0,landingPulse=0;
+  const rig={},bases=new Map(),axes=new Map(),used=new Set(),q=new THREE.Quaternion(),delta=new THREE.Quaternion();
+  let phase=0,elapsed=0,bodyOffset=0,landingPulse=0,duckBlend=0;
   const bones=[];model.traverse(o=>{if(o.isBone)bones.push(o);});if(!bones.length)throw new Error('GLB has no bones.');
   for(const key of Object.keys(BONE_MAPPING)){
     const side=key.startsWith('left')?'left':key.startsWith('right')?'right':'',kind=side?key.slice(side.length):key;
@@ -38,14 +39,17 @@ export async function createLabRunnerCharacter(url){
     const bone=matches.length===1&&!used.has(matches[0])?matches[0]:null;if(bone){rig[key]=bone;used.add(bone);}
   }
   const required=['leftUpperArm','rightUpperArm','leftForearm','rightForearm','leftThigh','rightThigh','leftShin','rightShin','leftFoot','rightFoot'],missing=required.filter(k=>!rig[k]);
-  if(missing.length)throw new Error('Rig mapping incomplete: '+missing.join(', '));bones.forEach(b=>rest.set(b,b.quaternion.clone()));
+  if(missing.length)throw new Error('Rig mapping incomplete: '+missing.join(', '));
 
   model.updateWorldMatrix(true,true);let box=new THREE.Box3().setFromObject(model,true),height=box.max.y-box.min.y;if(!(height>0))throw new Error('Invalid avatar dimensions.');
-  model.scale.multiplyScalar(1.82/height);model.updateWorldMatrix(true,true);box.setFromObject(model,true);model.position.x-=(box.min.x+box.max.x)/2;model.position.z-=(box.min.z+box.max.z)/2;model.position.y-=box.min.y;
+  // Slightly larger than the original technical test so the 3D Chimpion reads as the
+  // hero against the 2D art instead of looking like a small debug model.
+  model.scale.multiplyScalar(2.08/height);model.updateWorldMatrix(true,true);box.setFromObject(model,true);model.position.x-=(box.min.x+box.max.x)/2;model.position.z-=(box.min.z+box.max.z)/2;model.position.y-=box.min.y;
   model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=false;o.frustumCulled=false;}});
 
-  // Exact world-space arm preparation from the working Rig Lab. Raw Euler values are
-  // never added directly to imported local bone axes; that caused the twisted prototype.
+  // Same world-space arm preparation strategy used by the working Rig Lab. Never add
+  // guessed Euler values directly to imported local axes: that was the cause of the
+  // twisted first Dash prototype.
   for(const side of ['left','right']){
     const arm=rig[side+'UpperArm'],elbow=rig[side+'Forearm'];if(!isDescendant(elbow,arm))throw new Error('Forearm hierarchy is incompatible.');
     model.updateWorldMatrix(true,true);const from=worldDirection(arm,elbow);if(from.lengthSq()<.5)throw new Error('Arm has zero length.');
@@ -60,33 +64,59 @@ export async function createLabRunnerCharacter(url){
     bodyOffset=THREE.MathUtils.lerp(bodyOffset,offset,alpha);visual.position.y=bodyOffset;
   }
   function makePose(state,gait,jumpHeight,vy,sliding){
-    const pose={},set=(key,x=0,y=0,z=0)=>{pose[key]=[x,y,z];},run=state==='RUN',swing=Math.sin(phase),breath=Math.sin(elapsed*1.7),stride=(run ? .88 : .48)*gait;
-    set('hips',run ? .08*gait : 0,swing*.03*gait,swing*.018*gait);set('spine',-.015+breath*.008+(run ? .10*gait : 0));set('chest',breath*.01,-swing*.05*gait);set('neck',-.01);set('head',Math.sin(elapsed*.7)*.012,Math.sin(elapsed*.5)*.018);
+    const pose={},set=(key,x=0,y=0,z=0)=>{pose[key]=[x,y,z];},run=state==='RUN',swing=Math.sin(phase),breath=Math.sin(elapsed*1.7),stride=(run?.78:.42)*gait;
+    set('hips',run?.065*gait:0,swing*.022*gait,swing*.014*gait);set('spine',-.012+breath*.006+(run?.075*gait:0));set('chest',breath*.008,-swing*.038*gait);set('neck',-.008);set('head',Math.sin(elapsed*.7)*.01,Math.sin(elapsed*.5)*.014);
     for(const [side,sign] of [['left',1],['right',-1]]){
-      const cycle=swing*sign;set(side+'Shoulder',0,0,-sign*.025);set(side+'UpperArm',cycle*(run ? .68 : .3)*gait);set(side+'Forearm',-.16-(run ? .62 : .12)*gait-Math.max(0,cycle)*.16*gait);set(side+'Hand',.02);
-      set(side+'Thigh',-.04-cycle*stride);set(side+'Shin',.10+Math.max(0,-cycle)*(run ? 1.12 : .62)*gait);set(side+'Foot',-.05-Math.max(0,-cycle)*.20*gait);
+      const cycle=swing*sign;set(side+'Shoulder',0,0,-sign*.02);set(side+'UpperArm',cycle*(run?.52:.25)*gait);set(side+'Forearm',-.14-(run?.48:.10)*gait-Math.max(0,cycle)*.13*gait);set(side+'Hand',.018);
+      set(side+'Thigh',-.035-cycle*stride);set(side+'Shin',.09+Math.max(0,-cycle)*(run?.98:.55)*gait);set(side+'Foot',-.045-Math.max(0,-cycle)*.18*gait);
     }
-    let offset=breath*.004+Math.abs(Math.cos(phase))*(run ? .05 : .02)*gait;
+    let offset=breath*.003+Math.abs(Math.cos(phase))*(run?.042:.018)*gait;
     if(state==='JUMP'){
-      const apex=Math.max(0,Math.min(1,jumpHeight/85)),launch=Math.max(0,Math.min(1,vy/600)),tuck=.20+.44*apex;offset=-.06*tuck;set('hips',.10*tuck);set('spine',.09*tuck);
-      for(const side of ['left','right']){set(side+'Thigh',-.48*tuck);set(side+'Shin',.92*tuck);set(side+'Foot',-.32*tuck);set(side+'UpperArm',-.54+.18*launch);set(side+'Forearm',-.34);}
+      const apex=clamp(jumpHeight/85,0,1),launch=clamp(vy/600,0,1),tuck=.18+.40*apex;offset=-.055*tuck;set('hips',.09*tuck);set('spine',.075*tuck);
+      for(const side of ['left','right']){set(side+'Thigh',-.44*tuck);set(side+'Shin',.82*tuck);set(side+'Foot',-.28*tuck);set(side+'UpperArm',-.44+.14*launch);set(side+'Forearm',-.28);}
     }
-    if(sliding){
-      offset=-.43;set('hips',.34);set('spine',.48);set('chest',.18);set('neck',-.16);set('head',-.12);
-      for(const [side,sign] of [['left',1],['right',-1]]){set(side+'Thigh',-.92,0,sign*.05);set(side+'Shin',1.45);set(side+'Foot',-.48);set(side+'UpperArm',.35*sign,0,sign*.16);set(side+'Forearm',-.68);}
+    if(duckBlend>.001){
+      // Low athletic crouch: knees carry the compression, torso folds forward,
+      // head counter-rotates and arms tuck behind the knees rather than flailing.
+      const duck={
+       hips:[.28,0,0],spine:[.62,0,0],chest:[.18,0,0],neck:[-.34,0,0],head:[-.22,0,0],
+      };
+      for(const [side,sign] of [['left',1],['right',-1]]){
+       duck[side+'Thigh']=[-1.42,0,sign*.055];
+       duck[side+'Shin']=[1.92,0,0];
+       duck[side+'Foot']=[-.46,0,0];
+       duck[side+'Shoulder']=[.08,0,-sign*.025];
+       duck[side+'UpperArm']=[.55,0,sign*.065];
+       duck[side+'Forearm']=[-1.02,0,0];
+       duck[side+'Hand']=[-.08,0,0];
+      }
+      for(const [key,angles] of Object.entries(duck)){
+       const from=pose[key]||[0,0,0];pose[key]=angles.map((angle,i)=>THREE.MathUtils.lerp(from[i],angle,duckBlend));
+      }
+      offset=THREE.MathUtils.lerp(offset,-.72,duckBlend);
     }
-    if(landingPulse>0&&!sliding){const t=landingPulse;offset-=.12*t;set('hips',.20*t);set('spine',.12*t);for(const side of ['left','right']){set(side+'Thigh',-.28*t);set(side+'Shin',.52*t);}}
+    if(landingPulse>0&&!sliding){const t=landingPulse;offset-=.10*t;set('hips',.16*t);set('spine',.10*t);for(const side of ['left','right']){set(side+'Thigh',-.23*t);set(side+'Shin',.43*t);}}
     return{pose,offset};
   }
   const idle=makePose('IDLE',0,0,0,false);applyPose(idle.pose,idle.offset,1);model.updateWorldMatrix(true,true);
   for(const side of ['left','right'])if(worldDirection(rig[side+'UpperArm'],rig[side+'Forearm']).y>-.55)throw new Error('Idle arm validation failed.');
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});box.setFromObject(model,true);model.position.y-=box.min.y;model.updateWorldMatrix(true,true);root.rotation.y=Math.PI/2;model.visible=true;
 
+  const footPoint=new THREE.Vector3();
+  const footHeight=()=>{root.updateWorldMatrix(true,true);return Math.min(...['leftFoot','rightFoot'].map(key=>{rig[key].getWorldPosition(footPoint);return root.worldToLocal(footPoint).y;}));};
+  const restingFootHeight=footHeight();
   return{
     root,model,boneCount:bones.length,
     update(dt,{state='RUN',speed=1,jumpHeight=0,vy=0,sliding=false,landed=false}={}){
-      elapsed+=dt;if(landed)landingPulse=1;landingPulse=Math.max(0,landingPulse-dt*7);const gait=state==='RUN'||state==='WALK'?Math.max(.25,Math.min(1,speed)):0;phase+=dt*(state==='RUN'?11.5:6.5)*Math.max(.3,gait);
-      const posed=makePose(state,gait,jumpHeight,vy,sliding);applyPose(posed.pose,posed.offset,1-Math.exp(-16*dt));model.updateWorldMatrix(true,true);
+      elapsed+=dt;duckBlend=THREE.MathUtils.damp(duckBlend,sliding?1:0,sliding?28:16,dt);if(landed)landingPulse=1;landingPulse=Math.max(0,landingPulse-dt*7);
+      // speed is the game-speed ratio (1 at Stage 1, roughly 2 at the cap). Keep the
+      // stride safe for varied rigs but increase foot cadence with world speed so the
+      // Chimpion always looks like it is actually running, never jogging in slow motion.
+      const speedRatio=clamp(speed,.25,4),moving=state==='RUN'||state==='WALK';
+      const gait=moving?clamp(.72+speedRatio*.28,.72,1.12):0;
+      phase+=dt*(state==='RUN'?11.8:6.4)*(moving?speedRatio:0.3)*(1-duckBlend*.9);
+      const posed=makePose(state,gait,jumpHeight,vy,sliding);applyPose(posed.pose,posed.offset,1-Math.exp(-17*dt));model.updateWorldMatrix(true,true);
+      if(duckBlend>.001)visual.position.y+=(restingFootHeight-footHeight())*duckBlend;
     },
     setFacingRight(right=true){root.rotation.y=right?Math.PI/2:-Math.PI/2;},
     dispose(){const geometries=new Set(),materials=new Set(),textures=new Set(),skeletons=new Set();root.traverse(o=>{if(o.skeleton)skeletons.add(o.skeleton);if(o.geometry)geometries.add(o.geometry);for(const m of(o.material?(Array.isArray(o.material)?o.material:[o.material]):[])){materials.add(m);Object.values(m).forEach(v=>{if(v?.isTexture)textures.add(v);});}});geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());textures.forEach(t=>t.dispose());skeletons.forEach(s=>s.dispose());}
