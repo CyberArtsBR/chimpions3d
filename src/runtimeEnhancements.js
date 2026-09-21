@@ -10,7 +10,7 @@ function moveCollection(dx,dy){
  const dialog=document.querySelector('#collection-dialog[open]');if(!dialog)return false;
  const active=document.activeElement,grid=[...dialog.querySelectorAll('.avatar-option:not(:disabled)')].filter(isVisible);
  if(active?.classList?.contains('avatar-option')&&grid.length){
-  const index=grid.indexOf(active),columns=3,target=index+(dx||dy*columns);
+  const index=grid.indexOf(active),firstTop=grid[0].offsetTop,nextRow=grid.findIndex((el,i)=>i>0&&el.offsetTop!==firstTop),columns=nextRow>0?nextRow:grid.length,target=index+(dx||dy*columns);
   if(target>=0&&target<grid.length)return focusElement(grid[target]);
   if(dy<0)return focusElement(dialog.querySelector('#avatar-list input[type="search"]'))||focusElement(dialog.querySelector('#random-chimpion'));
   if(dy>0)return focusElement([...dialog.querySelectorAll('.collection-nav button:not(:disabled)')][0]||dialog.querySelector('#confirm-chimpion'));
