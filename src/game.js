@@ -223,8 +223,8 @@ function drawWorld(dt=0){
  const current=themes[idx],previousTheme=themes[(idx+3)%4],from=game.time<30?current:previousTheme;if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
  const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone();scene.fog.color.copy(palette);const night=THREE.MathUtils.lerp(from===themes[3]?1:0,idx===3?1:0,blend);
- const climb=Math.min(1,game.height/260);scene.fog.near=25-climb*3.5;scene.fog.far=58-climb*7;sun.intensity=2.25+climb*.55+(game.event?.type==='banana-bloom'?.18:0);heroLight.intensity=2.5+climb*.35;heroFill.intensity=1+night*.32;
- audio.setIntensity(Math.min(1,game.time/150+(game.event?.type?.length? .12:0)));
+ const climb=Math.min(1,game.height/260);scene.fog.near=25-climb*3.5;scene.fog.far=58-climb*7;sun.intensity=2.25+climb*.55+(game.event?.type==='banana-bloom' ? .18 : 0);heroLight.intensity=2.5+climb*.35;heroFill.intensity=1+night*.32;
+ audio.setIntensity(Math.min(1,game.time/150+(game.event ? .12 : 0)));
  scenery.update(game.camera,visualTime,dt,palette,night,idx,game.time<30?1:blend);$('world').classList.toggle('night',night>.5);$('world').style.setProperty('--night-strength',night);sun.color.set(from.light).lerp(other.set(current.light),blend);
 }
 function tick(dt,control=input()){
@@ -252,7 +252,7 @@ function tick(dt,control=input()){
   else if(e.type==='bounce'){
    const branchSound=e.spring?'spring':e.fragile?'fragile':e.platformType==='leaf'?'leaf':e.platformType==='swing'?'swing':e.platformType==='vanish'?'vanish':'bounce';sound(branchSound);
    if(!['spring','cracked','vanish'].includes(e.platformType)&&!cleanPlatformIds.has(e.platformId)){cleanPlatformIds.add(e.platformId);cleanLandings++;}
-   landingImpulse=reducedMotion?0:(e.spring?.045:.03);const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;
+   landingImpulse=reducedMotion?0:(e.spring ? .045 : .03);const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;
    if(e.spring){boostZoom=reducedMotion?1:.91;toast(game.event?.type==='spring-fever'?'SPRING FEVER BOOST!':'Spring boost!');}
    else if(e.platformType==='vanish')toast('VANISH BRANCH · MOVE!');
   }
