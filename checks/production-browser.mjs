@@ -38,7 +38,10 @@ async function snap(name){const state=await page.evaluate(()=>window.chimpJump()
 
 try{
   report.deployment=await waitForDeployment();
-  // Match the local browser gate: control frames deterministically so a headless/SwiftShader scheduler stall\n  // cannot trigger the game's intentional safety auto-pause and masquerade as a production failure.\n  await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());\n  await page.evaluate(()=>window.chimpJumpTest?.render());
+  // Match the local browser gate: control frames deterministically so a headless/SwiftShader scheduler stall
+  // cannot trigger the game's intentional safety auto-pause and masquerade as a production failure.
+  await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());
+  await page.evaluate(()=>window.chimpJumpTest?.render());
 
   const menu=await snap('menu');
   assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
@@ -56,7 +59,8 @@ try{
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:30000});\n  await page.evaluate(()=>window.chimpJumpTest.render());
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:30000});
+  await page.evaluate(()=>window.chimpJumpTest.render());
   const playing=await snap('playing');
   assert(playing.visible,'Production avatar must be visible');
   assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
@@ -64,19 +68,27 @@ try{
   assert.equal(playing.cameraZoom,1,'Fresh production run must start at full-route zoom');
   await shot('production-playing-desktop.png');
 
-  await page.keyboard.down('ArrowLeft');\n  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));\n  assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Production keyboard steering must turn left');\n  await page.keyboard.up('ArrowLeft');
+  await page.keyboard.down('ArrowLeft');
+  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
+  assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Production keyboard steering must turn left');
+  await page.keyboard.up('ArrowLeft');
 
   await page.getByRole('button',{name:'Pause game'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
   await shot('production-pause-desktop.png');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();\n  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');\n  await page.evaluate(()=>window.chimpJumpTest.render());
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+  await page.evaluate(()=>window.chimpJumpTest.render());
 
   await page.setViewportSize({width:1920,height:1080});
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
   const layout=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
   report.viewport1080p=layout;
   assert.equal(layout.scrollWidth,1920,'Production 1080p layout must not overflow horizontally');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();\n  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');\n  await page.evaluate(()=>window.chimpJumpTest.render());\n  await shot('production-playing-desktop-1080p.png');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+  await page.evaluate(()=>window.chimpJumpTest.render());
+  await shot('production-playing-desktop-1080p.png');
 
   await snap('final');
   assert.deepEqual(errors,[],'Production browser must not raise page errors');
