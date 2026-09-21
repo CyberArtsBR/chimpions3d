@@ -16,9 +16,7 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visible);
  assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
- assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
- assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>0);
  assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
  await page.getByRole('button',{name:'Field guide',exact:true}).click();
  await page.getByLabel('Reduced motion').check();
@@ -29,6 +27,9 @@ try{
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.locator('#confirm-chimpion').click();
  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+ await page.evaluate(()=>window.chimpJumpTest.render());
+ assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must attach when gameplay begins');
+ assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>0,'Authored branch assets must render during gameplay');
  await page.keyboard.down('ArrowLeft');
  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
  assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Left key must turn the character');
