@@ -73,7 +73,10 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
 .jump-start-screen[data-mode="menu"] #audio-settings{display:none!important}
 .jump-start-screen[data-mode="menu"] #menu-backdrop::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:96px;pointer-events:none;
-  background:linear-gradient(to bottom,transparent 0%,rgba(8,31,24,.48) 58%,rgba(6,24,19,.92) 100%);
+  background:
+    linear-gradient(#061813,#061813) left bottom/76px 74px no-repeat,
+    linear-gradient(#061813,#061813) right bottom/176px 74px no-repeat,
+    linear-gradient(to bottom,transparent 0%,rgba(8,31,24,.48) 58%,rgba(6,24,19,.92) 100%);
 }
 @media(max-width:650px){
   .jump-start-screen[data-mode="menu"] #overlay .games-back{
@@ -83,14 +86,3 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
     right:12px!important;bottom:max(66px,calc(env(safe-area-inset-bottom) + 56px))!important;
   }
 }
-
-
-/* Desktop title artwork still contains two legacy edge labels baked into the image.
-   Mask only the bottom corner strips; keep the central art and Back button untouched. */
-.jump-start-screen[data-mode="menu"] #overlay::before,
-.jump-start-screen[data-mode="menu"] #overlay::after{
-  content:"";position:fixed;bottom:0;height:74px;z-index:20;pointer-events:none;
-  background:linear-gradient(to bottom,rgba(6,24,19,.90),rgba(6,24,19,.98) 48%,#061813 100%);
-}
-.jump-start-screen[data-mode="menu"] #overlay::before{left:0;width:76px}
-.jump-start-screen[data-mode="menu"] #overlay::after{right:0;width:176px}
