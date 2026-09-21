@@ -19,6 +19,9 @@ body[data-reduced-motion="true"] #world .rays,body[data-reduced-motion="true"] #
 
 
 /* Desktop/browser release focus: keep the illustrated menu uncluttered and controls separated. */
+body[data-mode="menu"] #audio-settings,
+body[data-mode="menu"] #background-style{display:none!important}
+
 @media(hover:hover) and (pointer:fine){
   #jump-guide-button{top:18px;right:18px;bottom:auto}
   #jump-control-hint{display:none}
