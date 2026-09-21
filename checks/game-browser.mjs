@@ -4,6 +4,11 @@ import {chromium} from '@playwright/test';
 
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
+await page.addInitScript(()=>{
+  const pad={connected:true,axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false}))};
+  Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[pad]});
+  window.__chimpTestPad=pad;
+});
 const errors=[];
 const report={scope:'desktop-browser',viewport:{width:1440,height:900},checkpoints:{},renderStats:{}};
 
@@ -45,6 +50,17 @@ try{
   await page.getByRole('button',{name:'Close field guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  const selectable=page.locator('.avatar-option:not(:disabled)');
+  await selectable.first().focus();
+  const firstLabel=await selectable.first().innerText();
+  await page.evaluate(()=>{window.__chimpTestPad.axes[1]=1;});
+  await page.waitForTimeout(120);
+  await page.evaluate(()=>{window.__chimpTestPad.axes[1]=0;});
+  await page.waitForTimeout(100);
+  const focusedLabel=await page.evaluate(()=>document.activeElement?.innerText||'');
+  const fifthLabel=await selectable.nth(4).innerText();
+  assert.notEqual(firstLabel,fifthLabel,'Desktop picker fixture must contain at least five distinct choices');
+  assert.equal(focusedLabel,fifthLabel,'Gamepad down must move one four-column desktop row');
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.evaluate(()=>window.chimpJumpTest.render());
