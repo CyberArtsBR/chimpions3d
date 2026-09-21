@@ -78,3 +78,35 @@ Before production-final status, verify in desktop Chromium:
 - repeated restart stability and representative GLB selection/upload.
 
 Physics should only be changed when these tests or later player evidence show a concrete problem.
+
+## Canopy expansion delivery review — 2026-09-21
+
+PR #13 extends the earlier pass with optional leaf/swing/vanish branches, thorn pods,
+wind, seeded canopy events, bonus routes, reactive atmosphere/audio and the desktop
+picker. Existing art, GLBs and music are reused; this follow-up adds no external assets.
+
+The final review inspected the three dedicated screenshots from CI run 35658580284
+(commit 3ed95b0). Mechanics and event HUD remained visible. The picker exposed a
+four-child/three-column layout error and empty portrait areas when remote images
+were unavailable. Explicit grid areas now keep preview, description and Play aligned,
+with Random beneath Play; initials remain visible until a portrait loads, including
+on failure. The Field Guide now explains all three new branch families and events.
+
+Local production-build Chromium verification passed start, keyboard/mouse independence,
+four-column controller focus, pause/resume, death/retry, same-seed replay, GLB rejection,
+120 simulated seconds and bounded resources after 12 restarts. The corrected picker
+screenshot was visually inspected. Automated tests and static screenshots do not
+constitute human feel/audio approval or physical mobile testing.
+
+Release checks now publish dist/version.json and wait for the exact successful main
+commit on Render before testing production. The production audit checks out that same
+commit, checks expansion telemetry and captures the deployed picker. Playwright 1.63.0
+is pinned in the lockfile and shared by both workflows, removing the two high-severity
+warnings from the former 1.55.0 test installation. One low-severity esbuild development
+server advisory remains; the compatible automatic fix did not resolve it. It is a
+build-tool dependency, not shipped browser code.
+
+Rollback: revert the squash merge through a new commit on main, pass CI and let Render
+redeploy (or select the preceding successful Render deployment). This pass does not
+change localStorage schemas or migrate saved records. Post-merge acceptance requires
+the matching live version manifest and a successful production desktop audit.

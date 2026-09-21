@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from '@playwright/test';
+const base=process.env.CHIMP_TEST_URL||'http://127.0.0.1:4173';
 
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
@@ -18,7 +19,7 @@ page.on('console',message=>{if(message.type()==='error')console.log('[browser co
 async function screenshot(name){
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   await page.evaluate(()=>window.chimpJumpTest.render());
-  await page.screenshot({path:'checks/'+name});
+  await page.screenshot({path:'checks/'+name,timeout:90000});
 }
 
 async function snapshot(label){
@@ -28,7 +29,7 @@ async function snapshot(label){
 }
 
 try{
-  await page.goto('http://127.0.0.1:4173/?test=1',{waitUntil:'domcontentloaded'});
+  await page.goto(base+'/?test=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.chimpJump?.().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
@@ -52,6 +53,17 @@ try{
   await page.getByRole('button',{name:'Close field guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');
+  await screenshot('game-picker-desktop.png');
+  const pickerLayout=await page.locator('.selection-actions').evaluate(el=>getComputedStyle(el).gridTemplateColumns);
+  assert(pickerLayout.split(' ').length>=3,'Desktop picker must use the expanded preview/info/play layout');
+  const picker=await page.evaluate(()=>{
+    const box=id=>{const r=document.getElementById(id).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};
+    return {preview:box('selected-preview'),copy:box('selected-chimpion'),play:box('confirm-chimpion'),random:box('random-chimpion')};
+  });
+  assert(picker.preview.right<=picker.copy.x&&picker.copy.right<=picker.play.x,'Preview, description and play action must occupy separate columns');
+  assert(picker.play.bottom<=picker.random.y,'Random must sit below the play action');
+  assert(await page.locator('.avatar-option .avatar-portrait').first().isVisible(),'A portrait or initials must reserve a visible card preview');
   const selectable=page.locator('.avatar-option:not(:disabled)');
   await selectable.first().focus();
   const firstLabel=await selectable.first().innerText();
@@ -71,6 +83,27 @@ try{
   assert(playing.visibleBranches>=4,'Generated branches must attach when gameplay begins');
   assert(playing.authoredBranches>0,'Authored branch assets must render during gameplay');
   assert.equal(playing.cameraZoom,1,'Fresh gameplay must start with the complete route visible');
+  assert(Array.isArray(playing.platformTypes)&&playing.platformTypes.includes('solid'),'Expansion telemetry must expose live platform types');
+  assert.equal(typeof playing.wind,'number');
+  assert.equal(typeof playing.hazardCount,'number');
+  assert(playing.musicPlaybackRate>=.98&&playing.musicPlaybackRate<=1.06,'Reactive music rate stays subtle');
+
+  // Deterministic visual fixture: render every new branch family plus one thorn pod in-frame.
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();
+    const base=id=>({id,x:0,baseX:0,y:0,width:2.05,type:'solid',coin:true,route:'reward',reward:2,fragile:false,broken:false,phase:.5,moveSpeed:1,moveRange:0,vanishAt:null});
+    g.platforms.push(
+      {...base(9501),id:9501,x:-4.4,baseX:-4.4,y:2.4,type:'leaf',moveRange:1.05},
+      {...base(9502),id:9502,x:0,baseX:0,y:5.0,type:'vanish'},
+      {...base(9503),id:9503,x:4.2,baseX:4.2,y:7.4,type:'swing',moveRange:1.35}
+    );
+    g.hazards=[{id:9501,type:'thorn-pod',x:2.0,baseX:2.0,y:2.9,radius:.42,range:.24,speed:.9,phase:.2}];
+  });
+  await screenshot('game-canopy-mechanics-desktop.png');
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();g.platforms=g.platforms.filter(p=>p.id<9500);g.hazards=[];
+    window.chimpJumpTest.render();
+  });
 
   await page.keyboard.down('ArrowLeft');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
@@ -83,6 +116,16 @@ try{
   assert(await page.evaluate(()=>window.chimpJump().yaw>.6),'Right key must turn the character');
   assert(await page.evaluate(()=>window.chimpJump().vx>0),'Mouse movement must not release or override a held keyboard direction');
   await page.keyboard.up('ArrowRight');
+
+  // Timed canopy events must surface in the desktop HUD without changing the core safe-route physics.
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();g.time=44.99;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=Infinity;
+    window.chimpJumpTest.step(2);
+  });
+  assert(['wind-surge','banana-bloom','spring-fever'].includes(await page.evaluate(()=>window.chimpJump().event)));
+  assert(await page.locator('#canopy-event').isVisible(),'Canopy event badge must be visible during an active event');
+  await screenshot('game-canopy-event-desktop.png');
+  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.time=0;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=30;g.wind=0;});
 
   await screenshot('game-playing-desktop.png');
   await page.setViewportSize({width:1920,height:1080});
@@ -108,7 +151,7 @@ try{
   // Long-session desktop pacing check using a deterministic safe bounce fixture.
   await page.evaluate(()=>{
     const g=window.chimpJumpTest.game();
-    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;
+    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;g.windScale=0;g.hazards=[];
     g.platforms=[{id:9000,x:0,baseX:0,y:0,width:10,type:'solid',coin:false,broken:false}];
   });
   const paceSamples=[];
@@ -119,6 +162,7 @@ try{
   }
   report.paceSamples=paceSamples;
   for(let i=1;i<paceSamples.length;i++)assert(paceSamples[i].pace>=paceSamples[i-1].pace,'Pace must not regress over a long run');
+  assert(Math.abs(paceSamples.at(-1).pace-(.92+2.08*120/300))<.001,'Long-session fixture must reach the full simulated 120 seconds');
   await screenshot('game-long-run-desktop.png');
 
   const failedSeed=await page.evaluate(()=>window.chimpJump().runSeed);
@@ -141,7 +185,7 @@ try{
   await page.keyboard.press('Escape');
   const modelBytes=fs.readFileSync('public/model/chimpion.glb');
   let external=0;
-  page.on('request',request=>{if(!request.url().startsWith('http://127.0.0.1:4173')&&!request.url().startsWith('data:')&&!request.url().startsWith('blob:'))external++;});
+  page.on('request',request=>{if(!request.url().startsWith(base)&&!request.url().startsWith('data:')&&!request.url().startsWith('blob:'))external++;});
   await page.locator('#avatar-file').setInputFiles({name:'my-chimp.glb',mimeType:'model/gltf-binary',buffer:modelBytes});
   await page.waitForFunction(()=>document.getElementById('avatar-status').textContent.includes('local file')&&window.chimpJump().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);

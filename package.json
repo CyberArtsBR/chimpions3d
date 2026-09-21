@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/avatars.mjs && vite build",
+    "build": "node scripts/avatars.mjs && vite build && node scripts/build-version.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
     "three": "0.180.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "vite": "7.3.5"
   }
 }
