@@ -52,6 +52,9 @@ try{
   await page.getByRole('button',{name:'Close field guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');
+  const pickerLayout=await page.locator('.selection-actions').evaluate(el=>getComputedStyle(el).gridTemplateColumns);
+  assert(pickerLayout.split(' ').length>=3,'Desktop picker must use the expanded preview/info/play layout');
   const selectable=page.locator('.avatar-option:not(:disabled)');
   await selectable.first().focus();
   const firstLabel=await selectable.first().innerText();
@@ -71,6 +74,10 @@ try{
   assert(playing.visibleBranches>=4,'Generated branches must attach when gameplay begins');
   assert(playing.authoredBranches>0,'Authored branch assets must render during gameplay');
   assert.equal(playing.cameraZoom,1,'Fresh gameplay must start with the complete route visible');
+  assert(Array.isArray(playing.platformTypes)&&playing.platformTypes.includes('solid'),'Expansion telemetry must expose live platform types');
+  assert.equal(typeof playing.wind,'number');
+  assert.equal(typeof playing.hazardCount,'number');
+  assert(playing.musicPlaybackRate>=.98&&playing.musicPlaybackRate<=1.06,'Reactive music rate stays subtle');
 
   await page.keyboard.down('ArrowLeft');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
@@ -83,6 +90,15 @@ try{
   assert(await page.evaluate(()=>window.chimpJump().yaw>.6),'Right key must turn the character');
   assert(await page.evaluate(()=>window.chimpJump().vx>0),'Mouse movement must not release or override a held keyboard direction');
   await page.keyboard.up('ArrowRight');
+
+  // Timed canopy events must surface in the desktop HUD without changing the core safe-route physics.
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();g.time=44.99;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=Infinity;
+    window.chimpJumpTest.step(2);
+  });
+  assert(['wind-surge','banana-bloom','spring-fever'].includes(await page.evaluate(()=>window.chimpJump().event)));
+  assert(await page.locator('#canopy-event').isVisible(),'Canopy event badge must be visible during an active event');
+  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.time=0;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=30;g.wind=0;});
 
   await screenshot('game-playing-desktop.png');
   await page.setViewportSize({width:1920,height:1080});
