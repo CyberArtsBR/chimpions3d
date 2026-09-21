@@ -25,19 +25,26 @@ async function waitForDeployment(){
       if(!/^[a-f0-9]{40}$/.test(version.commit||''))throw new Error('Invalid deployed revision');
       if(expectedCommit&&version.commit!==expectedCommit)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
       report.version=version;
-      await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});
+      errors.length=0;
+      sameOriginFailures.length=0;
+      const auditUrl=base+'/?test=1&audit='+Date.now();
+      await page.goto(auditUrl,{waitUntil:'domcontentloaded',timeout:45000});
       await page.waitForTimeout(2500);
       const state=await page.evaluate(()=>({
         ready:!!window.chimpJump?.().ready,
         fieldGuide:!!document.querySelector('#jump-guide-button'),
-        mode:document.body?.dataset?.mode||''
+        mode:document.body?.dataset?.mode||'',
+        hasChimp:typeof window.chimpJump==='function',
+        scriptCount:document.scripts.length
       }));
       if(state.ready&&state.fieldGuide&&state.mode==='menu')return state;
       last=JSON.stringify(state);
     }catch(error){last=error.message;}
     await page.waitForTimeout(15000);
   }
-  throw new Error('Timed out waiting for Render deployment. Last state: '+last);
+  report.waitFailure={last,errors:[...errors],sameOriginFailures:[...sameOriginFailures]};
+  fs.writeFileSync('checks/production-browser-report.json',JSON.stringify(report,null,2));
+  throw new Error('Timed out waiting for Render deployment. Last state: '+last+'; page errors: '+JSON.stringify(errors)+'; same-origin failures: '+JSON.stringify(sameOriginFailures));
 }
 
 async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false,timeout:90000});}
