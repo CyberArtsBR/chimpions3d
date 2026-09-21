@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {chromium} from '@playwright/test';
+const base=process.env.CHIMP_TEST_URL||'http://127.0.0.1:4173';
 
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
@@ -28,7 +29,7 @@ async function snapshot(label){
 }
 
 try{
-  await page.goto('http://127.0.0.1:4173/?test=1',{waitUntil:'domcontentloaded'});
+  await page.goto(base+'/?test=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.chimpJump?.().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
@@ -56,6 +57,13 @@ try{
   await screenshot('game-picker-desktop.png');
   const pickerLayout=await page.locator('.selection-actions').evaluate(el=>getComputedStyle(el).gridTemplateColumns);
   assert(pickerLayout.split(' ').length>=3,'Desktop picker must use the expanded preview/info/play layout');
+  const picker=await page.evaluate(()=>{
+    const box=id=>{const r=document.getElementById(id).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};
+    return {preview:box('selected-preview'),copy:box('selected-chimpion'),play:box('confirm-chimpion'),random:box('random-chimpion')};
+  });
+  assert(picker.preview.right<=picker.copy.x&&picker.copy.right<=picker.play.x,'Preview, description and play action must occupy separate columns');
+  assert(picker.play.bottom<=picker.random.y,'Random must sit below the play action');
+  assert(await page.locator('.avatar-option .avatar-portrait').first().isVisible(),'A portrait or initials must reserve a visible card preview');
   const selectable=page.locator('.avatar-option:not(:disabled)');
   await selectable.first().focus();
   const firstLabel=await selectable.first().innerText();
@@ -177,7 +185,7 @@ try{
   await page.keyboard.press('Escape');
   const modelBytes=fs.readFileSync('public/model/chimpion.glb');
   let external=0;
-  page.on('request',request=>{if(!request.url().startsWith('http://127.0.0.1:4173')&&!request.url().startsWith('data:')&&!request.url().startsWith('blob:'))external++;});
+  page.on('request',request=>{if(!request.url().startsWith(base)&&!request.url().startsWith('data:')&&!request.url().startsWith('blob:'))external++;});
   await page.locator('#avatar-file').setInputFiles({name:'my-chimp.glb',mimeType:'model/gltf-binary',buffer:modelBytes});
   await page.waitForFunction(()=>document.getElementById('avatar-status').textContent.includes('local file')&&window.chimpJump().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);

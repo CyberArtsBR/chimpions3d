@@ -17,17 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.workflow_run.head_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Install production browser runtime
         run: |
-          npm install --no-save @playwright/test@1.55.0
+          npm ci
           npx playwright install --with-deps chromium
       - name: Audit deployed desktop browser build
         env:
           CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+          CHIMP_EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
         run: node checks/production-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()

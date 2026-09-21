@@ -23,7 +23,6 @@ jobs:
         run: node --check checks/production-browser.mjs
       - name: Install desktop browser test runtime
         run: |
-          npm install --no-save @playwright/test@1.55.0
           npx playwright install --with-deps chromium
       - name: Run desktop browser audit
         run: |

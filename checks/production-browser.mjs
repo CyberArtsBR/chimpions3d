@@ -5,6 +5,7 @@ import {chromium} from '@playwright/test';
 const base=(process.env.CHIMP_PRODUCTION_URL||'https://chimp-jump.onrender.com').replace(/\/$/,'');
 const url=base+'/?test=1';
 const origin=new URL(base).origin;
+const expectedCommit=process.env.CHIMP_EXPECTED_COMMIT||'';
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[],sameOriginFailures=[];
@@ -18,6 +19,12 @@ async function waitForDeployment(){
   let last='';
   while(Date.now()<deadline){
     try{
+      const versionResponse=await page.request.get(base+'/version.json?audit='+Date.now());
+      if(!versionResponse.ok())throw new Error('Waiting for deployed version manifest');
+      const version=await versionResponse.json();
+      if(!/^[a-f0-9]{40}$/.test(version.commit||''))throw new Error('Invalid deployed revision');
+      if(expectedCommit&&version.commit!==expectedCommit)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
+      report.version=version;
       await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});
       await page.waitForTimeout(2500);
       const state=await page.evaluate(()=>({
@@ -58,6 +65,8 @@ try{
   await page.getByRole('button',{name:'Close field guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  assert(await page.locator('#selected-chimpion-meta').isVisible(),'Expanded picker must be deployed');
+  await shot('production-picker-desktop.png');
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:30000});
   await page.evaluate(()=>window.chimpJumpTest.render());
@@ -66,6 +75,7 @@ try{
   assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
   assert(playing.visibleBranches>=4,'Production route branches must attach');
   assert.equal(playing.cameraZoom,1,'Fresh production run must start at full-route zoom');
+  assert(Array.isArray(playing.platformTypes)&&typeof playing.wind==='number','Canopy gameplay expansion must be deployed');
   await shot('production-playing-desktop.png');
 
   await page.keyboard.down('ArrowLeft');

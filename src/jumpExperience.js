@@ -20,7 +20,8 @@ export function setupJumpExperience(){
   const dialog=document.createElement('dialog');dialog.id='jump-guide-dialog';
   dialog.innerHTML=`<header><div><small>CHIMP JUMP</small><h2>Field guide</h2></div><button class="guide-close" aria-label="Close field guide">×</button></header>
     <section><h3>Controls</h3><p>Steer while the chimp auto-jumps with Arrow keys or A/D, mouse, or gamepad. P or Escape pauses.</p></section>
-    <section><h3>Read the branches</h3><div class="guide-branches"><span>↔ <b>Moving</b></span><span>╱ <b>Fragile</b></span><span>↑ <b>Spring</b></span><span>🍌 <b>Small branches pay more</b></span></div></section>
+    <section><h3>Read the branches</h3><div class="guide-branches"><span>↔ <b>Moving</b></span><span>╱ <b>Fragile</b></span><span>↑ <b>Spring</b></span><span>🍃 <b>Leaf</b></span><span>⌁ <b>Swing</b></span><span>◌ <b>Vanish</b></span></div><p>Leaves drift and swings sway. Vanishing branches disappear after you land. Small, optional branches pay more bananas; solid branches form the main route.</p></section>
+    <section><h3>Canopy surprises</h3><p>Avoid thorn pods and steer against the wind arrow. Wind Surge brings stronger gusts, Banana Bloom adds rewards, and Spring Fever boosts springs. Watch the event badge for the active effect.</p></section>
     <section><h3>Comfort</h3><label><input id="jump-reduced-motion" type="checkbox"> Reduced motion</label><label><input id="jump-high-visibility" type="checkbox"> High-visibility HUD</label></section>
     <section><h3>Expedition goals</h3><ul id="jump-goals"></ul></section>`;
   document.body.append(button,hint,status,goalToast,dialog);

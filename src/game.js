@@ -177,10 +177,16 @@ $('avatar-file').onchange=async e=>{const file=e.target.files[0];e.target.value=
 $('flip').remove();let collectionPage=0,collectionQuery='';
 const selectedPreview=document.createElement('div');selectedPreview.id='selected-preview';selectionActions.prepend(selectedPreview);
 function randomEntry(){const entries=catalog.filter(e=>e.url&&e.id!=='chimpion');const pool=entries.length?entries:catalog;return pool[Math.floor(Math.random()*pool.length)];}
+function appendPortrait(container,entry,imageUrl){
+ const fallback=document.createElement('span');fallback.className='preview-monogram';fallback.setAttribute('aria-hidden','true');
+ fallback.textContent=(entry.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();container.append(fallback);
+ if(!imageUrl)return;
+ const img=document.createElement('img');img.alt='';img.referrerPolicy='no-referrer';img.hidden=true;
+ img.onload=()=>{fallback.remove();img.hidden=false;};img.onerror=()=>img.remove();container.append(img);img.src=imageUrl;
+}
 function showPending(){
  if(!pendingEntry)return;const metadata=collection.find(e=>e.id===pendingEntry.id||e.name===pendingEntry.name)||pendingEntry;selectedPreview.replaceChildren();
- if(metadata.image||pendingEntry.image){const img=document.createElement('img');img.src=metadata.image||pendingEntry.image;img.alt=pendingEntry.name;img.referrerPolicy='no-referrer';img.onerror=()=>img.remove();selectedPreview.append(img);}
- else{const monogram=document.createElement('span');monogram.className='preview-monogram';monogram.textContent=(pendingEntry.name||'?').slice(0,2).toUpperCase();selectedPreview.append(monogram);}
+ appendPortrait(selectedPreview,pendingEntry,metadata.image||pendingEntry.image);
  $('selected-chimpion').textContent=pendingEntry.name;
  const meta=[metadata.tribe,metadata.id?'#'+metadata.id:null,pendingEntry.url?'Playable now':'Preview only'].filter(Boolean).join(' · ');$('selected-chimpion-meta').textContent=meta||'Ready for the canopy';
  $('confirm-chimpion').textContent='Play with '+pendingEntry.name;
@@ -193,7 +199,7 @@ function renderCollection(){
  const entries=[...catalog,...collection.filter(c=>!catalog.some(a=>a.id===c.id))].filter(c=>c.name.toLowerCase().includes(collectionQuery.toLowerCase()));const pages=Math.max(1,Math.ceil(entries.length/12));collectionPage=Math.min(collectionPage,pages-1);const grid=document.createElement('div');grid.className='avatar-grid';
  for(const entry of entries.slice(collectionPage*12,collectionPage*12+12)){
   const button=document.createElement('button');button.className='avatar-option';button.disabled=!entry.url;button.setAttribute('aria-label',entry.name+(entry.url?'':entry.unavailable?' · Rig needs correction':' · GLB coming soon'));button.setAttribute('aria-pressed',String(pendingEntry?.id===entry.id));
-  if(entry.image){const img=document.createElement('img');img.src=entry.image;img.loading='lazy';img.decoding='async';img.alt='';img.referrerPolicy='no-referrer';img.onerror=()=>{img.remove();};button.append(img);}
+  const portrait=document.createElement('span');portrait.className='avatar-portrait';appendPortrait(portrait,entry,entry.image);button.append(portrait);
   const name=document.createElement('strong');name.textContent=entry.name;button.append(name);const status=document.createElement('small');status.textContent=entry.url?(pendingEntry?.id===entry.id?'Selected':'Select'):(entry.unavailable?'Rig needs correction':'GLB coming soon');button.title=entry.unavailable||entry.name;button.append(status);
   button.onclick=()=>{pendingEntry=entry;showPending();for(const option of grid.children)option.setAttribute('aria-pressed',String(option===button));};grid.append(button);
  }
