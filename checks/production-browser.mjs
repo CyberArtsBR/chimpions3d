@@ -19,23 +19,26 @@ async function waitForDeployment(){
   let last='';
   while(Date.now()<deadline){
     try{
-      const versionResponse=await page.request.get(base+'/version.json?audit='+Date.now());
+      const stamp=Date.now();
+      const versionResponse=await page.request.get(base+'/version.json?audit='+stamp);
       if(!versionResponse.ok())throw new Error('Waiting for deployed version manifest');
       const version=await versionResponse.json();
       if(!/^[a-f0-9]{40}$/.test(version.commit||''))throw new Error('Invalid deployed revision');
       if(expectedCommit&&version.commit!==expectedCommit)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
       report.version=version;
-      await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});
-      await page.waitForTimeout(2500);
+      const liveUrl=base+'/?test=1&revision='+encodeURIComponent(version.commit)+'&audit='+stamp;
+      await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
+      const remaining=Math.max(1000,Math.min(45000,deadline-Date.now()));
+      await page.waitForFunction(()=>window.chimpJump?.().ready&&document.querySelector('#jump-guide-button')&&document.body?.dataset?.mode==='menu',null,{timeout:remaining});
       const state=await page.evaluate(()=>({
         ready:!!window.chimpJump?.().ready,
         fieldGuide:!!document.querySelector('#jump-guide-button'),
         mode:document.body?.dataset?.mode||''
       }));
-      if(state.ready&&state.fieldGuide&&state.mode==='menu')return state;
-      last=JSON.stringify(state);
+      report.liveUrl=liveUrl;
+      return state;
     }catch(error){last=error.message;}
-    await page.waitForTimeout(15000);
+    if(Date.now()<deadline)await page.waitForTimeout(15000);
   }
   throw new Error('Timed out waiting for Render deployment. Last state: '+last);
 }
@@ -45,6 +48,8 @@ async function snap(name){const state=await page.evaluate(()=>window.chimpJump()
 
 try{
   report.deployment=await waitForDeployment();
+  // Ignore transient errors from deployment polling; assertions below apply to the settled revision only.
+  errors.length=0;sameOriginFailures.length=0;
   // Match the local browser gate: control frames deterministically so a headless/SwiftShader scheduler stall
   // cannot trigger the game's intentional safety auto-pause and masquerade as a production failure.
   await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());
