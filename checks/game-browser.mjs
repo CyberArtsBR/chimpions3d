@@ -53,6 +53,7 @@ try{
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');
+  await screenshot('game-picker-desktop.png');
   const pickerLayout=await page.locator('.selection-actions').evaluate(el=>getComputedStyle(el).gridTemplateColumns);
   assert(pickerLayout.split(' ').length>=3,'Desktop picker must use the expanded preview/info/play layout');
   const selectable=page.locator('.avatar-option:not(:disabled)');
@@ -79,6 +80,23 @@ try{
   assert.equal(typeof playing.hazardCount,'number');
   assert(playing.musicPlaybackRate>=.98&&playing.musicPlaybackRate<=1.06,'Reactive music rate stays subtle');
 
+  // Deterministic visual fixture: render every new branch family plus one thorn pod in-frame.
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();
+    const base=id=>({id,x:0,baseX:0,y:0,width:2.05,type:'solid',coin:true,route:'reward',reward:2,fragile:false,broken:false,phase:.5,moveSpeed:1,moveRange:0,vanishAt:null});
+    g.platforms.push(
+      {...base(9501),id:9501,x:-4.4,baseX:-4.4,y:2.4,type:'leaf',moveRange:1.05},
+      {...base(9502),id:9502,x:0,baseX:0,y:5.0,type:'vanish'},
+      {...base(9503),id:9503,x:4.2,baseX:4.2,y:7.4,type:'swing',moveRange:1.35}
+    );
+    g.hazards=[{id:9501,type:'thorn-pod',x:2.0,baseX:2.0,y:2.9,radius:.42,range:.24,speed:.9,phase:.2}];
+  });
+  await screenshot('game-canopy-mechanics-desktop.png');
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();g.platforms=g.platforms.filter(p=>p.id<9500);g.hazards=[];
+    window.chimpJumpTest.render();
+  });
+
   await page.keyboard.down('ArrowLeft');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
   assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Left key must turn the character');
@@ -98,6 +116,7 @@ try{
   });
   assert(['wind-surge','banana-bloom','spring-fever'].includes(await page.evaluate(()=>window.chimpJump().event)));
   assert(await page.locator('#canopy-event').isVisible(),'Canopy event badge must be visible during an active event');
+  await screenshot('game-canopy-event-desktop.png');
   await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.time=0;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=30;g.wind=0;});
 
   await screenshot('game-playing-desktop.png');
@@ -124,7 +143,7 @@ try{
   // Long-session desktop pacing check using a deterministic safe bounce fixture.
   await page.evaluate(()=>{
     const g=window.chimpJumpTest.game();
-    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;
+    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;g.windScale=0;g.hazards=[];
     g.platforms=[{id:9000,x:0,baseX:0,y:0,width:10,type:'solid',coin:false,broken:false}];
   });
   const paceSamples=[];
@@ -135,6 +154,7 @@ try{
   }
   report.paceSamples=paceSamples;
   for(let i=1;i<paceSamples.length;i++)assert(paceSamples[i].pace>=paceSamples[i-1].pace,'Pace must not regress over a long run');
+  assert(Math.abs(paceSamples.at(-1).pace-(.92+2.08*120/300))<.001,'Long-session fixture must reach the full simulated 120 seconds');
   await screenshot('game-long-run-desktop.png');
 
   const failedSeed=await page.evaluate(()=>window.chimpJump().runSeed);
