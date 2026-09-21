@@ -1,0 +1,31 @@
+name: Chimp Jump production final pass
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Chromium
+        run: |
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify public Render desktop build
+        env:
+          CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+        run: node checks/production-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-production-final-pass
+          path: |
+            checks/production-*.png
+            checks/production-browser-report.json
