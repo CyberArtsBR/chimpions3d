@@ -50,7 +50,7 @@ export class Game {
     this.time=0;this.height=0;this.camera=5;this.previousCamera=5;
     this.jetpack=null;this.jetRemaining=0;this.nextJetAt=30;
     this.bounceAge=0;this.bounces=0;this.bananas=0;this.dead=false;
-    this.wind=0;this.event=null;this.eventIndex=0;this.nextEventAt=EVENT_INTERVAL;
+    this.wind=0;this.windScale=1;this.event=null;this.eventIndex=0;this.nextEventAt=EVENT_INTERVAL;
     this.lastMilestone=0;this.hazardCooldown=0;this.hazards=[];this.nextHazardId=0;
     this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;
     this.add(0,0,2.8,'solid',false);this.generate();
@@ -167,7 +167,7 @@ export class Game {
   step(input,dt=STEP){
     if(this.dead)return [];
     const events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
-    this.wind=windAt(this.time,this.runSeed,this.event?.type||'');
+    this.wind=windAt(this.time,this.runSeed,this.event?.type||'')*this.windScale;
     this.hazardCooldown=Math.max(0,this.hazardCooldown-realDt);
 
     dt*=paceAt(this.time);this.bounceAge+=dt;
