@@ -90,7 +90,7 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
 .jump-start-screen[data-mode="menu"] #overlay::before,
 .jump-start-screen[data-mode="menu"] #overlay::after{
   content:"";position:fixed;bottom:0;height:74px;z-index:20;pointer-events:none;
-  background:linear-gradient(to bottom,rgba(6,24,19,.18),rgba(6,24,19,.94) 48%,#061813 100%);
+  background:linear-gradient(to bottom,rgba(6,24,19,.90),rgba(6,24,19,.98) 48%,#061813 100%);
 }
 .jump-start-screen[data-mode="menu"] #overlay::before{left:0;width:76px}
 .jump-start-screen[data-mode="menu"] #overlay::after{right:0;width:176px}
