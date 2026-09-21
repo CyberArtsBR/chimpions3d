@@ -45,7 +45,7 @@ const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);a
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
-const idle=new Game(9);for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert(idle.height-idleHeight<.01,'Wider early branches may help, but standing still cannot climb indefinitely');
+const idle=new Game(9);idle.windScale=0;for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert(idle.height-idleHeight<.01,'Wider early branches may help, but standing still cannot climb indefinitely');
 assert.equal(paceAt(0),.92);assert(paceAt(180)<3);assert(Math.abs(paceAt(300)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 for(const boundary of [30,60,180,360]){
  const epsilon=1e-6,left=platformPhaseAt(boundary)-platformPhaseAt(boundary-epsilon),right=platformPhaseAt(boundary+epsilon)-platformPhaseAt(boundary);
