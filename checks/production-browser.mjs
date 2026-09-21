@@ -40,7 +40,7 @@ async function waitForDeployment(){
   throw new Error('Timed out waiting for Render deployment. Last state: '+last);
 }
 
-async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false});}
+async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false,timeout:90000});}
 async function snap(name){const state=await page.evaluate(()=>window.chimpJump());report.checkpoints[name]=state;return state;}
 
 try{
