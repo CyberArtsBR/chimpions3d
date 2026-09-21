@@ -18,7 +18,7 @@ page.on('console',message=>{if(message.type()==='error')console.log('[browser co
 async function screenshot(name){
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   await page.evaluate(()=>window.chimpJumpTest.render());
-  await page.screenshot({path:'checks/'+name,fullPage:true});
+  await page.screenshot({path:'checks/'+name});
 }
 
 async function snapshot(label){
