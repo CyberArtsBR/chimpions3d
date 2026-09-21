@@ -84,9 +84,17 @@ try{
 
   await screenshot('game-playing-desktop.png');
   await page.setViewportSize({width:1920,height:1080});
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused');
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Desktop resize must safely auto-pause an active run');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   report.viewport1080p=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
   await screenshot('game-playing-desktop-1080p.png');
+
   await page.setViewportSize({width:1440,height:900});
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   await page.getByRole('button',{name:'Pause game'}).click();
   const pausedAt=await page.evaluate(()=>window.chimpJump().time);
