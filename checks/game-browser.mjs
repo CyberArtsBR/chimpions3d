@@ -19,6 +19,12 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visibleBranches>=4,'Generated branches must be attached to the rendered scene');
  await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
  assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>0);
+ assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
+ await page.getByRole('button',{name:'Field guide',exact:true}).click();
+ await page.getByLabel('Reduced motion').check();
+ assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
+ await page.getByLabel('Reduced motion').uncheck();
+ await page.getByRole('button',{name:'Close field guide',exact:true}).click();
  await screenshot({path:'checks/game-menu.png'});
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.locator('#confirm-chimpion').click();
@@ -29,9 +35,12 @@ try{
  await page.keyboard.up('ArrowLeft');
  const left=await page.evaluate(()=>window.chimpJump());assert(left.x<0);
  await page.keyboard.down('ArrowRight');
+ await page.mouse.move(80,400);
  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
  assert(await page.evaluate(()=>window.chimpJump().yaw>.6),'Right key must turn the character');
+ assert(await page.evaluate(()=>window.chimpJump().vx>0),'Mouse movement must not release or override a held keyboard direction');
  await page.keyboard.up('ArrowRight');
+ assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Fresh gameplay must start with the complete route visible');
  await screenshot({path:'checks/game-playing.png'});
  await page.getByRole('button',{name:'Pause game'}).click();
  const time=await page.evaluate(()=>window.chimpJump().time);
@@ -81,7 +90,6 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).visible);
  assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
  assert.equal(external,0,'Local avatar must not trigger external requests');
- await page.getByRole('button',{name:'Flip avatar facing'}).click();
  assert(await page.getByRole('button',{name:/Detail:/}).isDisabled());
  const quality=await page.evaluate(()=>window.chimpJump().quality);assert.equal(quality,'balanced');
  assert.equal(await page.evaluate(()=>window.chimpJump().authoredBranches),0);
@@ -123,7 +131,7 @@ try{
  console.log('RENDER_STATS:'+JSON.stringify(after));
  assert.deepEqual(errors,[]);
 
- console.log('PASS game: actual GLB, turns, movement, pause, themes, retry, mobile, local upload, invalid files/rigs, detail switch, bounded resources');
+ console.log('PASS game: actual GLB, field guide, full-route camera, independent keyboard/mouse input, turns, pause, themes, retry, mobile, local upload, invalid files/rigs, detail switch, bounded resources');
 }finally{
  await screenshot({path:'checks/game-final.png'});
  await browser.close();
