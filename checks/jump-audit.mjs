@@ -11,6 +11,7 @@ assert(!runtime.includes('new KeyboardEvent'),'mouse steering must never synthes
 assert(game.includes('introTime=3'),'new runs must begin at the full-route camera view');
 assert(!game.includes('introTime=0'),'the old 1.72x opening zoom must not return');
 assert(game.includes("chimp-jump-muted")&&game.includes("chimp-jump-detail"),'player preferences must persist');
+assert(game.includes("entry.id==='chimpion'"),'startup must use the known lightweight default avatar instead of a random GLB');
 assert(game.includes("chimp-run-finished"),'completed runs must publish a summary for goals');
 assert(results.includes('Replay this trail'),'results must expose reproducible same-seed practice');
 
