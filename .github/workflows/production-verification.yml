@@ -24,11 +24,11 @@ jobs:
       - name: Verify public Render desktop build
         env:
           CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
-        run: node checks/production-browser.mjs
+        run: |\n          node checks/production-diagnostic.mjs\n          node checks/production-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: chimp-jump-production-verification
           path: |
-            checks/production-*.png
+            checks/production-*.png\n            checks/production-diagnostic.png
             checks/production-browser-report.json
