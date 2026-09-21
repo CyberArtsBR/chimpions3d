@@ -29,6 +29,7 @@ The pass deliberately does not change gravity, steering speed, landing forgivene
 | Difficulty progression | Guaranteed route is generated before optional risk routes; altitude narrows choices while the real-time pace increases gradually. | Keep / playtest | Retained for this pass. Tune only from measured player failure data. |
 | Lighting / graphics | Current scene already uses ACES tone mapping, environment lighting, warm key, cool rim/fill, fog, authored branch assets and mobile detail budgeting. | Keep | No speculative lighting retune without a visual/device comparison. Improvements in this pass target route readability and HUD clarity instead. |
 | Mobile | Core touch targets are already large and physics are device-independent. | Keep + improve | Field Guide/comfort UI uses safe-area-aware responsive layout; gameplay rules remain identical. |
+| Initial avatar load | Startup selected a random GLB from the 207-character catalog before the player chose a character, making first-load cost unpredictable. | High on mobile | Startup now uses the known `model/chimpion.glb` default; the rest of the collection remains on-demand. |
 
 ## New expedition goals
 
@@ -50,6 +51,7 @@ The production workflow now runs `checks/jump-audit.mjs` in addition to build, p
 - runtime enhancements cannot synthesize keyboard input for mouse steering;
 - the old 1.72x opening-camera reset cannot return;
 - mute/detail persistence remains present;
+- startup remains pinned to the lightweight default avatar rather than a random catalog GLB;
 - run summaries remain available for expedition goals;
 - same-seed replay remains exposed;
 - exactly six goals ship and their unlock logic is idempotent.
