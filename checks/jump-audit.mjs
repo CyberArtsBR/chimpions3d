@@ -8,6 +8,7 @@ const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtim
 assert(main.includes("'test'"),'test mode must route to Chimp Jump, not the launcher');
 assert(main.includes("setupJumpExperience"),'the framework experience layer must mount');
 assert(!runtime.includes('new KeyboardEvent'),'mouse steering must never synthesize keyboard key-up/down events');
+assert(!runtime.includes('columns=3'),'desktop character navigation must not hardcode the old three-column grid');
 assert(game.includes('introTime=3'),'new runs must begin at the full-route camera view');
 assert(!game.includes('introTime=0'),'the old 1.72x opening zoom must not return');
 assert(game.includes("chimp-jump-muted")&&game.includes("chimp-jump-detail"),'player preferences must persist');
@@ -21,4 +22,4 @@ assert.equal(sample.unlocked.length,6,'a qualifying run should unlock all goals'
 const repeat=evaluateJumpGoals({meters:120,bananas:28,cleanLandings:32},sample.unlocked);
 assert.equal(repeat.newlyUnlocked.length,0,'goals must not announce twice');
 
-console.log('PASS Chimp Jump audit gates: routing, single-owner input, camera, persistence, replay and goals');
+console.log('PASS Chimp Jump audit gates: routing, desktop input/navigation, camera, persistence, replay and goals');
