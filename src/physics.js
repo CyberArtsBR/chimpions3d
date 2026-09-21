@@ -200,7 +200,7 @@ export class Game {
     }
 
     for(const p of this.platforms){
-      if(p.type==='vanish'&&p.vanishAt!==null&&!p.broken&&this.time>=p.vanishAt){
+      if(p.type==='vanish'&&p.vanishAt!=null&&!p.broken&&this.time>=p.vanishAt){
         p.broken=true;events.push({type:'vanish',x:p.x,y:p.y,platformId:p.id});
       }
     }
@@ -241,7 +241,7 @@ export class Game {
       this.vy=landing.type==='spring'?SPRING_JUMP*springBoost:JUMP;
       this.bounceAge=0;this.bounces++;
       if(landing.type==='cracked'||landing.fragile)landing.broken=true;
-      if(landing.type==='vanish'&&landing.vanishAt===null)landing.vanishAt=this.time+.55;
+      if(landing.type==='vanish'&&landing.vanishAt==null)landing.vanishAt=this.time+.55;
       events.push({
         type:'bounce',x:this.x,y:this.y,spring:landing.type==='spring',
         fragile:landing.type==='cracked',platformType:landing.type,
