@@ -1,7 +1,7 @@
 # Chimp Jump — Framework Audit & Polish Pass
 
 Date: 2026-09-21  
-Scope: Chimp Jump only. Stack remains Vite + vanilla JavaScript + Three.js.
+Scope: Chimp Jump browser/desktop only. Stack remains Vite + vanilla JavaScript + Three.js. Mobile behavior is outside the acceptance criteria for this pass.
 
 ## Experience target
 
@@ -27,9 +27,9 @@ The pass deliberately does not change gravity, steering speed, landing forgivene
 | Content goals | Progress was mostly personal best / leaderboard. | Medium | Added six optional persistent expedition goals: two altitude, two banana, two clean-landing goals. |
 | Collision forgiveness | Landing already uses swept descending collision and an extra horizontal margin of 0.24 world units. | Keep | Retained. No evidence justified making the collider stricter or looser. |
 | Difficulty progression | Guaranteed route is generated before optional risk routes; altitude narrows choices while the real-time pace increases gradually. | Keep / playtest | Retained for this pass. Tune only from measured player failure data. |
-| Lighting / graphics | Current scene already uses ACES tone mapping, environment lighting, warm key, cool rim/fill, fog, authored branch assets and mobile detail budgeting. | Keep | No speculative lighting retune without a visual/device comparison. Improvements in this pass target route readability and HUD clarity instead. |
-| Mobile | Core touch targets are already large and physics are device-independent. | Keep + improve | Field Guide/comfort UI uses safe-area-aware responsive layout; gameplay rules remain identical. |
-| Initial avatar load | Startup selected a random GLB from the 207-character catalog before the player chose a character, making first-load cost unpredictable. | High on mobile | Startup now uses the known `model/chimpion.glb` default; the rest of the collection remains on-demand. |
+| Lighting / graphics | Current scene already uses ACES tone mapping, environment lighting, warm key, cool rim/fill, fog and authored branch assets. | Keep / verify | Desktop visual acceptance is now validated in Chromium at 1440×900 and 1920×1080 before merge. |
+| Desktop character picker | Controller navigation assumed three columns although the desktop grid renders four. | High | Navigation now detects the actual rendered column count so controller focus moves one real row at a time. |
+| Initial avatar load | Startup selected a random GLB from the 207-character catalog before the player chose a character, making first-load cost unpredictable. | High | Startup now uses the known `model/chimpion.glb` default; the rest of the collection remains on-demand. |
 
 ## New expedition goals
 
@@ -44,7 +44,7 @@ Goals are optional, local, and do not modify leaderboard score.
 
 ## Quality gates
 
-The production workflow now runs `checks/jump-audit.mjs` in addition to build, physics, and asset checks. It asserts:
+The production workflow now runs `checks/jump-audit.mjs` plus a real Chromium desktop audit in addition to build, physics, and asset checks. It asserts:
 
 - test mode reaches Chimp Jump;
 - the experience layer is mounted;
@@ -54,19 +54,27 @@ The production workflow now runs `checks/jump-audit.mjs` in addition to build, p
 - startup remains pinned to the lightweight default avatar rather than a random catalog GLB;
 - run summaries remain available for expedition goals;
 - same-seed replay remains exposed;
-- exactly six goals ship and their unlock logic is idempotent.
+- exactly six goals ship and their unlock logic is idempotent;
+- 1440×900 and 1920×1080 desktop rendering completes without page errors;
+- keyboard and mouse ownership stays independent;
+- desktop controller navigation follows the actual four-column character grid;
+- pause, 120-second pace progression, same-seed replay and local GLB validation work in Chromium;
+- renderer geometry/texture counts remain bounded across repeated desktop restarts.
 
 Existing physics checks remain the authority for deterministic route/collision behavior.
 
-## Manual/device gates still required
+## Desktop acceptance gate
 
-Automated checks cannot honestly establish sustained FPS, thermal behavior, controller feel, or whether a HUD overlaps a specific phone cutout. Before calling the pass production-final, playtest:
+This pass is accepted on browser/desktop only. Mobile is explicitly outside the current priority and is not a release blocker.
 
-- one current desktop browser with keyboard, mouse and controller;
-- one narrow iPhone-class viewport and one midrange Android device;
+Before production-final status, verify in desktop Chromium:
+
+- title screen and Field Guide at 1440×900;
+- active gameplay and HUD at 1440×900 and 1920×1080;
+- keyboard, mouse and controller navigation;
 - start → pause/resume → death → retry → replay-same-seed;
-- reduced motion on/off and high-visibility HUD on/off;
-- at least one 5+ minute run to judge the late pace ramp and repeated landing audio;
-- representative large-accessory and wide-shoulder Chimpion rigs.
+- Reduced Motion and High-Visibility HUD;
+- a simulated 120-second pacing session;
+- repeated restart stability and representative GLB selection/upload.
 
-Recommended tuning criterion after human testing: record the altitude/time of the first three failures for new players before changing physics. Prefer route/difficulty changes supported by those failures rather than camera or collider guesswork.
+Physics should only be changed when these tests or later player evidence show a concrete problem.
