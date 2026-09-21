@@ -69,12 +69,12 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
   left:calc((var(--menu-art-w) - 100vw)/2 + 24px)!important;
   bottom:calc((var(--menu-art-h) - 100vh)/2 + 82px)!important;
 }
-.jump-start-screen[data-mode="menu"] #background-style{
-  visibility:visible!important;display:block!important;
-  right:24px!important;bottom:82px!important;
-  z-index:101!important;
-}
+.jump-start-screen[data-mode="menu"] #background-style,
 .jump-start-screen[data-mode="menu"] #audio-settings{display:none!important}
+.jump-start-screen[data-mode="menu"] #menu-backdrop::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:96px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 0%,rgba(8,31,24,.48) 58%,rgba(6,24,19,.92) 100%);
+}
 @media(max-width:650px){
   .jump-start-screen[data-mode="menu"] #overlay .games-back{
     left:12px!important;bottom:max(66px,calc(env(safe-area-inset-bottom) + 56px))!important;
