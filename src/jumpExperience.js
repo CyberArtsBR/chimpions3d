@@ -19,7 +19,7 @@ export function setupJumpExperience(){
 
   const dialog=document.createElement('dialog');dialog.id='jump-guide-dialog';
   dialog.innerHTML=`<header><div><small>CHIMP JUMP</small><h2>Field guide</h2></div><button class="guide-close" aria-label="Close field guide">×</button></header>
-    <section><h3>Controls</h3><p>Steer while the chimp auto-jumps. Desktop: Arrow keys or A/D, mouse, or gamepad. Mobile: hold the left/right buttons. P or Escape pauses.</p></section>
+    <section><h3>Controls</h3><p>Steer while the chimp auto-jumps with Arrow keys or A/D, mouse, or gamepad. P or Escape pauses.</p></section>
     <section><h3>Read the branches</h3><div class="guide-branches"><span>↔ <b>Moving</b></span><span>╱ <b>Fragile</b></span><span>↑ <b>Spring</b></span><span>🍌 <b>Small branches pay more</b></span></div></section>
     <section><h3>Comfort</h3><label><input id="jump-reduced-motion" type="checkbox"> Reduced motion</label><label><input id="jump-high-visibility" type="checkbox"> High-visibility HUD</label></section>
     <section><h3>Expedition goals</h3><ul id="jump-goals"></ul></section>`;
