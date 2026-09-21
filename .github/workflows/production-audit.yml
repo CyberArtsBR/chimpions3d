@@ -1,0 +1,38 @@
+name: Chimp Jump production desktop audit
+
+on:
+  workflow_run:
+    workflows: ["Chimp Jump build and checks"]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  production-audit:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install production browser runtime
+        run: |
+          npm install --no-save @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Audit deployed desktop browser build
+        env:
+          CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+        run: node checks/production-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-production-reports
+          path: |
+            checks/production-*.png
+            checks/production-browser-report.json

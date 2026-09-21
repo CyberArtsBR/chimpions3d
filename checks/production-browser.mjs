@@ -1,0 +1,93 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {chromium} from '@playwright/test';
+
+const base=(process.env.CHIMP_PRODUCTION_URL||'https://chimp-jump.onrender.com').replace(/\/$/,'');
+const url=base+'/?test=1';
+const origin=new URL(base).origin;
+const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const page=await browser.newPage({viewport:{width:1440,height:900}});
+const errors=[],sameOriginFailures=[];
+const report={scope:'production-desktop-browser',url,viewport:{width:1440,height:900},checkpoints:{},sameOriginFailures};
+
+page.on('pageerror',error=>errors.push(error.message));
+page.on('response',response=>{if(response.url().startsWith(origin)&&response.status()>=400)sameOriginFailures.push({url:response.url(),status:response.status()});});
+
+async function waitForDeployment(){
+  const deadline=Date.now()+10*60*1000;
+  let last='';
+  while(Date.now()<deadline){
+    try{
+      await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});
+      await page.waitForTimeout(2500);
+      const state=await page.evaluate(()=>({
+        ready:!!window.chimpJump?.().ready,
+        fieldGuide:!!document.querySelector('#jump-guide-button'),
+        mode:document.body?.dataset?.mode||''
+      }));
+      if(state.ready&&state.fieldGuide&&state.mode==='menu')return state;
+      last=JSON.stringify(state);
+    }catch(error){last=error.message;}
+    await page.waitForTimeout(15000);
+  }
+  throw new Error('Timed out waiting for Render deployment. Last state: '+last);
+}
+
+async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false});}
+async function snap(name){const state=await page.evaluate(()=>window.chimpJump());report.checkpoints[name]=state;return state;}
+
+try{
+  report.deployment=await waitForDeployment();
+
+  const menu=await snap('menu');
+  assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
+  assert.equal(menu.quality,'high','Desktop production should default to high detail');
+  assert.equal(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible(),true);
+  assert.equal(await page.locator('#audio-settings').isVisible(),false);
+  assert.equal(await page.locator('#background-style').isVisible(),false);
+  await shot('production-menu-desktop.png');
+
+  await page.getByRole('button',{name:'Field guide',exact:true}).click();
+  assert.equal(await page.locator('#jump-guide-dialog[open]').isVisible(),true);
+  assert.equal(await page.locator('#jump-goals li').count(),6,'Production Field Guide must expose six expedition goals');
+  await shot('production-guide-desktop.png');
+  await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+
+  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  await page.locator('#confirm-chimpion').click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:30000});
+  const playing=await snap('playing');
+  assert(playing.visible,'Production avatar must be visible');
+  assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
+  assert(playing.visibleBranches>=4,'Production route branches must attach');
+  assert.equal(playing.cameraZoom,1,'Fresh production run must start at full-route zoom');
+  await shot('production-playing-desktop.png');
+
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(180);
+  assert(await page.evaluate(()=>window.chimpJump().yaw<0),'Production keyboard steering must turn left');
+  await page.keyboard.up('ArrowLeft');
+
+  await page.getByRole('button',{name:'Pause game'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
+  await shot('production-pause-desktop.png');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+
+  await page.setViewportSize({width:1920,height:1080});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
+  const layout=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
+  report.viewport1080p=layout;
+  assert.equal(layout.scrollWidth,1920,'Production 1080p layout must not overflow horizontally');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+  await shot('production-playing-desktop-1080p.png');
+
+  await snap('final');
+  assert.deepEqual(errors,[],'Production browser must not raise page errors');
+  assert.deepEqual(sameOriginFailures,[],'Production same-origin assets must not return HTTP errors');
+  fs.writeFileSync('checks/production-browser-report.json',JSON.stringify(report,null,2));
+  console.log('PASS production desktop browser: deployment, menu, Field Guide, gameplay, keyboard, pause and 1080p layout');
+}finally{
+  await browser.close();
+}
