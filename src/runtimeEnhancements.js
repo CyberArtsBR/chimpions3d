@@ -68,35 +68,6 @@ setInterval(()=>{
  previousX=x;previousY=y;previousA=a;previousB=b;
 },80);
 
-// Relative mouse steering: only movement direction matters, never cursor position.
-let mouseCode=null,mouseRelease=0,lockGraceUntil=0;
-const dispatchKey=(type,code)=>document.body.dispatchEvent(new KeyboardEvent(type,{code,key:code==='ArrowLeft'?'ArrowLeft':'ArrowRight',bubbles:true}));
-const releaseMouse=()=>{if(mouseCode)dispatchKey('keyup',mouseCode);mouseCode=null;clearTimeout(mouseRelease);mouseRelease=0;};
-document.addEventListener('pointermove',event=>{
- if(event.pointerType!=='mouse'||document.body?.dataset?.mode!=='playing')return;
- const dx=event.movementX;if(Math.abs(dx)<.25)return;
- event.stopPropagation();
- const next=dx<0?'ArrowLeft':'ArrowRight';
- if(mouseCode&&mouseCode!==next)dispatchKey('keyup',mouseCode);
- if(mouseCode!==next)dispatchKey('keydown',next);
- mouseCode=next;clearTimeout(mouseRelease);mouseRelease=setTimeout(releaseMouse,110);
-},true);
-const requestLock=canvas=>{try{const result=canvas?.requestPointerLock?.();result?.catch?.(()=>{});}catch{}};
-document.addEventListener('pointerdown',event=>{
- if(event.pointerType!=='mouse'||document.body?.dataset?.mode!=='playing')return;
- const canvas=document.querySelector('#world canvas');if(canvas&&event.target===canvas&&document.pointerLockElement!==canvas)requestLock(canvas);
-},true);
-document.addEventListener('click',event=>{
- const mode=document.body?.dataset?.mode||'';
- const target=event.target.closest?.('#confirm-chimpion,#try-again,#quick-retry,#play');
- if(!target||target.id==='play'&&mode!=='paused')return;
- const canvas=document.querySelector('#world canvas');
- if(canvas&&matchMedia('(pointer:fine)').matches){lockGraceUntil=performance.now()+4000;if(document.pointerLockElement!==canvas)requestLock(canvas);}
-},true);
-document.addEventListener('pointerlockchange',()=>{if(!document.pointerLockElement)releaseMouse();});
-setInterval(()=>{
- const mode=document.body?.dataset?.mode||'';
- if(mode==='playing'){lockGraceUntil=0;return;}
- if(performance.now()<lockGraceUntil)return;
- releaseMouse();if(document.pointerLockElement===document.querySelector('#world canvas'))document.exitPointerLock?.();
-},200);
+// Gameplay mouse steering is intentionally owned by game.js.
+// Keeping a single input owner prevents synthetic key-up events from cancelling a
+// physical Arrow/A/D key that the player is still holding.
