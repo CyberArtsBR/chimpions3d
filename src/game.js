@@ -17,8 +17,8 @@ import {createAudio} from './audio.js';
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
 <header id="hud"><div class="stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Mute sound">♪</button><button id="pause" aria-label="Pause game" hidden>Ⅱ</button></div></header>
-<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace">PACE 1.06×</div>
-<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>Small branch · 2× bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
+<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace">PACE 1.06×</div><div id="wind" hidden></div><div id="canopy-event" hidden></div>
+<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>🍃 Leaf</span><span>◌ Vanish</span><span>⌁ Swing</span><span>Risk routes · bonus bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">Load your GLB avatar</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
 const $=id=>document.getElementById(id);
@@ -36,7 +36,7 @@ collectionDialog.setAttribute('aria-label','Choose your chimp');
 collectionDialog.innerHTML='<header><h2>Choose your chimp</h2><button id="close-collection" aria-label="Close character selection">×</button></header>';
 collectionDialog.append($('avatar-list'));document.body.append(collectionDialog);
 const selectionActions=document.createElement('div');selectionActions.className='selection-actions';
-selectionActions.innerHTML='<button id="random-chimpion">Random Chimpion</button><p id="selected-chimpion" role="status"></p><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
+selectionActions.innerHTML='<button id="random-chimpion">↻ Random</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Ready for the canopy</small></div><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
 collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
 collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();$('choose').focus();});
@@ -58,6 +58,7 @@ const heroFill=new THREE.DirectionalLight(0xe7f3ff,1.05);heroFill.target=heroTar
 const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer),fallSplash=createFallSplash(scene),deathBounds=new THREE.Box3();
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
+function removeHazard(m){world.remove(m);}
 const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
 let desktopHigh=true;try{desktopHigh=localStorage.getItem('chimp-jump-detail')!=='low';}catch{}
 let highDetail=!mobileProfile()&&desktopHigh;
@@ -66,7 +67,7 @@ function quality(){
  $('quality').textContent='Detail: '+(mobileProfile()?'Balanced · Mobile':highDetail?'High · Desktop':'Low · Desktop');$('quality').disabled=mobileProfile();resize();
 }
 $('quality').onclick=()=>{desktopHigh=!desktopHigh;try{localStorage.setItem('chimp-jump-detail',desktopHigh?'high':'low');}catch{}quality();};
-const platformMeshes=new Map(),characterLayer=new THREE.Group();scene.add(characterLayer);
+const platformMeshes=new Map(),hazardMeshes=new Map(),characterLayer=new THREE.Group();scene.add(characterLayer);
 const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,jetEquipped);jetVisual.scale.setScalar(ITEM_SCALE);jetEquipped.scale.setScalar(ITEM_SCALE);jetVisual.visible=jetEquipped.visible=false;
 
 const FACE_ANGLE=Math.PI/4;
@@ -108,6 +109,11 @@ const themes=[
  {name:'Moonlit Grove',top:'#283d71',bottom:'#7787ae',leaf:0x5d8e9b,bark:0x595a71,light:0xc5dcff}
 ];
 const color=new THREE.Color(),other=new THREE.Color();
+const eventLabels={
+ 'wind-surge':'WIND SURGE',
+ 'banana-bloom':'BANANA BLOOM',
+ 'spring-fever':'SPRING FEVER'
+};
 function toast(text){$('toast').textContent=text;$('toast').style.opacity=1;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity=0,1800);}
 function sound(type){audio.play(type);}
 function syncUI(){
