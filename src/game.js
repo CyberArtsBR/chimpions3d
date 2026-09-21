@@ -71,7 +71,7 @@ const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,
 
 const FACE_ANGLE=Math.PI/4;
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FACE_ANGLE;
-let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0;
+let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set();
 const hudCache=new Map();function hudText(id,value){value=String(value);if(hudCache.get(id)!==value){$(id).textContent=value;hudCache.set(id,value);}}
 const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
@@ -134,7 +134,7 @@ async function start(requestedSeed=null){
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
  if(mode==='menu'&&!selectionConfirmed){openSelection();return;}audio.unlock();const fresh=mode!=='paused';
  if(fresh){
-  mode='starting';syncUI();runTicket=null;inputTrace=[];cleanLandings=0;
+  mode='starting';syncUI();runTicket=null;inputTrace=[];cleanLandings=0;cleanPlatformIds.clear();
   const replaySeed=requestedSeed===null||requestedSeed===undefined?null:(Number(requestedSeed)>>>0);
   if(replaySeed===null){try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}}
   else toast('Practice trail · same route, no online submission');
@@ -227,7 +227,7 @@ function tick(dt,control=input()){
   }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE VINES TO WRAP AROUND');}}
   else if(e.type==='coin')sound('coin');else if(e.type==='jet'){sound('jet');toast('JETPACK · 10 seconds!');}
   else if(e.type==='jet-spawn')toast('Jetpack nearby! Find it in the canopy');
-  else if(e.type==='bounce'){sound(e.spring?'spring':e.fragile?'fragile':'bounce');if(!e.spring&&!e.fragile)cleanLandings++;landingImpulse=reducedMotion?0:.025;const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;if(e.spring){boostZoom=reducedMotion?1:.94;toast('Spring boost!');}}
+  else if(e.type==='bounce'){sound(e.spring?'spring':e.fragile?'fragile':'bounce');if(!e.spring&&!e.fragile&&!cleanPlatformIds.has(e.platformId)){cleanPlatformIds.add(e.platformId);cleanLandings++;}landingImpulse=reducedMotion?0:.025;const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;if(e.spring){boostZoom=reducedMotion?1:.94;toast('Spring boost!');}}
  }
 }
 function updateEnding(dt){
