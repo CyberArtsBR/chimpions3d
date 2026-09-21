@@ -1,5 +1,5 @@
 const params=new URLSearchParams(location.search);
-if(!['dash','lab','rig','play','dev','arena'].some(key=>params.has(key))){
+if(!['dash','lab','rig','play','dev','arena','test'].some(key=>params.has(key))){
   import('./launcherV2.js');
 }else if(params.has('arena')){
   import('./menuScreensV2.js').then(({setupArenaGate})=>setupArenaGate());
@@ -27,5 +27,6 @@ if(!['dash','lab','rig','play','dev','arena'].some(key=>params.has(key))){
     setupBiomePolish();
     setupMenuExtras();
     const {setupJumpMenu}=await import('./menuScreensV2.js');setupJumpMenu();
+    const {setupJumpExperience}=await import('./jumpExperience.js');setupJumpExperience();
   });
 }

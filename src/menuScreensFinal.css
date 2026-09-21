@@ -63,14 +63,20 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
   opacity:0!important;outline:0!important;box-shadow:none!important;
 }
 
-/* CHIMP JUMP — keep bottom controls clear of the browser/taskbar area without F11. */
+/* CHIMP JUMP — desktop/browser controls stay inside the visible viewport even when
+   the 16:9 artwork is cover-cropped by a taller or wider browser window. */
 .jump-start-screen[data-mode="menu"] #overlay .games-back{
-  bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px))!important;
+  left:calc((var(--menu-art-w) - 100vw)/2 + 24px)!important;
+  bottom:calc((var(--menu-art-h) - 100vh)/2 + 82px)!important;
 }
-.jump-start-screen[data-mode="menu"] #background-style{
-  visibility:visible!important;display:block!important;
-  right:24px!important;bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px))!important;
-  z-index:101!important;
+.jump-start-screen[data-mode="menu"] #background-style,
+.jump-start-screen[data-mode="menu"] #audio-settings{display:none!important}
+.jump-start-screen[data-mode="menu"] #menu-backdrop::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:96px;pointer-events:none;
+  background:
+    linear-gradient(#061813,#061813) left bottom/76px 74px no-repeat,
+    linear-gradient(#061813,#061813) right bottom/176px 74px no-repeat,
+    linear-gradient(to bottom,transparent 0%,rgba(8,31,24,.48) 58%,rgba(6,24,19,.92) 100%);
 }
 @media(max-width:650px){
   .jump-start-screen[data-mode="menu"] #overlay .games-back{

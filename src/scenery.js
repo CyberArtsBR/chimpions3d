@@ -305,9 +305,10 @@ export function createScenery(scene,renderer){
 
  return {branch,
   animateBranch(group,p,time){
-   const impact=group.userData.impactAt===undefined?10:time-group.userData.impactAt;group.position.y=p.y-Math.sin(Math.min(1,impact/.25)*Math.PI)*.06;
-   const paddles=group.userData.paddles;if(paddles){paddles.position.x=Math.sin(time*(p.moveSpeed||1)*3+p.phase)*.045;paddles.scale.y=1+Math.sin(time*3+p.phase)*.06;}
-   const mushroom=group.userData.mushroom;if(mushroom){const pulse=Math.sin(time*2+p.id)*.035;mushroom.scale.set(ITEM_SCALE*(1-pulse*.45),ITEM_SCALE*(1+pulse),ITEM_SCALE*(1-pulse*.45));}
+   const reducedMotion=document.body?.dataset?.reducedMotion==='true',impact=group.userData.impactAt===undefined?10:time-group.userData.impactAt;
+   group.position.y=reducedMotion?p.y:p.y-Math.sin(Math.min(1,impact/.25)*Math.PI)*.06;
+   const paddles=group.userData.paddles;if(paddles){paddles.position.x=reducedMotion?0:Math.sin(time*(p.moveSpeed||1)*3+p.phase)*.045;paddles.scale.y=reducedMotion?1:1+Math.sin(time*3+p.phase)*.06;}
+   const mushroom=group.userData.mushroom;if(mushroom){const pulse=reducedMotion?0:Math.sin(time*2+p.id)*.035;mushroom.scale.set(ITEM_SCALE*(1-pulse*.45),ITEM_SCALE*(1+pulse),ITEM_SCALE*(1-pulse*.45));}
   },
   setPixelMode(enabled){background.visible=!enabled;refreshBackground();},
   get platformReady(){return !!platformTemplate;},
@@ -316,6 +317,7 @@ export function createScenery(scene,renderer){
   get pooledBranches(){return pooledBranchCount;},
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
+   if(document.body?.dataset?.reducedMotion==='true')return;
    if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;ring.visible=true;}
    if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;wrapCues.visible=true;}
    if(event.type==='wrap'||event.type==='bounce')for(let i=0;i<6;i++)sparks.push({x:event.x,y:event.y+.1,z:.6,vx:(r()-.5)*2,vy:.8+r(),age:0});

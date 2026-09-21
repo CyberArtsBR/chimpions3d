@@ -148,3 +148,13 @@ body[data-mode=dying] #touch,body[data-mode=over] #touch,body[data-mode=starting
 body[data-mode=playing] #audio-settings,body[data-mode=dying] #audio-settings{display:none}
 @media(max-width:500px){#hud .stat{padding:8px}#hud .stat strong{font-size:22px}#hud .stat small{font-size:9px}#selected-preview{grid-row:auto}.selection-actions{gap:8px;padding:10px}#selected-preview img{height:90px;width:90px}}
 @media(prefers-reduced-motion:reduce){#world .rays,#world .mist,#world .sun{animation:none}}
+
+
+/* Desktop pause menu secondary action. */
+#give-up{
+  margin-top:12px;padding:9px 18px;border:1px solid #b5c98f;border-radius:10px;
+  background:#29483d;color:#fff0c8;font:800 12px/1 system-ui;letter-spacing:.02em;
+  box-shadow:0 3px 0 #122a23;cursor:pointer
+}
+#give-up:hover{filter:brightness(1.08)}
+#give-up:active{transform:translateY(2px);box-shadow:0 1px 0 #122a23}
