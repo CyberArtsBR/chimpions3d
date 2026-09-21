@@ -1,4 +1,5 @@
 name: Chimp Jump production merge verification
+# verification rerun after cold-start audit fix
 
 on:
   pull_request:
