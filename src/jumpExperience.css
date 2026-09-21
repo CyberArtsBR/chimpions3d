@@ -16,3 +16,12 @@ body:not([data-mode="menu"]) #jump-runtime-status{display:none}
 body[data-high-visibility="true"] #hud .stat{background:#071d1bf2!important;border:2px solid #fff0aa!important;color:#fff!important;box-shadow:0 4px 18px #000b!important}body[data-high-visibility="true"] #hud small{color:#fff2b8!important}body[data-high-visibility="true"] #hud strong{text-shadow:0 2px 2px #000}
 body[data-reduced-motion="true"] #world .rays,body[data-reduced-motion="true"] #world .mist{display:none!important}body[data-reduced-motion="true"] #toast,body[data-reduced-motion="true"] #theme{transition:none!important}
 @media(max-width:600px){#jump-control-hint{bottom:max(68px,calc(env(safe-area-inset-bottom) + 58px));max-width:88vw;font-size:10px}#jump-guide-button{right:10px;bottom:10px;min-width:96px;font-size:12px}#jump-guide-dialog{padding:17px}.guide-branches{grid-template-columns:1fr}}
+
+
+/* Desktop/browser release focus: keep the illustrated menu uncluttered and controls separated. */
+@media(hover:hover) and (pointer:fine){
+  #jump-guide-button{top:18px;right:18px;bottom:auto}
+  #jump-control-hint{display:none}
+  #jump-guide-dialog{max-height:94vh}
+  #jump-guide-dialog section{padding:12px 0}
+}
