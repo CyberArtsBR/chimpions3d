@@ -56,11 +56,16 @@ try{
  });
  assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Emerald Mist');
  await screenshot({path:'checks/game-theme.png'});
+ const failedSeed=await page.evaluate(()=>window.chimpJump().runSeed);
  await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'over');
+ await page.getByRole('button',{name:'Replay this trail',exact:true}).click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+ assert.equal(await page.evaluate(()=>window.chimpJump().runSeed),failedSeed,'Practice replay must reproduce the same route seed');
+ assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Jungle Morning');
+ await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
  await page.getByRole('button',{name:'Try Again'}).click();
  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
- assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Jungle Morning');
  await page.setViewportSize({width:390,height:844});
  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
  await page.getByRole('button',{name:'Move right',exact:true}).click();
