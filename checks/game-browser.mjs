@@ -37,6 +37,8 @@ try{
   await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
   assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
   assert(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible(),'Field guide must be visible on desktop');
+  assert.equal(await page.locator('#audio-settings').isVisible(),false,'Title screen must hide Audio settings');
+  assert.equal(await page.locator('#background-style').isVisible(),false,'Title screen must hide Scenery settings');
 
   await screenshot('game-menu-desktop.png');
   await page.getByRole('button',{name:'Field guide',exact:true}).click();
