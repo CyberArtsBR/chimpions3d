@@ -55,6 +55,9 @@ export function createAudio(music){
   // Legacy game.js death/splash calls are intentionally suppressed. The real sequence
   // is tied to chimp-death-offscreen below, so nothing plays while the chimp is visible.
   if(type==='death'||type==='splash')return;
+  // Normal branches happen constantly; keep them tactile without letting the repeated
+  // bounce transient dominate the music. Special branches retain their stronger hit.
+  if(type==='bounce'){playRaw(type,0,.46);return;}
   playRaw(type);
  }
  const onDeathOffscreen=()=>{
