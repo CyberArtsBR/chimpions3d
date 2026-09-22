@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import {chromium} from '@playwright/test';
 
 const base=(process.env.CHIMP_PRODUCTION_URL||'https://chimp-jump.onrender.com').replace(/\/$/,'');
@@ -14,6 +15,19 @@ const report={scope:'production-desktop-browser',url,viewport:{width:1440,height
 page.on('pageerror',error=>errors.push(error.message));
 page.on('response',response=>{if(response.url().startsWith(origin)&&response.status()>=400)sameOriginFailures.push({url:response.url(),status:response.status()});});
 
+function revisionCompatibility(liveCommit){
+  if(!expectedCommit||liveCommit===expectedCommit)return {compatible:true,exact:true,files:[]};
+  try{
+    execFileSync('git',['merge-base','--is-ancestor',liveCommit,expectedCommit],{stdio:'ignore'});
+    const output=execFileSync('git',['diff','--name-only',liveCommit+'..'+expectedCommit],{encoding:'utf8'}).trim();
+    const files=output?output.split(/\r?\n/).filter(Boolean):[];
+    const auditOnly=files.length>0&&files.every(path=>path.startsWith('checks/')||path.startsWith('.github/'));
+    return {compatible:auditOnly,exact:false,files};
+  }catch{
+    return {compatible:false,exact:false,files:[]};
+  }
+}
+
 async function waitForDeployment(){
   const deadline=Date.now()+10*60*1000;
   let last='';
@@ -24,8 +38,10 @@ async function waitForDeployment(){
       if(!versionResponse.ok())throw new Error('Waiting for deployed version manifest');
       const version=await versionResponse.json();
       if(!/^[a-f0-9]{40}$/.test(version.commit||''))throw new Error('Invalid deployed revision');
-      if(expectedCommit&&version.commit!==expectedCommit)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
+      const revision=revisionCompatibility(version.commit);
+      if(expectedCommit&&!revision.compatible)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
       report.version=version;
+      report.revision={expected:expectedCommit,live:version.commit,exact:revision.exact,auditOnlyDrift:!revision.exact&&revision.compatible,files:revision.files};
       const liveUrl=base+'/?test=1&revision='+encodeURIComponent(version.commit)+'&audit='+stamp;
       await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
       const remaining=Math.max(1000,Math.min(45000,deadline-Date.now()));
@@ -122,7 +138,7 @@ try{
   assert.deepEqual(errors,[],'Production browser must not raise page errors');
   assert.deepEqual(sameOriginFailures,[],'Production same-origin assets must not return HTTP errors');
   fs.writeFileSync('checks/production-browser-report.json',JSON.stringify(report,null,2));
-  console.log('PASS production desktop browser: deployment, menu, Field Guide, gameplay, keyboard, pause and 1080p layout');
+  console.log('PASS production desktop browser: deployment, revision compatibility, menu, Field Guide, gameplay, keyboard, pause and 1080p layout');
 }finally{
   await browser.close();
 }
