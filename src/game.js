@@ -3,7 +3,7 @@ import {loadCharacter} from './character.js';
 import {createScenery} from './scenery.js';
 import {readLocalGLB} from './upload.js';
 import {disposeCharacter} from './character.js';
-import {Game,STEP,WIDTH,VIEW_HEIGHT,ITEM_SCALE,paceAt} from './physics.js';
+import {Game,STEP,WIDTH,VIEW_HEIGHT,ITEM_SCALE,BANANA_HEIGHT,paceAt} from './physics.js';
 import './game.css';
 import {createPixelBackdrop} from './pixelBackdrop.js';
 import {readPad} from './input.js';
@@ -22,6 +22,7 @@ document.body.innerHTML=`
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
 const $=id=>document.getElementById(id);
+const countdown=document.createElement('div');countdown.id='countdown';countdown.hidden=true;countdown.setAttribute('aria-live','polite');document.body.append(countdown);
 $('pace').hidden=true;
 $('description').innerHTML='Read the branches. Time your landing.<br>Choose your route. Climb higher.';
 document.querySelector('.gamepad-callout').setAttribute('aria-label','Play with a controller');
@@ -77,7 +78,7 @@ const hudCache=new Map();function hudText(id,value){value=String(value);if(hudCa
 const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
 const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
-let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3;
+let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,countdownTime=0,autoPauseAfter=0;
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='chimpion';
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
 const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
@@ -137,6 +138,10 @@ function menu(kind){
  }
  syncUI();
 }
+function beginPlaying(){
+ mode='playing';countdown.hidden=true;countdownTime=0;introTime=0;autoPauseAfter=performance.now()+1200;
+ mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();
+}
 async function start(requestedSeed=null){
  if(requestedSeed instanceof Event)requestedSeed=null;
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
@@ -147,9 +152,10 @@ async function start(requestedSeed=null){
   if(replaySeed===null){try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}}
   else toast('Practice trail · same route, no online submission');
   for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();for(const m of hazardMeshes.values())removeHazard(m);hazardMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;
-  runSeed=(replaySeed??runTicket?.seed??Math.floor(Math.random()*4294967295))>>>0;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=3;music.currentTime=0;deathPoint=null;splashed=false;
+  runSeed=(replaySeed??runTicket?.seed??Math.floor(Math.random()*4294967295))>>>0;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
+  music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();return;
  }
- mode='playing';music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();
+ music.muted=muted;music.play().catch(()=>{});beginPlaying();
 }
 $('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>menu('menu');
 function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
@@ -161,7 +167,7 @@ addEventListener('keydown',e=>{
  else if(['Escape','KeyP'].includes(e.code)&&!e.repeat){e.preventDefault();if(mode==='playing')menu('paused');else if(mode==='paused')start();}
  else if(e.code==='Enter'&&mode!=='playing'&&!e.repeat){e.preventDefault();start();}
 });
-addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>{if(mode==='playing')menu('paused');keys.clear();pointers.clear();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing')menu('paused');});
+addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');keys.clear();pointers.clear();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
 for(const [id,dir]of [['left',-1],['right',1]]){const b=$(id);b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);pointers.set(e.pointerId,dir);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=e=>pointers.delete(e.pointerId);}
 async function selectAvatar(entry){
  selectionConfirmed=false;const request=++avatarRequest;ready=false;$('play').disabled=true;$('play').textContent='LOADING YOUR CHIMP…';$('avatar-status').textContent='Preparing pose and checking skeleton…';
@@ -221,7 +227,7 @@ function drawWorld(dt=0){
  const live=new Set(game.platforms.map(p=>p.id));for(const [id,m]of platformMeshes){if(!live.has(id)){removeBranch(m);platformMeshes.delete(id);}}
  for(const p of game.platforms){
   let m=platformMeshes.get(p.id);if(m&&m.userData.fragile!==!!p.fragile){removeBranch(m);platformMeshes.delete(p.id);m=null;}if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
-  m.position.set(p.x,p.y,0);m.visible=!p.broken&&Math.abs(p.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateBranch(m,p,visualTime);m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=1+Math.sin(visualTime*2+p.id)*.07;
+  m.position.set(p.x,p.y,0);m.visible=!p.broken&&Math.abs(p.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateBranch(m,p,visualTime);m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=BANANA_HEIGHT+Math.sin(visualTime*2+p.id)*.07;
  }
  const liveHazards=new Set(game.hazards.map(h=>h.id));for(const [id,m]of hazardMeshes){if(!liveHazards.has(id)){removeHazard(m);hazardMeshes.delete(id);}}
  for(const h of game.hazards){let m=hazardMeshes.get(h.id);if(!m){m=scenery.hazard(h);world.add(m);hazardMeshes.set(h.id,m);}m.visible=Math.abs(h.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateHazard(m,h,visualTime);}
@@ -246,7 +252,7 @@ function tick(dt,control=input()){
    // exact current position and real-time vertical speed: no teleport, no acceleration, no pose.
    deathPoint={x:game.x,visualY:game.y,velocity:Math.min(-.1,game.vy*paceAt(game.time))};
    keys.clear();pointers.clear();avatar.root.visible=true;syncUI();
-  }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE VINES TO WRAP AROUND');}}
+  }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
   else if(e.type==='coin'){sound('coin');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
   else if(e.type==='jet'){sound('jet');toast('JETPACK · 10 seconds!');}
   else if(e.type==='jet-spawn')toast('Jetpack nearby! Find it in the canopy');
@@ -269,12 +275,13 @@ function updateEnding(dt){
  if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}const summary={id:runTicket?.id,trace:inputTrace,meters:Math.floor(game.height),bananas:game.bananas,best,seed:runSeed,cleanLandings};window.dispatchEvent(new CustomEvent('chimp-run-finished',{detail:summary}));results.open(summary);syncUI();}
 }
 function resize(){
- const w=innerWidth,h=innerHeight;renderer.setSize(w,h);const courtWidth=Math.min(w,h*WIDTH/VIEW_HEIGHT),viewWidth=w/courtWidth*WIDTH,viewHeight=h/courtWidth*WIDTH;renderer.setViewport(0,0,w,h);camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();scenery.resize(viewWidth,viewHeight);document.documentElement.style.setProperty('--court',courtWidth+'px');if(mode==='playing')menu('paused');previous=performance.now();
+ const w=innerWidth,h=innerHeight;renderer.setSize(w,h);const courtWidth=Math.min(w,h*WIDTH/VIEW_HEIGHT),viewWidth=w/courtWidth*WIDTH,viewHeight=h/courtWidth*WIDTH;renderer.setViewport(0,0,w,h);camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();scenery.resize(viewWidth,viewHeight);document.documentElement.style.setProperty('--court',courtWidth+'px');if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');previous=performance.now();
 }
 addEventListener('resize',quality);quality();applyBackdrop();menu('menu');
 function renderFrame(now){
- pollPad();if(document.hidden){previous=now;return;}if(!['playing','dying'].includes(mode)&&now-lastIdleFrame<1000/20)return;lastIdleFrame=now;
- const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);if(raw>0.75&&mode==='playing')menu('paused');if(mode==='playing'||mode==='dying')visualTime+=dt;updateEnding(dt);
+ pollPad();if(document.hidden){previous=now;return;}if(!['starting','playing','dying'].includes(mode)&&now-lastIdleFrame<1000/20)return;lastIdleFrame=now;
+ const raw=(now-previous)/1000;previous=now;const dt=Math.min(Math.max(raw,0),.05);if(raw>0.75&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');if(['starting','playing','dying'].includes(mode))visualTime+=dt;updateEnding(dt);
+ if(mode==='starting'){countdownTime=Math.max(0,countdownTime-dt);const n=Math.max(0,Math.ceil(countdownTime/.75)-1);countdown.textContent=String(n);if(countdownTime<=0)beginPlaying();}
  if(mode==='menu'&&document.body.classList.contains('jump-start-screen')){syncUI();return;}
  if(mode==='playing'){acc+=dt;while(acc>=STEP){tick(STEP);acc-=STEP;if(mode!=='playing'){acc=0;break;}}}
  if(avatar){
@@ -289,12 +296,12 @@ function renderFrame(now){
    if(deathBounds.max.y<bottom){splashed=true;window.dispatchEvent(new CustomEvent('chimp-death-offscreen',{detail:{x:deathPoint.x,y:bottom+.12}}));}
   }
  }
- if(mode==='playing'&&introTime<3)introTime=Math.min(3,introTime+dt);const intro=THREE.MathUtils.smoothstep(introTime,0,3),reducedMotion=document.body.dataset.reducedMotion==='true';boostZoom=THREE.MathUtils.damp(boostZoom,reducedMotion?1:game.jetRemaining>0?.93:1,3,dt);landingImpulse=reducedMotion?0:landingImpulse*Math.exp(-18*dt);
- if(mode!=='dying'&&mode!=='over'){camera.zoom=reducedMotion?1:THREE.MathUtils.lerp(1.72,boostZoom,intro);camera.position.y=(reducedMotion?game.camera:THREE.MathUtils.lerp(game.y+1.05,game.camera,intro)+landingImpulse);camera.updateProjectionMatrix();}
+ if(mode==='playing'&&introTime<1.35)introTime=Math.min(1.35,introTime+dt);const intro=THREE.MathUtils.smoothstep(introTime,0,1.35),reducedMotion=document.body.dataset.reducedMotion==='true';boostZoom=THREE.MathUtils.damp(boostZoom,reducedMotion?1:game.jetRemaining>0?.93:1,3,dt);landingImpulse=reducedMotion?0:landingImpulse*Math.exp(-18*dt);
+ if(mode!=='dying'&&mode!=='over'){const startZoom=mode==='starting'?2.08:1.72;camera.zoom=reducedMotion?1:THREE.MathUtils.lerp(startZoom,boostZoom,intro);camera.position.y=(reducedMotion?game.camera:THREE.MathUtils.lerp(game.y+1.05,game.camera,intro)+landingImpulse);camera.updateProjectionMatrix();}
  sun.position.set(-5,game.camera+9,12);sun.target.position.set(0,game.camera,0);drawWorld(dt);syncUI();renderer.render(scene,camera);
 }
 renderer.setAnimationLoop(renderFrame);
-window.chimpJump=()=>({ready,mode,runSeed,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,wind:game.wind,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
+window.chimpJump=()=>({ready,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,wind:game.wind,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:highDetail?'high':'balanced',drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures});
 if(new URLSearchParams(location.search).has('test')){
- window.chimpJumpTest={stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
+ window.chimpJumpTest={finishCountdown:()=>{if(mode==='starting')beginPlaying();},stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
 }
