@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,VINE_INSET,EVENT_INTERVAL,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt,windAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,BANANA_HEIGHT,VINE_INSET,EVENT_INTERVAL,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt,windAt} from '../src/physics.js';
 import {scoreFor,ordinal} from '../src/score.js';
 assert.equal(scoreFor(123.9,4),163);assert.equal(scoreFor(500,0),500);assert.equal(ordinal(1),'1st');assert.equal(ordinal(2),'2nd');assert.equal(ordinal(3),'3rd');assert.equal(ordinal(10),'10th');
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
@@ -79,7 +79,7 @@ console.log('PASS wider multi-platform layout, edge choices, small platforms and
 assert(Math.abs(JUMP**2/12.6**2-1.3)<1e-10,'Normal jump apex is exactly 30% higher');
 assert(Math.abs(SPRING_JUMP**2/28**2-1.3)<1e-10,'Spring apex is also 30% higher');
 assert.equal(new Game(1).platforms[0].width,2.8*PLATFORM_LENGTH,'Landing width must match current visual');
-assert.equal(ITEM_SCALE,1.5);assert.equal(PLATFORM_SCALE,1.5*.75*.75);
+assert.equal(ITEM_SCALE,1.5);assert.equal(BANANA_HEIGHT,1.35);assert.equal(PLATFORM_SCALE,1.5*.75*.75);
 for(const [baseWidth,value] of [[1.1,2],[2.45,1]]){
  const g=new Game(5);g.platforms=[];g.nextY=100;
  g.add(0,0,baseWidth,'solid',true);g.y=.4;g.vy=0;
@@ -153,3 +153,14 @@ const hazardEvents=hazardGame.step(0);assert(hazardEvents.some(e=>e.type==='haza
 assert(hazardGame.hazardCooldown>0,'Hazard knockback has a short repeat-hit cooldown');
 
 console.log('PASS canopy expansion: leaf/swing/vanish branches, hazards, wind and timed events');
+
+
+let bananaPlatforms=0,bananaEligible=0;
+for(let seed=0;seed<120;seed++){
+ const g=new Game(seed);g.camera=210;g.generate();
+ const eligible=g.platforms.filter(p=>p.y>10);
+ bananaEligible+=eligible.length;bananaPlatforms+=eligible.filter(p=>p.coin).length;
+}
+const bananaRatio=bananaPlatforms/bananaEligible;
+assert(bananaRatio>.35&&bananaRatio<.8,'Generated bananas must be random rather than present on every branch: '+bananaRatio);
+console.log('PASS randomized banana distribution at '+bananaRatio.toFixed(2)+' pickup density and elevated pickup height');
