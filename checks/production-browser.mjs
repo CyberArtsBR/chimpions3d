@@ -105,6 +105,9 @@ try{
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
   await page.evaluate(()=>window.chimpJumpTest.render());
 
+  // Resume/startup intentionally has a short no-auto-pause grace window.
+  // Let it expire before validating the later resize safety pause.
+  await page.waitForTimeout(1400);
   await page.setViewportSize({width:1920,height:1080});
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
   const layout=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));

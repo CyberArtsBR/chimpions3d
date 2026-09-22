@@ -227,7 +227,10 @@ try{
   const before=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
   for(let i=0;i<12;i++){
     await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
-    await page.getByRole('button',{name:'Try Again'}).click();
+    await page.waitForFunction(()=>window.chimpJump().mode==='over'&&document.getElementById('results-dialog')?.open);
+    // Real pointer activation is already covered above. The stress loop exercises restart/resource cleanup,
+    // so dispatch the same button handler directly instead of waiting on modal paint stability 12 times.
+    await page.evaluate(()=>document.getElementById('try-again').click());
     await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   }
   await page.waitForTimeout(100);
