@@ -76,13 +76,21 @@ try{
   assert.notEqual(firstLabel,fifthLabel,'Desktop picker fixture must contain at least five distinct choices');
   assert.equal(focusedLabel,fifthLabel,'Gamepad down must move one four-column desktop row');
   await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>window.chimpJump().mode==='starting');
   await page.evaluate(()=>window.chimpJumpTest.render());
+  const countdownState=await page.evaluate(()=>window.chimpJump());
+  assert.equal(countdownState.countdown,3,'Fresh run must open with a 3-to-0 countdown');
+  assert.equal(countdownState.time,0,'Physics must stay frozen during the countdown');
+  assert(countdownState.cameraZoom>1.8,'Countdown must focus the camera on the Chimpion');
+  assert(await page.locator('#countdown').isVisible(),'Countdown must be visible before the run starts');
+  await screenshot('game-countdown-desktop.png');
+  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   const playing=await snapshot('fresh-run');
   assert(playing.visibleBranches>=4,'Generated branches must attach when gameplay begins');
   assert(playing.authoredBranches>0,'Authored branch assets must render during gameplay');
-  assert.equal(playing.cameraZoom,1,'Fresh gameplay must start with the complete route visible');
+  assert.equal(playing.cameraZoom,1,'Gameplay camera must settle to the complete route view');
   assert(Array.isArray(playing.platformTypes)&&playing.platformTypes.includes('solid'),'Expansion telemetry must expose live platform types');
   assert.equal(typeof playing.wind,'number');
   assert.equal(typeof playing.hazardCount,'number');
@@ -132,14 +140,14 @@ try{
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
   assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Desktop resize must safely auto-pause an active run');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   report.viewport1080p=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
   await screenshot('game-playing-desktop-1080p.png');
 
   await page.setViewportSize({width:1440,height:900});
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   await page.getByRole('button',{name:'Pause game'}).click();
   const pausedAt=await page.evaluate(()=>window.chimpJump().time);
@@ -171,13 +179,13 @@ try{
   await screenshot('game-results-desktop.png');
 
   await page.getByRole('button',{name:'Replay this trail',exact:true}).click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   assert.equal(await page.evaluate(()=>window.chimpJump().runSeed),failedSeed,'Practice replay must reproduce the same route seed');
   assert.equal(await page.evaluate(()=>window.chimpJump().theme),'Jungle Morning');
 
   await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
   await page.getByRole('button',{name:'Try Again'}).click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   // Local GLB validation stays fully inside the desktop browser.
   await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
@@ -212,7 +220,7 @@ try{
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   // Performance/stability: repeated desktop restarts must not leak renderer resources.
   await page.waitForTimeout(100);
@@ -220,7 +228,7 @@ try{
   for(let i=0;i<12;i++){
     await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
     await page.getByRole('button',{name:'Try Again'}).click();
-    await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+    await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   }
   await page.waitForTimeout(100);
   const after=await page.evaluate(()=>{window.chimpJumpTest.render();return window.chimpJump();});
@@ -238,7 +246,7 @@ try{
   await page.getByRole('searchbox',{name:'Search characters'}).fill('Silver Chimp');
   await page.getByRole('button',{name:'Silver Chimp',exact:true}).click();
   await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.waitForFunction(()=>window.chimpJump().ready);
   assert(await page.locator('#avatar-list').isHidden());
 

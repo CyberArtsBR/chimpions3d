@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE} from './physics.js';
+import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
 
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function canvasTexture(w,h,draw){
@@ -130,19 +130,7 @@ export function createScenery(scene,renderer){
   if(staticRenderDirty||mode!==lastRenderMode){staticRenderDirty=false;lastRenderMode=mode;return baseRender(renderScene,renderCamera);}
  };
 
- const edgeVines=new THREE.Group();scene.add(edgeVines);
- const vineMaterial=new THREE.MeshStandardMaterial({color:0x365830,map:barkTexture,bumpMap:barkTexture,bumpScale:.13,roughness:.9});
- const vineMoss=new THREE.MeshStandardMaterial({color:0x7ca852,map:mossTexture,bumpMap:mossTexture,bumpScale:.08,roughness:.92});
- for(const side of [-1,1]){
-  for(let strand=0;strand<3;strand++){
-   const points=[];for(let i=0;i<=20;i++){const y=-13+i*1.3;points.push(new THREE.Vector3(side*(WIDTH/2-VINE_INSET+.02+strand*.045+Math.sin(i*.92+strand)*.07),y,.35+strand*.08+Math.cos(i*.73)*.035));}
-   const vine=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),120,.075-strand*.012,9,false),strand===1?vineMoss:vineMaterial);vine.castShadow=vine.receiveShadow=true;edgeVines.add(vine);
-  }
-  for(let i=0;i<28;i++){
-   const y=-12.2+i*.92,leafMesh=new THREE.Mesh(leafGeo,leaf);leafMesh.position.set(side*(WIDTH/2-VINE_INSET-.02+Math.sin(i*1.7)*.09),y,.48);
-   leafMesh.rotation.set(.15,side*.28,side*(.7+Math.sin(i*.8)*.35));leafMesh.scale.set(.13,.24+Math.sin(i)*.035,1);edgeVines.add(leafMesh);
-  }
- }
+ // Keep the wrap boundary invisible: no decorative vines hanging from the screen edges.
  let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null;
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
  function instances(geometry,material,parent,count,place){
@@ -292,7 +280,6 @@ export function createScenery(scene,renderer){
   }
   if(p.type==='swing'){
    const swingRig=new THREE.Group();group.add(swingRig);group.userData.swingRig=swingRig;
-   for(const side of [-1,1]){const rope=mesh(logGeo,vineGlow,swingRig,side*p.width*.36,1.7,.08);rope.scale.set(.18,3.6,.18);rope.castShadow=true;}
    instances(knotGeo,cream,swingRig,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.36,.05,.08);o.rotation.x=Math.PI/2;o.scale.set(1.55,1.55,.9);});
   }
   if(p.type==='vanish'){
@@ -307,7 +294,7 @@ export function createScenery(scene,renderer){
    instances(mossGeo,cream,mushroom,7,(i,o)=>{const angle=i*2.399,rad=i===0?0:.23;o.position.set(Math.cos(angle)*rad,.25+.23*Math.sqrt(1-(rad/.42)**2),Math.sin(angle)*rad*.8);o.scale.set(.046,.012,.039);o.rotation.z=-Math.cos(angle)*.4;});
    const collar=mesh(knotGeo,cream,mushroom,0,.14);collar.rotation.x=Math.PI/2;collar.scale.set(1.1,1.1,1);
   }
-  const coin=new THREE.Group();coin.position.set(0,1,.18);coin.scale.setScalar(ITEM_SCALE);group.add(coin);const bunches=p.reward===2?2:1,fruitCount=bunches*3;
+  const coin=new THREE.Group();coin.position.set(0,BANANA_HEIGHT,.18);coin.scale.setScalar(ITEM_SCALE);group.add(coin);const bunches=p.reward===2?2:1,fruitCount=bunches*3;
   function fruitPosition(i,o){const fruit=i%3,bunch=Math.floor(i/3);o.position.set((bunch-(bunches-1)/2)*.56+(fruit-1)*.07,Math.abs(fruit-1)*.035,fruit*.05);o.rotation.z=(fruit-1)*.16;}
   instances(bananaGeo,gold,coin,fruitCount,fruitPosition);const endpoint=new THREE.Vector3();
   instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);});
@@ -377,7 +364,7 @@ export function createScenery(scene,renderer){
   update(cameraY,time,dt,palette,night,biome=0,blend=1){
    const mode=document.body?.dataset?.mode||'',active=mode==='playing'||mode==='dying'||mode==='starting';
    if(!active&&!staticRenderDirty)return;
-   edgeVines.position.y=cameraY;currentCamera=cameraY;
+   currentCamera=cameraY;
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
     if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=Math.sin(time*.018)*.13;treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}

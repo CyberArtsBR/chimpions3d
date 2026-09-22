@@ -220,3 +220,17 @@ body[data-mode='paused'] #wind,body[data-mode='paused'] #canopy-event,body[data-
  #collection-dialog .avatar-option small{font-size:9px;letter-spacing:.04em;text-transform:uppercase}
  .collection-nav{justify-content:center;padding-top:4px}
 }
+
+
+/* Focused run start: character close-up with a clean 3-2-1-0 countdown. */
+#countdown{
+ position:fixed;inset:0;z-index:40;display:grid;place-items:center;pointer-events:none;
+ color:#fff4b0;font:1000 clamp(84px,14vw,180px)/1 ui-rounded,'Trebuchet MS',system-ui,sans-serif;
+ text-shadow:0 6px 0 #17362d,0 14px 38px #041d1acc;letter-spacing:-.06em;
+}
+body:not([data-mode='starting']) #countdown{display:none!important}
+body[data-mode='starting'] #hud,body[data-mode='starting'] #theme,body[data-mode='starting'] #pace,
+body[data-mode='starting'] #wind,body[data-mode='starting'] #canopy-event{opacity:.38}
+
+body[data-mode='starting'] #audio-settings,
+body[data-mode='starting'] #background-style{display:none!important}
