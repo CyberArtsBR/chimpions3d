@@ -1,5 +1,5 @@
 export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
-export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5;
+export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5, BANANA_HEIGHT=1.35;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=10, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const WIND_START=45, EVENT_INTERVAL=45, EVENT_DURATION=12;
@@ -105,7 +105,8 @@ export class Game {
       }
       const x=candidates.length?candidates[Math.floor(this.random()*candidates.length)]:
         Math.max(-limit,Math.min(limit,this.nextX));
-      if(!this.add(x,y,width,'solid',true,'safe'))break;
+      const safeBanana=this.random()<.58;
+      if(!this.add(x,y,width,'solid',safeBanana,'safe'))break;
       this.nextX=x;this.nextY=y;this.nextWidth=width*PLATFORM_LENGTH;
 
       const extras=1+(this.random()<.81?1:0);
@@ -130,7 +131,8 @@ export class Game {
         if(!places.length)continue;
         const px=this.random()<.5?places[0]:places.at(-1);
         const rewardType=['spring','leaf','vanish','swing'].includes(type);
-        if(this.add(px,optionalY,optionalWidth,type,true,rewardType?'reward':'risk')){
+        const optionalBanana=this.random()<(rewardType?.72:.48);
+        if(this.add(px,optionalY,optionalWidth,type,optionalBanana,rewardType?'reward':'risk')){
           const placed=this.platforms.at(-1);
           if(rewardType)placed.reward=2;
           if(y>24&&this.random()<.10+difficulty*.14)this.addHazardNear(placed,x,width*PLATFORM_LENGTH);
@@ -216,10 +218,10 @@ export class Game {
         if(distance<p.width/2+.24&&t<earliest){earliest=t;landing=p;}
       }
       const dx=wrappedDistance(this.x,p.x);
-      if(p.coin&&dx<.65*ITEM_SCALE&&Math.abs(this.y+.65-(p.y+1))<.85+.25*(ITEM_SCALE-1)){
+      if(p.coin&&dx<.65*ITEM_SCALE&&Math.abs(this.y+.65-(p.y+BANANA_HEIGHT))<.85+.25*(ITEM_SCALE-1)){
         p.coin=false;
         const bloom=this.event?.type==='banana-bloom'?1:0,value=(p.reward||1)+bloom;
-        this.bananas+=value;events.push({type:'coin',x:p.x,y:p.y+1,value,bloom:!!bloom});
+        this.bananas+=value;events.push({type:'coin',x:p.x,y:p.y+BANANA_HEIGHT,value,bloom:!!bloom});
       }
     }
 
