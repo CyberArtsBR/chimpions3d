@@ -231,3 +231,6 @@ body[data-mode='paused'] #wind,body[data-mode='paused'] #canopy-event,body[data-
 body:not([data-mode='starting']) #countdown{display:none!important}
 body[data-mode='starting'] #hud,body[data-mode='starting'] #theme,body[data-mode='starting'] #pace,
 body[data-mode='starting'] #wind,body[data-mode='starting'] #canopy-event{opacity:.38}
+
+body[data-mode='starting'] #audio-settings,
+body[data-mode='starting'] #background-style{display:none!important}
