@@ -75,6 +75,7 @@ try{
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:30000});
   await page.waitForFunction(()=>window.chimpJump?.().countdown===3,{timeout:5000});
+  await page.waitForFunction(()=>window.chimpJump?.().cameraZoom>1.8,{timeout:5000});
   const countdownState=await snap('countdown');
   assert(countdownState.cameraZoom>1.8,'Production countdown must zoom in on the Chimpion');
   assert.equal(countdownState.time,0,'Production physics must remain frozen during countdown');
