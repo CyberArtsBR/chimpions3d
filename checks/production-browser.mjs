@@ -72,6 +72,7 @@ try{
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Expanded picker must be deployed');
   await shot('production-picker-desktop.png');
+  await page.evaluate(()=>window.chimpJumpTest.resumeRendering());
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:30000});
   await page.waitForFunction(()=>window.chimpJump?.().countdown===3,{timeout:5000});
@@ -80,9 +81,10 @@ try{
   assert(countdownState.cameraZoom>1.8,'Production countdown must zoom in on the Chimpion');
   assert.equal(countdownState.time,0,'Production physics must remain frozen during countdown');
   await shot('production-countdown-desktop.png');
+  await page.evaluate(()=>window.chimpJumpTest.resumeRendering());
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:10000});
   await page.waitForFunction(()=>window.chimpJump?.().cameraZoom<1.05,{timeout:5000});
-  await page.evaluate(()=>window.chimpJumpTest.render());
+  await page.evaluate(()=>{window.chimpJumpTest.suspendRendering();window.chimpJumpTest.render();});
   const playing=await snap('playing');
   assert(playing.visible,'Production avatar must be visible');
   assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
