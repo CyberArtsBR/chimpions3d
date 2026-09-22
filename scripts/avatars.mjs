@@ -7,7 +7,7 @@ const overrides=JSON.parse(fs.readFileSync('public/avatar-overrides.json','utf8'
 const names=new Map(cards.map(c=>[normalize(c.name),c]));
 // Explicit reviewed spelling corrections; never fuzzy-match at runtime.
 const aliases={theboson:'thebosun',theacromatic:'theachromatic',thealmagamation:'theamalgamation',theattendantr:'theattendant',thebuddly:'thebubbly',thedeepweller:'thedeepdweller',thedrownsy:'thedrowsy',thefautly:'thefaulty',themaincaracter:'themaincharacter',theranched:'therancher',thesulton:'thesultan',theunkowable:'theunknowable',theyoutfull:'theyouthful'};
-const entries=[{id:'steamboat-willie',name:'Steamboat Willie',image:'ui/steamboat-willie.png',tribe:'Guest character',url:'model/steamboat_willie.glb'},{id:'chimpion',name:'Silver Chimp',url:'model/chimpion.glb'}],seen=new Map(),report={duplicates:[],extra:[],missing:[],unavailable:[]};
+const entries=[],seen=new Map(),report={duplicates:[],extra:[],missing:[],unavailable:[]};
 const files=[],specialModels=new Set(['public/model/chimpion.glb','public/model/steamboat_willie.glb']);
 function scan(dir){for(const file of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,file.name),normalized=full.replaceAll('\\','/');if(file.isDirectory())scan(full);else if(/\.glb$/i.test(file.name)&&!specialModels.has(normalized))files.push(full);}}
 scan('public/model');
@@ -30,4 +30,4 @@ report.missing=cards.filter(c=>!seen.has(String(c.id))).map(c=>c.name);
 report.files=files.length;report.playable=entries.filter(e=>e.url).length;report.matchedCards=cards.length-report.missing.length;
 fs.writeFileSync('public/avatars.json',JSON.stringify(entries,null,2)+'\n');
 fs.writeFileSync('public/avatar-report.json',JSON.stringify(report,null,2)+'\n');
-console.log('Avatar catalog: '+report.playable+' playable (including default), '+report.missing.length+' missing cards, '+report.unavailable.length+' rigs need correction.');
+console.log('Avatar catalog: '+report.playable+' playable collection characters, '+report.missing.length+' missing cards, '+report.unavailable.length+' rigs need correction.');
