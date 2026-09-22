@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {JUMP_GOALS,evaluateJumpGoals} from '../src/jumpGoals.js';
 
 const read=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js');
+const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js'),character=read('src/character.js');
 
 assert(main.includes("'test'"),'test mode must route to Chimp Jump, not the launcher');
 assert(main.includes("setupJumpExperience"),'the framework experience layer must mount');
@@ -13,19 +13,22 @@ assert(game.includes('countdownTime=3')&&game.includes('introTime=0'),'fresh run
 assert(game.includes('const startZoom=2.08'),'countdown and intro must keep the requested character close-up');
 assert(!game.includes('const startZoom=1.72'),'the old opening zoom must not return');
 assert(game.includes("chimp-jump-muted")&&game.includes("chimp-jump-detail"),'player preferences must persist');
-assert(!game.includes("entry.id==='steamboat-willie'")&&!game.includes("entry.id==='chimpion'"),'Willie and Silver Chimp must not be special hero-selection defaults');
+assert(game.includes("entry.id==='steamboat-willie'"),'startup must prefer rigged Steamboat Willie');
+assert(game.includes("entry.id==='chimpion'"),'startup fallback must preserve Silver Chimp');
 assert(game.includes("chimp-run-finished"),'completed runs must publish a summary for goals');
 assert(results.includes('Replay this trail'),'results must expose reproducible same-seed practice');
 for(const type of ["'leaf'","'vanish'","'swing'"])assert(physics.includes(type),'canopy expansion must retain '+type+' platform generation');
 assert(!physics.includes('windAt')&&physics.includes("'event-start'"),'wind must be absent while timed canopy events remain wired into physics');
 assert(physics.includes("'thorn-pod'"),'environmental thorn hazards must remain enabled');
 assert(scenery.includes('animateHazard')&&scenery.includes('jetTrail'),'hazard animation and jet trail polish must remain');
+assert(scenery.includes("organic-platform-detail"),'special procedural platforms must retain the organic high-detail contour pass');
 assert(audio.includes('setIntensity')&&audio.includes('milestone'),'reactive music and milestone audio must remain');
 assert(game.includes("countdown.id='countdown'")&&game.includes("mode='starting'")&&game.includes('finishCountdown'),'run countdown must remain wired before gameplay');
 assert(game.includes('BANANA_HEIGHT+Math.sin'),'banana visuals must remain elevated above branches');
 assert(physics.includes('BANANA_HEIGHT=1.35')&&physics.includes('safeBanana')&&physics.includes('optionalBanana'),'banana height and randomized spawn distribution must remain');
 assert(!scenery.includes('const edgeVines=new THREE.Group'),'screen-edge vine curtain must stay removed');
 assert(!scenery.includes('rope=mesh(logGeo,vineGlow,swingRig'),'swing branches must not draw long ropes into the screen border');
+for(const stage of ["'TAKEOFF'","'ASCEND'","'APEX'","'DESCEND'","'LAND'"])assert(character.includes(stage),'jump animation must expose '+stage+' staging');
 
 assert.equal(JUMP_GOALS.length,6,'ship six optional expedition goals');
 const sample=evaluateJumpGoals({meters:120,bananas:28,cleanLandings:32},[]);
