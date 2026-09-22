@@ -32,8 +32,7 @@ try{
   await page.goto(base+'/?test=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.chimpJump?.().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);
-  assert.equal(await page.evaluate(()=>window.chimpJump().selectedId),'steamboat-willie','Steamboat Willie must load as the default player');
-  assert.equal(await page.evaluate(()=>window.chimpJump().bones),19,'Default Willie rig must expose the full 19-bone gameplay skeleton');
+  assert(!['steamboat-willie','chimpion'].includes(await page.evaluate(()=>window.chimpJump().selectedId)),'Special Willie/Silver heroes must stay out of player selection');
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
   assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
 
@@ -249,8 +248,8 @@ try{
   await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aviator');
   assert(await page.getByRole('button',{name:'The Aviator · GLB coming soon',exact:true}).isDisabled());
   assert.equal(await page.locator('.avatar-option').count(),1);
-  await page.getByRole('searchbox',{name:'Search characters'}).fill('Silver Chimp');
-  await page.getByRole('button',{name:'Silver Chimp',exact:true}).click();
+  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aberration');
+  await page.getByRole('button',{name:'The Aberration',exact:true}).click();
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.waitForFunction(()=>window.chimpJump().ready);
