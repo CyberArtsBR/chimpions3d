@@ -133,7 +133,7 @@ function isDescendant(child, ancestor) {
   for (let p = child.parent; p; p = p.parent) if (p === ancestor) return true;
   return false;
 }
-function makePose(time, gait, jumpLift=0) {
+function makePose(time, gait, motion={}) {
   const pose = {};
   const set = (key, x = 0, y = 0, z = 0) => { pose[key] = [x, y, z]; };
   const running = state === 'RUN';
@@ -156,19 +156,29 @@ function makePose(time, gait, jumpLift=0) {
   }
   let offset = breath * 0.004 + Math.abs(Math.cos(phase)) * (running ? 0.065 : 0.025) * gait;
   if (state === 'JUMP' || state === 'LAND') {
-    const launchKick=Math.max(0,1-stageTime/.15);
-    const landingPrep=jumpStage==='AIRBORNE'?Math.max(0,1-jumpLift)*.26:0;
-    const crouch=Math.min(1,launchKick*.85+landingPrep+jumpLift*.12);
-    offset = -0.16 * crouch;
-    set('hips', 0.12 * crouch); set('spine', 0.12 * crouch);
-    for (const side of ['left', 'right']) {
-      set(side + 'Thigh', -0.55 * crouch);
-      set(side + 'Shin', 1.05 * crouch);
-      set(side + 'Foot', -0.45 * crouch);
-      set(side + 'Shoulder', -jumpLift*.08, 0, 0);
-      set(side + 'UpperArm', -1.08*jumpLift+.12*launchKick);
-      set(side + 'Forearm', -.16-.34*jumpLift-.16*launchKick);
-      set(side + 'Hand', .025+.12*jumpLift);
+    const launch=Math.max(0,Math.min(1,motion.launch||0));
+    const ascend=Math.max(0,Math.min(1,motion.ascend||0));
+    const apex=Math.max(0,Math.min(1,motion.apex||0));
+    const descend=Math.max(0,Math.min(1,motion.descend||0));
+    const landing=Math.max(0,Math.min(1,motion.landing||0));
+    const compression=Math.min(1,launch*.92+landing*.88+apex*.22);
+    // Keep the physical root untouched: all extra motion lives inside the visual rig.
+    // The silhouette now reads as push-off, extension, float, fall preparation and contact.
+    offset=-.18*launch+.045*ascend-.04*apex-.025*descend-.14*landing;
+    set('hips', .16*compression-.055*ascend+.045*descend);
+    set('spine', .13*launch-.085*ascend+.055*apex+.075*descend+.11*landing);
+    set('chest', -.055*ascend+.035*apex+.065*descend+.045*landing);
+    set('neck', -.018+.025*apex-.018*descend);
+    set('head', -.025*ascend+.038*apex+.025*descend);
+    for (const [side,sign] of [['left',1],['right',-1]]) {
+      const asym=sign*(.045*ascend+.07*descend);
+      set(side+'Thigh',-.72*launch-.12*ascend-.32*apex+.09*descend-.5*landing+asym);
+      set(side+'Shin',1.18*launch+.12*ascend+.62*apex+.18*descend+.92*landing);
+      set(side+'Foot',-.5*launch+.08*ascend-.22*apex+.13*descend-.34*landing);
+      set(side+'Shoulder',-.08*ascend-.05*apex,0,sign*(.08*apex+.055*descend));
+      set(side+'UpperArm',.24*launch-1.02*ascend-.7*apex-.31*descend+.13*landing,0,sign*(.055*apex+.035*descend));
+      set(side+'Forearm',-.18-.2*launch-.3*ascend-.22*apex-.1*descend-.16*landing);
+      set(side+'Hand',.025+.08*ascend+.05*apex);
     }
   }
   return { pose, offset };
@@ -221,24 +231,25 @@ function applyPose({ pose, offset }, alpha) {
   return {
     root, model, boneCount:rest.size, triangles,
     update(dt,time,velocity,bounceAge,active,feel={}) {
-      state=active?'JUMP':'IDLE';
-      jumpStage=active?(bounceAge<0.09?'TAKEOFF':velocity>3?'TAKEOFF':'AIRBORNE'):'';
       if(active&&bounceAge<.04&&velocity>0)launchVelocity=Math.max(JUMP,velocity);
-      const targetLift=active?(velocity>=0?1-Math.min(1,velocity/launchVelocity):Math.max(0,1+velocity/launchVelocity)):0;
-      armLift=THREE.MathUtils.damp(armLift,targetLift,active?9:14,dt);
-      stageTime=bounceAge; phase+=dt*7;
-      const posed=makePose(time,0,armLift);
-      const prep=active?Math.max(0,Math.min(1,feel.landing||0)):0;
+      const landing=active?Math.max(0,Math.min(1,feel.landing||0)):0;
+      const launch=active?Math.max(0,Math.min(1,1-bounceAge/.14)):0;
+      const ascend=active&&velocity>1.15?Math.max(0,Math.min(1,velocity/launchVelocity)):0;
+      const apex=active?Math.max(0,1-Math.abs(velocity)/3.1):0;
+      const descend=active&&velocity<-.8?Math.max(0,Math.min(1,-velocity/launchVelocity)):0;
+      state=landing>.12?'LAND':active?'JUMP':'IDLE';
+      jumpStage=!active?'':launch>.08?'TAKEOFF':ascend>.12?'ASCEND':apex>.12?'APEX':landing>.12?'LAND':'DESCEND';
+      stageTime=bounceAge;phase+=dt*7;
+      const posed=makePose(time,0,{launch,ascend,apex,descend,landing});
       for(const side of ['left','right']){
-        posed.pose[side+'Thigh'][0]-=prep*.18;
-        posed.pose[side+'Shin'][0]+=prep*.3;
-        posed.pose[side+'Foot'][0]-=prep*.12;
         if(feel.dying){
           posed.pose[side+'UpperArm'][0]=-1.1+Math.sin(time*15+(side==='left'?0:2))*.35;
           posed.pose[side+'Shin'][0]=.5+Math.sin(time*12)*.2;
         }
       }
-      applyPose(posed,1-Math.exp(-18*dt));
+      // Slightly faster response at takeoff/contact, softer through the airborne arc.
+      const poseRate=launch>.08||landing>.25?22:14;
+      applyPose(posed,1-Math.exp(-poseRate*dt));
       const squash=active?Math.exp(-bounceAge*22)*.05:0;
       visual.scale.set(1+squash*.4,1-squash,1+squash*.4);
       visual.rotation.z=THREE.MathUtils.damp(visual.rotation.z,active?-(feel.vx||0)*.009:0,12,dt);
