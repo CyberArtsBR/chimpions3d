@@ -32,7 +32,8 @@ try{
   await page.goto(base+'/?test=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.chimpJump?.().ready);
   assert((await page.evaluate(()=>window.chimpJump())).visible);
-  assert(!['steamboat-willie','chimpion'].includes(await page.evaluate(()=>window.chimpJump().selectedId)),'Special Willie/Silver heroes must stay out of player selection');
+  assert.equal(await page.evaluate(()=>window.chimpJump().selectedId),'steamboat-willie','Steamboat Willie must load as the default player');
+  assert.equal(await page.evaluate(()=>window.chimpJump().bones),19,'Default Willie rig must expose the full 19-bone gameplay skeleton');
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
   assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
 
