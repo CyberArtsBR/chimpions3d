@@ -113,7 +113,7 @@ try{
   assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
   assert(playing.visibleBranches>=4,'Production route branches must attach');
   assert.equal(playing.cameraZoom,1,'Fresh production run must start at full-route zoom');
-  assert(Array.isArray(playing.platformTypes)&&typeof playing.wind==='number','Canopy gameplay expansion must be deployed');
+  assert(Array.isArray(playing.platformTypes)&&!('wind' in playing),'Canopy gameplay without wind must be deployed');
   await shot('production-playing-desktop.png');
 
   await page.keyboard.down('ArrowLeft');

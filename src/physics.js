@@ -2,8 +2,8 @@ export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_H
 export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5, BANANA_HEIGHT=1.35;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=10, JET_SPEED=24;
 export const VINE_INSET=.24;
-export const WIND_START=45, EVENT_INTERVAL=45, EVENT_DURATION=12;
-export const RULESET='2026-09-expedition-v6-countdown-bananas';
+export const EVENT_INTERVAL=45, EVENT_DURATION=12;
+export const RULESET='2026-09-expedition-v7-no-wind';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
@@ -33,15 +33,7 @@ export const platformX=(platform,time)=>{
 export const hazardX=(hazard,time)=>
   hazard.baseX+Math.sin(time*(1.25+(hazard.speed||1)*.22)+(hazard.phase||0))*(hazard.range||.28);
 
-export const windAt=(time,runSeed,eventType='')=>{
-  if(time<WIND_START)return 0;
-  const ramp=Math.min(1,(time-WIND_START)/150);
-  const strength=.3+.95*ramp;
-  const eventBoost=eventType==='wind-surge'?1.65:1;
-  return Math.sin(time*.42+(runSeed%4096)*.017)*strength*eventBoost;
-};
-
-const EVENT_TYPES=['wind-surge','banana-bloom','spring-fever'];
+const EVENT_TYPES=['banana-bloom','spring-fever'];
 
 export class Game {
   constructor(seed=1){this.reset(seed);}
@@ -50,7 +42,7 @@ export class Game {
     this.time=0;this.height=0;this.camera=5;this.previousCamera=5;
     this.jetpack=null;this.jetRemaining=0;this.nextJetAt=30;
     this.bounceAge=0;this.bounces=0;this.bananas=0;this.dead=false;
-    this.wind=0;this.windScale=1;this.event=null;this.eventIndex=0;this.nextEventAt=EVENT_INTERVAL;
+    this.event=null;this.eventIndex=0;this.nextEventAt=EVENT_INTERVAL;
     this.lastMilestone=0;this.hazardCooldown=0;this.hazards=[];this.nextHazardId=0;
     this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;
     this.add(0,0,2.8,'solid',false);this.generate();
@@ -169,12 +161,11 @@ export class Game {
   step(input,dt=STEP){
     if(this.dead)return [];
     const events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
-    this.wind=windAt(this.time,this.runSeed,this.event?.type||'')*this.windScale;
     this.hazardCooldown=Math.max(0,this.hazardCooldown-realDt);
 
     dt*=paceAt(this.time);this.bounceAge+=dt;
     this.previousCamera=this.camera;
-    const target=input*SPEED+this.wind,amount=24*dt;
+    const target=input*SPEED,amount=24*dt;
     this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
 
     const oldX=this.x,oldY=this.y,travel=this.vx*dt;

@@ -165,14 +165,13 @@ body[data-mode=playing] #audio-settings,body[data-mode=dying] #audio-settings{di
 
 /* Desktop canopy expansion: keep new mechanics readable without touching the mobile layout. */
 .branch-guide{flex-wrap:wrap;row-gap:7px}
-#wind,#canopy-event{
+#canopy-event{
  position:fixed;z-index:18;top:104px;padding:7px 12px;border-radius:999px;
  font:900 10px/1.1 'Trebuchet MS',system-ui,sans-serif;letter-spacing:.12em;
  text-transform:uppercase;pointer-events:none;backdrop-filter:blur(5px)
 }
-#wind{left:calc(50% - 165px);transform:translateX(-50%);color:#dff9ff;background:#123b45d9;border:1px solid #78d7e0aa;box-shadow:0 5px 18px #001d2770}
 #canopy-event{left:calc(50% + 150px);transform:translateX(-50%);color:#fff0aa;background:#4b3219e8;border:1px solid #ffd66baa;box-shadow:0 5px 18px #2d160770}
-body[data-mode='paused'] #wind,body[data-mode='paused'] #canopy-event,body[data-mode='menu'] #wind,body[data-mode='menu'] #canopy-event{display:none!important}
+body[data-mode='paused'] #canopy-event,body[data-mode='menu'] #canopy-event{display:none!important}
 
 @media(min-width:901px){
  #collection-dialog{
@@ -230,7 +229,7 @@ body[data-mode='paused'] #wind,body[data-mode='paused'] #canopy-event,body[data-
 }
 body:not([data-mode='starting']) #countdown{display:none!important}
 body[data-mode='starting'] #hud,body[data-mode='starting'] #theme,body[data-mode='starting'] #pace,
-body[data-mode='starting'] #wind,body[data-mode='starting'] #canopy-event{opacity:.38}
+body[data-mode='starting'] #canopy-event{opacity:.38}
 
 body[data-mode='starting'] #audio-settings,
 body[data-mode='starting'] #background-style{display:none!important}

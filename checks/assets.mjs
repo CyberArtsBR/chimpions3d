@@ -77,7 +77,9 @@ assert(avatars.filter(a=>a.url).length>200,'Expected complete uploaded collectio
 assert.equal(new Set(avatars.map(a=>a.id)).size,avatars.length,'Unique IDs');
 
 const avatarReport=[];
-for(const avatar of avatars.slice(1).filter(a=>a.url)){
+assert.equal(avatars[0]?.id,'steamboat-willie','Steamboat Willie must be the catalog default');
+assert(avatars.some(a=>a.id==='chimpion'&&a.url),'Silver Chimp must remain selectable');
+for(const avatar of avatars.filter(a=>a.url)){
   const filePath='public/'+decodeURIComponent(avatar.url);
   assert(fs.existsSync(filePath),`${avatar.name}: missing ${filePath}`);
   const {bytes,json}=parseGLB(filePath);

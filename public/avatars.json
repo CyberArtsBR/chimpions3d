@@ -1,5 +1,12 @@
 [
   {
+    "id": "steamboat-willie",
+    "name": "Steamboat Willie",
+    "image": "ui/steamboat-willie.png",
+    "tribe": "Guest character",
+    "url": "model/steamboat_willie.glb"
+  },
+  {
     "id": "chimpion",
     "name": "Silver Chimp",
     "url": "model/chimpion.glb"

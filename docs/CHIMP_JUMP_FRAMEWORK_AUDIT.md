@@ -110,3 +110,30 @@ Rollback: revert the squash merge through a new commit on main, pass CI and let 
 redeploy (or select the preceding successful Render deployment). This pass does not
 change localStorage schemas or migrate saved records. Post-merge acceptance requires
 the matching live version manifest and a successful production desktop audit.
+## Wind removal and next visual pass — 2026-09-22
+
+Gameplay wind, Wind Surge, the wind HUD and guide references are removed at the
+user's request. Leaf/swing motion, hazards, Banana Bloom and Spring Fever remain.
+Replay ruleset v7 distinguishes the changed simulation from older recorded runs.
+The base spring fixture disables timed events explicitly; removing one event changes
+the seeded event selection, so that fixture must not accidentally test Spring Fever.
+Regression coverage includes 15 seeded 120-second no-input runs at early/late game
+ages, both remaining events, and 22,008 generated platform transfers.
+
+Visual feasibility assessment (source/asset inspection, not a completed art pass):
+- The existing branch-moss GLB has 13,056 triangles and three textures. Reuse/adapt
+  it rather than assuming that more polygons alone will improve the image.
+- Special leaf/swing/vanish and fragile supports use procedural fallback geometry.
+  Bring their bark/moss/material finish and organic silhouettes up to the authored
+  branch standard, retaining clearly different silhouettes and aligned landing tops.
+- Character animation uses procedural rig poses. The game does not drive a distinct
+  LAND state: launch, apex and landing preparation share a compact pose calculation.
+  A richer contact/recoil, extension, ascent, apex and descent cycle is feasible
+  using the existing bones without delaying the automatic bounce or changing physics.
+- Validate one platform family and one representative rig in motion first, then
+  cover different rigs, spring/jet transitions, reduced motion and resource budgets.
+  Preserve the frozen death pose and authored rest transforms. Do not claim all
+  avatars are compatible without representative rig tests.
+
+No platform art or jump animation has been changed in this wind-removal patch.
+Mobile hardware, perceived realism and audio/feel still need human playtesting.
