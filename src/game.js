@@ -297,7 +297,7 @@ function renderFrame(now){
   }
  }
  if(mode==='playing'&&introTime<1.35)introTime=Math.min(1.35,introTime+dt);const intro=THREE.MathUtils.smoothstep(introTime,0,1.35),reducedMotion=document.body.dataset.reducedMotion==='true';boostZoom=THREE.MathUtils.damp(boostZoom,reducedMotion?1:game.jetRemaining>0?.93:1,3,dt);landingImpulse=reducedMotion?0:landingImpulse*Math.exp(-18*dt);
- if(mode!=='dying'&&mode!=='over'){const startZoom=mode==='starting'?2.08:1.72;camera.zoom=reducedMotion?1:THREE.MathUtils.lerp(startZoom,boostZoom,intro);camera.position.y=(reducedMotion?game.camera:THREE.MathUtils.lerp(game.y+1.05,game.camera,intro)+landingImpulse);camera.updateProjectionMatrix();}
+ if(mode!=='dying'&&mode!=='over'){const startZoom=2.08;camera.zoom=reducedMotion?1:THREE.MathUtils.lerp(startZoom,boostZoom,intro);camera.position.y=(reducedMotion?game.camera:THREE.MathUtils.lerp(game.y+1.05,game.camera,intro)+landingImpulse);camera.updateProjectionMatrix();}
  sun.position.set(-5,game.camera+9,12);sun.target.position.set(0,game.camera,0);drawWorld(dt);syncUI();renderer.render(scene,camera);
 }
 renderer.setAnimationLoop(renderFrame);
