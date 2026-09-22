@@ -79,7 +79,7 @@ const quickRetry=document.createElement('button');quickRetry.id='quick-retry';qu
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
 const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,countdownTime=0,autoPauseAfter=0;
-let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='steamboat-willie';
+let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='';
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
 const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
 const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
@@ -180,7 +180,7 @@ $('upload').onclick=()=>{$('avatar-file').click();};
 $('avatar-file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{const buffer=await readLocalGLB(file);await selectAvatar({name:file.name.replace(/\.glb$/i,''),buffer});}catch(error){$('avatar-status').textContent=error.message;}};
 $('flip').remove();let collectionPage=0,collectionQuery='';
 const selectedPreview=document.createElement('div');selectedPreview.id='selected-preview';selectionActions.prepend(selectedPreview);
-function randomEntry(){const entries=catalog.filter(e=>e.url&&e.id!=='chimpion');const pool=entries.length?entries:catalog;return pool[Math.floor(Math.random()*pool.length)];}
+function randomEntry(){const entries=catalog.filter(e=>e.url);const pool=entries.length?entries:catalog;return pool[Math.floor(Math.random()*pool.length)];}
 function appendPortrait(container,entry,imageUrl){
  const fallback=document.createElement('span');fallback.className='preview-monogram';fallback.setAttribute('aria-hidden','true');
  fallback.textContent=(entry.name||'?').replace(/^The /,'').split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();container.append(fallback);
@@ -217,7 +217,7 @@ async function openSelection(){
  if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }
 $('choose').onclick=()=>{selectionConfirmed=false;openSelection();};
-fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();}).then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');pendingEntry=entries.find(entry=>entry.id==='steamboat-willie'&&entry.url)||entries.find(entry=>entry.id==='chimpion'&&entry.url)||entries.find(entry=>entry.url)||entries[0];return selectAvatar(pendingEntry);}).catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
+fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();}).then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');pendingEntry=entries.find(entry=>entry.url)||entries[0];return selectAvatar(pendingEntry);}).catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
 
 function drawWorld(dt=0){
  jetVisual.visible=!!game.jetpack;if(game.jetpack){jetVisual.position.set(game.jetpack.x,game.jetpack.y+Math.sin(visualTime*2)*.08,.6);jetVisual.rotation.y=Math.sin(visualTime*.9)*.45;}animateJetpack(jetVisual,visualTime,false);animateJetpack(jetEquipped,visualTime,true);
