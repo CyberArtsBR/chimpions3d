@@ -192,6 +192,26 @@ html, body {
   pointer-events: none;
 }
 
+/* Ski uses the same approved high-resolution transparent SNES shell as the
+   established launcher cartridges. Only its artwork is layered into the
+   recessed label window, so the shell edges/top remain transparent and the
+   lower dark ribbed panel stays crisp. */
+.ski-cart .cart-body { position: relative; }
+.ski-cart .ski-shell,
+.ski-cart .ski-art {
+  position: absolute;
+  inset: 0;
+}
+.ski-cart .ski-shell {
+  z-index: 2;
+  filter: drop-shadow(0 22px 30px rgba(0,0,0,.42));
+}
+.ski-cart .ski-art {
+  z-index: 3;
+  clip-path: inset(7.5% 13.5% 29.5% 13.5% round 14px);
+  filter: saturate(1.04) contrast(1.025);
+}
+
 .cart-wrap.is-front {
   z-index: 7;
   filter: brightness(1.02) saturate(1.02);
