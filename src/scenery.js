@@ -280,7 +280,6 @@ export function createScenery(scene,renderer){
   }
   if(p.type==='swing'){
    const swingRig=new THREE.Group();group.add(swingRig);group.userData.swingRig=swingRig;
-   for(const side of [-1,1]){const rope=mesh(logGeo,vineGlow,swingRig,side*p.width*.36,1.7,.08);rope.scale.set(.18,3.6,.18);rope.castShadow=true;}
    instances(knotGeo,cream,swingRig,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.36,.05,.08);o.rotation.x=Math.PI/2;o.scale.set(1.55,1.55,.9);});
   }
   if(p.type==='vanish'){
