@@ -3,7 +3,7 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=10, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const WIND_START=45, EVENT_INTERVAL=45, EVENT_DURATION=12;
-export const RULESET='2026-09-expedition-v5-canopy-events';
+export const RULESET='2026-09-expedition-v6-countdown-bananas';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
