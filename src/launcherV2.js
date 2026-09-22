@@ -18,6 +18,7 @@ document.body.innerHTML=`
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Jump" data-index="0"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Jump cartridge" src="/launcher/cartridge-jump.png" /></div></div></div></div>
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Dash" data-index="1"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Dash cartridge" src="/launcher/cartridge-dash.png" /></div></div></div></div>
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Card Arena" data-index="2"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Card Arena cartridge" src="/launcher/cartridge-arena.png" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Ski" data-index="3"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Ski cartridge" src="/launcher/cartridge-ski.webp" /></div></div></div></div>
   </div>
   <div class="play-pill">Click to Play</div>
   <div class="controls"><span class="key">A</span><span class="key">D</span><span>Select</span><span class="sep">•</span><span class="key">↵</span><span>Play</span><span class="sep">•</span><span>Click a side cartridge to center it</span></div>
@@ -32,7 +33,8 @@ document.body.innerHTML=`
 const games=[
   {name:'Chimp Jump',url:'/?play=jump',image:'/launcher/cartridge-jump.png'},
   {name:'Chimp Dash',url:'/?dash=1',image:'/launcher/cartridge-dash.png'},
-  {name:'Chimpions Card Arena',url:'/?arena=1',image:'/launcher/cartridge-arena.png'}
+  {name:'Chimpions Card Arena',url:'/?arena=1',image:'/launcher/cartridge-arena.png'},
+  {name:'Chimpions Ski',url:'https://chimpions-ski.onrender.com',image:'/launcher/cartridge-ski.webp'}
 ];
 
 const app=document.getElementById('app');
@@ -83,15 +85,36 @@ function launchSound(){noiseBurst(.10,.012);beep({type:'sawtooth',freq:170,slide
 function layout(){
   const spread=Math.min(420,innerWidth*.30);
   cards.forEach((card,i)=>{
-    card.classList.remove('is-front','is-back');
+    card.classList.remove('is-front','is-back','is-far');
     const rel=(i-active+cards.length)%cards.length;card.dataset.rel=String(rel);
-    if(rel===0){card.classList.add('is-front');card.style.transform='translate3d(0px, 0px, 270px) scale(1.10) rotateY(0deg)';card.style.opacity='1';}
-    else if(rel===1){card.classList.add('is-back');card.style.transform=`translate3d(${spread}px, 62px, -170px) scale(.73) rotateY(-25deg)`;card.style.opacity='.95';}
-    else{card.classList.add('is-back');card.style.transform=`translate3d(${-spread}px, 62px, -170px) scale(.73) rotateY(25deg)`;card.style.opacity='.95';}
+    if(rel===0){
+      card.classList.add('is-front');
+      card.style.transform='translate3d(0px, 0px, 270px) scale(1.10) rotateY(0deg)';
+      card.style.opacity='1';
+    }else if(rel===1){
+      card.classList.add('is-back');
+      card.style.transform=`translate3d(${spread}px, 62px, -170px) scale(.73) rotateY(-25deg)`;
+      card.style.opacity='.95';
+    }else if(rel===cards.length-1){
+      card.classList.add('is-back');
+      card.style.transform=`translate3d(${-spread}px, 62px, -170px) scale(.73) rotateY(25deg)`;
+      card.style.opacity='.95';
+    }else{
+      card.classList.add('is-far');
+      card.style.transform='translate3d(0px, 96px, -390px) scale(.56) rotateY(0deg)';
+      card.style.opacity='.62';
+    }
   });
 }
 function rotate(step){if(!ready||locked)return;active=(active+step+games.length)%games.length;rotateSound();layout();}
-function clickCartridge(index){if(!ready||locked)return;if(index===active){launch();return;}const rel=Number(cards[index].dataset.rel);if(rel===1)rotate(1);else if(rel===2)rotate(-1);}
+function clickCartridge(index){
+  if(!ready||locked)return;
+  if(index===active){launch();return;}
+  const rel=Number(cards[index].dataset.rel);
+  if(rel===1)rotate(1);
+  else if(rel===cards.length-1)rotate(-1);
+  else if(rel===2)rotate(2);
+}
 function launch(){
   if(!ready||locked)return;
   locked=true;launchSound();labelZoomImage.src=games[active].image;labelZoomImage.alt=games[active].name+' cartridge';app.classList.add('launching');
