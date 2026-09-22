@@ -217,7 +217,7 @@ async function openSelection(){
  if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }
 $('choose').onclick=()=>{selectionConfirmed=false;openSelection();};
-fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();}).then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');pendingEntry=entries.find(entry=>entry.url)||entries[0];return selectAvatar(pendingEntry);}).catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
+fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();}).then(entries=>{catalog=entries;if(!entries.length)throw new Error('No avatars configured');pendingEntry=randomEntry();return selectAvatar(pendingEntry);}).catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
 
 function drawWorld(dt=0){
  jetVisual.visible=!!game.jetpack;if(game.jetpack){jetVisual.position.set(game.jetpack.x,game.jetpack.y+Math.sin(visualTime*2)*.08,.6);jetVisual.rotation.y=Math.sin(visualTime*.9)*.45;}animateJetpack(jetVisual,visualTime,false);animateJetpack(jetEquipped,visualTime,true);
