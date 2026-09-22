@@ -37,11 +37,11 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4173/?test=1 >/dev/null
           node checks/game-browser.mjs
-      - name: Inspect source GLB
+      - name: Inspect default Willie GLB payload
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          const b = fs.readFileSync('public/model/chimpion.glb');
+          const parts=['00','01','02','03'].map(n=>fs.readFileSync('public/model/willie/part'+n+'.b64','utf8').trim()).join('');\n          const compressed=Buffer.from(parts,'base64');\n          const b=(await import('node:zlib')).gunzipSync(compressed);
           const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString());
           console.log(JSON.stringify({skins: json.skins, nodes: json.nodes.map(({name,children,translation,rotation}) => ({name,children,translation,rotation}))}, null, 2));
           NODE
