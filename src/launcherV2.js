@@ -101,8 +101,9 @@ function layout(){
       card.style.opacity='.95';
     }else{
       card.classList.add('is-far');
-      card.style.transform='translate3d(0px, 96px, -390px) scale(.56) rotateY(0deg)';
-      card.style.opacity='.62';
+      const farSpread=Math.min(650,spread*1.58);
+      card.style.transform=`translate3d(${farSpread}px, 88px, -300px) scale(.60) rotateY(-34deg)`;
+      card.style.opacity='.78';
     }
   });
 }
