@@ -34,4 +34,4 @@ assert.equal(sample.unlocked.length,6,'a qualifying run should unlock all goals'
 const repeat=evaluateJumpGoals({meters:120,bananas:28,cleanLandings:32},sample.unlocked);
 assert.equal(repeat.newlyUnlocked.length,0,'goals must not announce twice');
 
-console.log('PASS Chimp Jump audit gates: routing, desktop input/navigation, camera, persistence, replay, goals and canopy expansion');
+console.log('PASS Chimp Jump audit gates: routing, Willie default, desktop input/navigation, camera, persistence, replay, goals and canopy expansion');
