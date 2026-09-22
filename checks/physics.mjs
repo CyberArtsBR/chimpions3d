@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,BANANA_HEIGHT,VINE_INSET,EVENT_INTERVAL,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt,windAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,BANANA_HEIGHT,VINE_INSET,EVENT_INTERVAL,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt} from '../src/physics.js';
 import {scoreFor,ordinal} from '../src/score.js';
 assert.equal(scoreFor(123.9,4),163);assert.equal(scoreFor(500,0),500);assert.equal(ordinal(1),'1st');assert.equal(ordinal(2),'2nd');assert.equal(ordinal(3),'3rd');assert.equal(ordinal(10),'10th');
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
@@ -45,7 +45,7 @@ const fall=new Game(1);fall.y=-20;fall.step(0);assert(fall.dead);fall.reset(1);a
 const spring=fixture('spring');spring.y=.05;spring.vy=-20;spring.step(0);assert.equal(spring.vy,SPRING_JUMP);
 const broken=fixture('cracked');broken.y=.05;broken.vy=-20;broken.step(0);assert(broken.platforms[0].broken);
 // Standing still must no longer climb the generated route indefinitely.
-const idle=new Game(9);idle.windScale=0;for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert(idle.height-idleHeight<.01,'Wider early branches may help, but standing still cannot climb indefinitely');
+const idle=new Game(9);for(let i=0;i<3600;i++)idle.step(0);const idleHeight=idle.height;for(let i=0;i<3600;i++)idle.step(0);assert(idle.height-idleHeight<.01,'Wider early branches may help, but standing still cannot climb indefinitely');
 assert.equal(paceAt(0),.92);assert(paceAt(180)<3);assert(Math.abs(paceAt(300)-3)<1e-10);assert(Math.abs(paceAt(10000)-3)<1e-10);
 for(const boundary of [30,60,180,360]){
  const epsilon=1e-6,left=platformPhaseAt(boundary)-platformPhaseAt(boundary-epsilon),right=platformPhaseAt(boundary+epsilon)-platformPhaseAt(boundary);
@@ -111,7 +111,7 @@ for(let seed=0;seed<100;seed++){
  }
 }
 for(const type of ['solid','spring']){
- const g=fixture(type);g.time=230;g.nextJetAt=Infinity;g.y=.05;g.vy=-20;g.step(0);
+ const g=fixture(type);g.time=230;g.nextEventAt=Infinity;g.nextJetAt=Infinity;g.y=.05;g.vy=-20;g.step(0);
  assert(!g.platforms[0].broken,'Existing solid and spring platforms retain their type');
  assert.equal(g.vy,type==='spring'?SPRING_JUMP:JUMP,'Fragile spring still launches');
 }
@@ -119,7 +119,7 @@ console.log('PASS swept separation, restored gameplay pace, reduced dimensions a
 
 
 
-// Canopy expansion: special optional branches, wind, hazards and timed events remain deterministic.
+// Canopy expansion: special optional branches, hazards and timed events remain deterministic.
 const specialTypes=new Set();let hazardTotal=0;
 for(let seed=0;seed<180;seed++){
  const g=new Game(seed);g.camera=250;g.generate();
@@ -135,9 +135,19 @@ for(let i=0;i<40;i++)vanishEvents=vanishEvents.concat(vanish.step(0));
 assert(vanish.platforms[0].broken,'Vanish branch disappears shortly after landing');
 assert(vanishEvents.some(e=>e.type==='vanish'),'Vanish branch emits feedback event');
 
-assert.equal(windAt(30,7),0,'Crosswind must stay off during onboarding');
-const windSamples=[60,75,90,120].map(t=>Math.abs(windAt(t,7)));
-assert(windSamples.some(value=>value>.15),'Crosswind must become meaningful later in the run');
+// No-input runs must stay centered, including late-game pace and both canopy events.
+for(const seed of [1,7,44])for(const age of [0,60,120,300,600]){
+ const g=fixture();g.runSeed=seed;g.time=age;g.nextJetAt=Infinity;g.nextY=10000;
+ const seen=new Set();
+ for(let i=0;i<7200;i++){
+  for(const e of g.step(0))if(e.type==='event-start')seen.add(e.eventType);
+  assert.equal(g.x,0,'No lateral drift without input at age '+age);
+  assert.equal(g.vx,0,'No environmental lateral acceleration');
+  assert(!g.dead,'No-drift fixture must remain alive');
+ }
+ assert.deepEqual([...seen].sort(),['banana-bloom','spring-fever']);
+}
+console.log('PASS no-input drift regression across 15 seeded early/late runs and both events');
 
 const leafMotion={baseX:0,type:'leaf',moveSpeed:1,moveRange:1.05,phase:.4};
 const swingMotion={baseX:0,type:'swing',moveSpeed:1,moveRange:1.35,phase:.8};
@@ -146,13 +156,13 @@ assert.notEqual(platformX(swingMotion,1),platformX(swingMotion,2),'Swing platfor
 
 const eventGame=fixture();eventGame.nextJetAt=Infinity;eventGame.time=EVENT_INTERVAL-STEP/2;
 const eventEvents=eventGame.step(0);assert(eventEvents.some(e=>e.type==='event-start'),'Timed canopy event starts at the first interval');
-assert(eventGame.event&&['wind-surge','banana-bloom','spring-fever'].includes(eventGame.event.type));
+assert(eventGame.event&&['banana-bloom','spring-fever'].includes(eventGame.event.type));
 
 const hazardGame=fixture();hazardGame.nextJetAt=Infinity;hazardGame.y=.2;hazardGame.vy=0;hazardGame.hazards=[{id:1,type:'thorn-pod',x:0,baseX:0,y:.65,radius:.42,range:0,speed:0,phase:0}];
 const hazardEvents=hazardGame.step(0);assert(hazardEvents.some(e=>e.type==='hazard'),'Thorn pod collision emits a hazard event');
 assert(hazardGame.hazardCooldown>0,'Hazard knockback has a short repeat-hit cooldown');
 
-console.log('PASS canopy expansion: leaf/swing/vanish branches, hazards, wind and timed events');
+console.log('PASS canopy expansion: leaf/swing/vanish branches, hazards and timed events');
 
 
 let bananaPlatforms=0,bananaEligible=0;

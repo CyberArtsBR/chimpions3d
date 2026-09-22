@@ -92,7 +92,8 @@ try{
   assert(playing.authoredBranches>0,'Authored branch assets must render during gameplay');
   assert.equal(playing.cameraZoom,1,'Gameplay camera must settle to the complete route view');
   assert(Array.isArray(playing.platformTypes)&&playing.platformTypes.includes('solid'),'Expansion telemetry must expose live platform types');
-  assert.equal(typeof playing.wind,'number');
+  assert(!('wind' in playing));
+  assert.equal(await page.locator('#wind').count(),0,'Removed wind HUD must not remain');
   assert.equal(typeof playing.hazardCount,'number');
   assert(playing.musicPlaybackRate>=.98&&playing.musicPlaybackRate<=1.06,'Reactive music rate stays subtle');
 
@@ -130,10 +131,10 @@ try{
     const g=window.chimpJumpTest.game();g.time=44.99;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=Infinity;
     window.chimpJumpTest.step(2);
   });
-  assert(['wind-surge','banana-bloom','spring-fever'].includes(await page.evaluate(()=>window.chimpJump().event)));
+  assert(['banana-bloom','spring-fever'].includes(await page.evaluate(()=>window.chimpJump().event)));
   assert(await page.locator('#canopy-event').isVisible(),'Canopy event badge must be visible during an active event');
   await screenshot('game-canopy-event-desktop.png');
-  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.time=0;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=30;g.wind=0;});
+  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.time=0;g.event=null;g.eventIndex=0;g.nextEventAt=45;g.nextJetAt=30;});
 
   await screenshot('game-playing-desktop.png');
   await page.setViewportSize({width:1920,height:1080});
@@ -159,7 +160,7 @@ try{
   // Long-session desktop pacing check using a deterministic safe bounce fixture.
   await page.evaluate(()=>{
     const g=window.chimpJumpTest.game();
-    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;g.windScale=0;g.hazards=[];
+    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=100;g.hazards=[];
     g.platforms=[{id:9000,x:0,baseX:0,y:0,width:10,type:'solid',coin:false,broken:false}];
   });
   const paceSamples=[];

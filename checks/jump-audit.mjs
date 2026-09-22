@@ -17,7 +17,7 @@ assert(game.includes("entry.id==='chimpion'"),'startup must use the known lightw
 assert(game.includes("chimp-run-finished"),'completed runs must publish a summary for goals');
 assert(results.includes('Replay this trail'),'results must expose reproducible same-seed practice');
 for(const type of ["'leaf'","'vanish'","'swing'"])assert(physics.includes(type),'canopy expansion must retain '+type+' platform generation');
-assert(physics.includes('windAt')&&physics.includes("'event-start'"),'wind and timed canopy events must remain wired into physics');
+assert(!physics.includes('windAt')&&physics.includes("'event-start'"),'wind must be absent while timed canopy events remain wired into physics');
 assert(physics.includes("'thorn-pod'"),'environmental thorn hazards must remain enabled');
 assert(scenery.includes('animateHazard')&&scenery.includes('jetTrail'),'hazard animation and jet trail polish must remain');
 assert(audio.includes('setIntensity')&&audio.includes('milestone'),'reactive music and milestone audio must remain');
