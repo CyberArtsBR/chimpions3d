@@ -131,7 +131,7 @@ export class Game {
         if(!places.length)continue;
         const px=this.random()<.5?places[0]:places.at(-1);
         const rewardType=['spring','leaf','vanish','swing'].includes(type);
-        const optionalBanana=this.random()<(rewardType?.72:.48);
+        const optionalBanana=this.random()<(rewardType ? .72 : .48);
         if(this.add(px,optionalY,optionalWidth,type,optionalBanana,rewardType?'reward':'risk')){
           const placed=this.platforms.at(-1);
           if(rewardType)placed.reward=2;
