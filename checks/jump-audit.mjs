@@ -13,7 +13,8 @@ assert(game.includes('countdownTime=3')&&game.includes('introTime=0'),'fresh run
 assert(game.includes('const startZoom=2.08'),'countdown and intro must keep the requested character close-up');
 assert(!game.includes('const startZoom=1.72'),'the old opening zoom must not return');
 assert(game.includes("chimp-jump-muted")&&game.includes("chimp-jump-detail"),'player preferences must persist');
-assert(game.includes("entry.id==='chimpion'"),'startup must use the known lightweight default avatar instead of a random GLB');
+assert(game.includes("entry.id==='steamboat-willie'"),'startup must prefer the rigged Steamboat Willie default avatar');
+assert(game.includes("entry.id==='chimpion'"),'startup fallback must preserve Silver Chimp');
 assert(game.includes("chimp-run-finished"),'completed runs must publish a summary for goals');
 assert(results.includes('Replay this trail'),'results must expose reproducible same-seed practice');
 for(const type of ["'leaf'","'vanish'","'swing'"])assert(physics.includes(type),'canopy expansion must retain '+type+' platform generation');
