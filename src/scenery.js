@@ -268,6 +268,18 @@ export function createScenery(scene,renderer){
   instances(mossGeo,branchMoss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
   instances(leafGeo,leaf,detail,7,(i,o)=>{o.position.set((i/6-.5)*p.width*.85,-.31,.05);o.scale.set(.11,.22,1);o.rotation.z=(i%2?1:-1)*.6;});
   instances(leafGeo,leaf,fallback,14,(i,o)=>{o.position.set((i/13-.5)*p.width,-.16-Math.sin(i*3.1)*.045,.12);o.rotation.set(.1,Math.sin(i)*.5,Math.sin(i*7+p.id)*.9);o.scale.set(.1,.13+Math.abs(Math.sin(i*2))*.12,1);});
+
+  // High-detail contour work for procedural/special branches. It stays below the
+  // landing plane, so silhouettes gain taper, knots and moss without changing physics.
+  const organic=new THREE.Group();organic.name='organic-platform-detail';organic.userData.desktopDetail=true;organic.visible=highQuality;fallback.add(organic);
+  for(const [side,index] of [[-1,0],[1,1]]){
+   const spur=mesh(logGeo,branchBark,organic,side*p.width*(.38+variant*.012),-.3,-.06+index*.03);
+   spur.scale.set(.13+variant*.012,.42+variant*.045,.13);spur.rotation.z=side*(.9+variant*.055);spur.rotation.x=side*.09;spur.castShadow=spur.receiveShadow=true;
+   const tuft=mesh(mossGeo,branchMoss,organic,side*p.width*.34,-.055,.02-index*.04);
+   tuft.scale.set(.28+variant*.025,.045,.18+variant*.015);tuft.rotation.z=side*(.08+variant*.018);tuft.receiveShadow=true;
+  }
+  instances(knotGeo,end,organic,3,(i,o)=>{o.position.set((i-1)*p.width*.27,-.255,.205);o.rotation.y=Math.PI/2;o.scale.set(.85+i*.08,.75,.7);});
+  instances(mossGeo,branchMoss,organic,5,(i,o)=>{o.position.set((i/4-.5)*p.width*.68,-.035,Math.sin(i*2.6)*.105);o.scale.set(.12+.025*(i%2),.035,.12+.02*((i+1)%2));});
   if(p.type==='moving'){
    const paddles=new THREE.Group();group.add(paddles);group.userData.paddles=paddles;
    for(const side of [-1,1]){const fin=mesh(arrowGeo,blue,paddles,side*(p.width*(.34+variant%3*.055)),-.23*PLATFORM_SCALE,.48);fin.rotation.z=side<0?Math.PI:0;fin.scale.setScalar((.22+variant*.012)*PLATFORM_SCALE);}
@@ -275,12 +287,14 @@ export function createScenery(scene,renderer){
   }
   if(p.type==='leaf'){
    const leafPad=new THREE.Group();group.add(leafPad);group.userData.leafPad=leafPad;
-   instances(leafGeo,leafBright,leafPad,9,(i,o)=>{const lane=i%3,row=Math.floor(i/3);o.position.set((lane-1)*p.width*.28,-.02+row*.018,.18-row*.08);o.rotation.set(.18,(lane-1)*.16,(lane-1)*.52+(row-1)*.12);o.scale.set(.34+.03*row,.52+.06*(i%2),1);});
+   const leafStem=mesh(logGeo,branchBark,leafPad,0,-.22,-.02);leafStem.rotation.z=Math.PI/2;leafStem.scale.set(.12,p.width*.44,.12);leafStem.castShadow=true;
+   instances(leafGeo,leafBright,leafPad,11,(i,o)=>{const lane=i%3,row=Math.floor(i/3);o.position.set((lane-1)*p.width*.27+(row%2?-.04:.04),-.03+row*.015,.2-row*.065);o.rotation.set(.18,(lane-1)*.16,(lane-1)*.48+(row-1)*.1);o.scale.set(.31+.035*row,.48+.055*(i%2),1);});
    instances(knotGeo,vineGlow,leafPad,3,(i,o)=>{o.position.set((i-1)*p.width*.24,-.18,.1);o.rotation.x=Math.PI/2;o.scale.set(1.4,1.4,.8);});
   }
   if(p.type==='swing'){
    const swingRig=new THREE.Group();group.add(swingRig);group.userData.swingRig=swingRig;
    instances(knotGeo,cream,swingRig,2,(i,o)=>{o.position.set((i?1:-1)*p.width*.36,.05,.08);o.rotation.x=Math.PI/2;o.scale.set(1.55,1.55,.9);});
+   for(const side of [-1,1]){const root=mesh(logGeo,branchBark,swingRig,side*p.width*.35,-.34,-.06);root.scale.set(.08,.28,.08);root.rotation.z=side*.2;root.castShadow=true;}
   }
   if(p.type==='vanish'){
    const vanishGlow=new THREE.Group();group.add(vanishGlow);group.userData.vanishGlow=vanishGlow;
