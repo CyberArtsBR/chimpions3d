@@ -1,0 +1,24 @@
+name: Export Ski Music
+
+on:
+  push:
+    branches:
+      - temp/export-ski-music
+
+jobs:
+  export-music:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source asset
+        run: |
+          test -f public/audio/music-full.mp3
+          ls -lh public/audio/music-full.mp3
+          sha1sum public/audio/music-full.mp3
+      - name: Upload exact source asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: chimp-jump-music-full
+          path: public/audio/music-full.mp3
+          if-no-files-found: error
+          compression-level: 0
