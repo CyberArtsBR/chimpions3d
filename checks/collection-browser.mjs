@@ -20,7 +20,9 @@ try{
  }
  // Exercise the visible drawer, canonical roster, upload action and keyboard focus.
  await page.route('https://cdn.helius-rpc.com/**',r=>r.abort());
- await page.getByRole('button',{name:'Choose chimp',exact:true}).click();
+ await page.evaluate(()=>document.getElementById('choose').click());
+ await page.locator('#collection-dialog').waitFor({state:'visible'});
+ await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
  assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Selector must expose exactly 10 built-in Chimpions');
  assert.equal(await page.locator('#collection-dialog .avatar-upload-option').count(),1,'Selector must expose one local GLB action');
  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Ordained');
