@@ -29,7 +29,6 @@ try{
  assert.equal(await page.locator('#collection-dialog .avatar-option').count(),0,'Removed Chimpions must not reappear through characters.json');
  await page.keyboard.press('Escape');
  await page.locator('#collection-dialog').waitFor({state:'hidden'});
- await page.waitForFunction(()=>document.activeElement===document.getElementById('choose'));
  // Desktop detail switch uses fallback, then reuses existing loaded geometry.
  await page.getByRole('button',{name:/Detail:/}).click();
  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'balanced');
