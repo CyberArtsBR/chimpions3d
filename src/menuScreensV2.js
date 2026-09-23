@@ -1,5 +1,6 @@
 import './menuScreensV2.css';
 import './menuScreensFinal.css';
+import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 
 const launcher=()=>{location.href='/'};
 function backButton(parent,className=''){
@@ -29,6 +30,7 @@ export function setupDashMenu(){
     <header><h2>Choose your Chimpion</h2><button class="picker-close" aria-label="Close character selection">×</button></header>
     <div class="picker-selection-actions">
       <button class="picker-random">Random Chimpion</button>
+      <button class="picker-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button>
       <div class="picker-current"><img alt="" hidden><p role="status">Choose a Chimpion</p></div>
       <button class="picker-play">Play with selected Chimpion</button>
     </div>
@@ -57,11 +59,12 @@ export function setupDashMenu(){
 
   Promise.all([fetch('/avatars.json').then(r=>r.json()),fetch('/characters.json').then(r=>r.json()).catch(()=>[])])
     .then(([avatars,cards])=>{
-      const images=new Map(cards.map(c=>[c.id,c.image]));
-      entries=avatars.filter(e=>e.url).map(e=>({...e,image:e.image||images.get(e.id)}));
+      const approvedCards=filterBuiltInRoster(cards),images=new Map(approvedCards.map(c=>[String(c.id),c.image]));
+      entries=filterBuiltInRoster(avatars.filter(e=>e.url)).map(e=>({...e,image:e.image||images.get(String(e.id))}));
+      if(entries.length!==10)throw new Error('Expected exactly 10 approved built-in Chimpions');
       let saved='';try{saved=localStorage.getItem('chimpions-lab-avatar')||'';}catch{}
-      selected=entries.find(e=>String(e.id)===String(saved))||entries[Math.floor(Math.random()*entries.length)]||null;render();
-    });
+      selected=entries.find(e=>String(e.id)===String(saved))||fallbackBuiltIn(entries);render();
+    }).catch(error=>{status.textContent='Character roster unavailable: '+error.message;});
 
   start.onclick=()=>dialog.showModal();
   dialog.querySelector('.picker-close').onclick=()=>dialog.close();
@@ -71,11 +74,16 @@ export function setupDashMenu(){
   dialog.querySelector('.picker-random').onclick=()=>{
     if(!entries.length)return;selected=entries[Math.floor(Math.random()*entries.length)];search.value='';filtered=entries;page=Math.max(0,Math.floor(entries.findIndex(e=>e.id===selected.id)/perPage));render();
   };
+  const beginWhenReady=()=>{if(!trigger)return;if(trigger.disabled){setTimeout(beginWhenReady,80);return;}trigger.click();};
+  dialog.querySelector('.picker-upload').onclick=()=>document.querySelector('#dash-upload')?.click();
+  window.addEventListener('chimpions-dash-avatar-loaded',event=>{
+    if(!event.detail?.local)return;
+    selected=null;preview.hidden=true;status.textContent=event.detail.name+' · local GLB ready';dialog.close();beginWhenReady();
+  });
   dialog.querySelector('.picker-play').onclick=()=>{
     if(!selected||!trigger)return;
     const select=document.querySelector('#lab-avatar');if(!select)return;
-    select.value=selected.id;select.dispatchEvent(new Event('change'));dialog.close();
-    const begin=()=>trigger.disabled?setTimeout(begin,80):trigger.click();begin();
+    select.value=selected.id;select.dispatchEvent(new Event('change'));dialog.close();beginWhenReady();
   };
   back.onclick=launcher;
 }

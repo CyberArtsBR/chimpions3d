@@ -24,12 +24,17 @@ page.on('response',res=>{
 });
 
 const avatars=[
-  ['26','The Bosun'],
-  ['69','The Executioner'],
-  ['118','The Knight Commander'],
-  ['142','The One Who Rocks Hard'],
+  ['12','The Archon'],
+  ['95','The Heretic'],
+  ['38','The Commodore'],
+  ['158','The Pioneer'],
+  ['166','The Punk'],
   ['193','The Street Fighter'],
-];
+  ['26','The Bosun'],
+  ['3','The Adolescent'],
+  ['9','The Angsty'],
+  ['11','The Apologetic'],
+]
 const report={avatars:[],errors,network};
 const preparing='Preparing pose and checking skeleton…';
 
@@ -90,7 +95,7 @@ try{
   }
   assert.deepEqual(errors,[]);
   console.log('AVATAR_BROWSER_REPORT:'+JSON.stringify(report));
-  console.log('PASS avatars: all five supplied Chimpions load through the real browser character pipeline');
+  console.log('PASS avatars: all ten approved Chimpions load through the real browser character pipeline');
 }finally{
   saveReport();
   await browser.close();

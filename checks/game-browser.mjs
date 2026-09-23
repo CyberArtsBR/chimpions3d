@@ -241,15 +241,17 @@ try{
   assert(after.geometries<=before.geometries+3,'Geometry count must remain bounded after repeated desktop restarts');
   assert(after.textures<=before.textures+1,'Texture count must remain bounded after repeated desktop restarts');
 
-  // Catalog search remains functional after the stress cycle.
+  // Catalog search remains functional after the stress cycle and removed characters stay absent.
   await page.evaluate(()=>{window.chimpJumpTest.game().y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
   await page.route('https://cdn.helius-rpc.com/**',route=>route.abort());
   await page.locator('#choose-again').click();
-  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aviator');
-  assert(await page.getByRole('button',{name:'The Aviator · GLB coming soon',exact:true}).isDisabled());
-  assert.equal(await page.locator('.avatar-option').count(),1);
-  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Aberration');
-  await page.getByRole('button',{name:'The Aberration',exact:true}).click();
+  assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Jump selector must expose exactly 10 approved built-ins');
+  assert.equal(await page.locator('#collection-dialog .avatar-upload-option').count(),1,'Jump selector must expose one local GLB upload action');
+  const rosterSearch=page.getByRole('searchbox',{name:'Search characters'});
+  await rosterSearch.fill('The Aviator');
+  assert.equal(await page.locator('#collection-dialog .avatar-option').count(),0,'Removed characters must not reappear in search');
+  await rosterSearch.fill('The Archon');
+  await page.getByRole('button',{name:'The Archon',exact:true}).click();
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.waitForFunction(()=>window.chimpJump().ready);

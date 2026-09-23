@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import {createLabRunnerCharacter} from './labRunnerCharacter.js';
+import {readLocalGLB} from './upload.js';
+import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
 const voice=new GameAudio(true);
@@ -32,7 +34,7 @@ document.body.innerHTML=`
     <p>Automatic side-running at full pace. Jump, slide and read the jungle while your selected rigged Chimpion stays in motion.</p>
     <label>YOUR RUNNING MATE<select id="lab-avatar" aria-label="Choose Chimpion"></select></label>
     <div id="lab-message" role="status">Loading Chimpion…</div>
-    <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><a href="./">Back to Chimp Jump</a></div>
+    <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><button id="dash-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="dash-avatar-file" type="file" accept=".glb" hidden><a href="./">Back to Chimp Jump</a></div>
     <p class="controls">Mouse: hold left to jump higher · right to duck. Controller: ↑ / ↓ or A / B.<br><kbd>SPACE</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> jump · <kbd>↓</kbd>/<kbd>SHIFT</kbd>/<kbd>S</kbd>/<kbd>A</kbd> slide · <kbd>P</kbd> pause</p>
   </section>
   <section id="dash-over" class="dash-panel modal" hidden><span class="eyebrow">RUN COMPLETE</span><h2>THE JUNGLE WON THIS ROUND</h2><p id="dash-result"></p><div class="dash-menu-actions"><button id="dash-retry" class="primary">RUN AGAIN</button><button id="dash-change">Change Chimpion</button><a href="?dash=1">Back to the home screen</a></div></section>
@@ -136,17 +138,21 @@ for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){
 
 let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
-  if(!entry?.url||loading)return;
+  if((!entry?.url&&!entry?.buffer)||loading)return false;
+  if(!entry.buffer&&character&&currentEntry?.id===entry.id)return true;
   loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
   try{
-    const next=await createLabRunnerCharacter(BASE+entry.url);
+    const next=await createLabRunnerCharacter(entry.buffer||BASE+entry.url);
     if(character){scene.remove(character.root);character.dispose();}
     character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);
-    try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
-    $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones';
+    if(!entry.buffer)try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
+    $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones'+(entry.buffer?' · local file':'');
     $('dash-start').disabled=false;
+    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer}}));
+    return true;
   }catch(error){
     console.error(error);$('dash-start').disabled=!character;$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
+    return false;
   }finally{loading=false;$('lab-avatar').disabled=false;}
 }
 
@@ -521,6 +527,8 @@ $('dash-pause').onclick=()=>state==='paused'?resume():pause();
 $('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-start').onclick=startRun;
 $('dash-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math.floor(Math.random()*catalog.length)];$('lab-avatar').value=entry.id;loadAvatar(entry);};
 $('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
+$('dash-upload').onclick=()=>$('dash-avatar-file').click();
+$('dash-avatar-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{const buffer=await readLocalGLB(file);await loadAvatar({id:'local-custom',name:file.name.replace(/\.glb$/i,''),buffer,local:true});}catch(error){$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');}};
 
 function pollGamepad(){
  const p=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected);
@@ -533,12 +541,18 @@ function pollGamepad(){
 }
 
 fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
-  catalog=entries.filter(e=>e.url);
+  catalog=filterBuiltInRoster(entries.filter(e=>e.url));
+  if(catalog.length!==10)throw new Error('Expected exactly 10 approved built-in Chimpions');
   for(const entry of catalog){const option=document.createElement('option');option.value=entry.id;option.textContent=entry.name;$('lab-avatar').append(option);}
-  let saved;try{saved=localStorage.getItem('chimpions-lab-avatar');}catch{}
-  const entry=catalog.find(e=>e.id===saved)||catalog.find(e=>e.id==='chimpion')||catalog[0];
+  let saved='';try{saved=localStorage.getItem('chimpions-lab-avatar')||'';}catch{}
+  const savedEntry=catalog.find(e=>String(e.id)===String(saved));
+  const entry=savedEntry||fallbackBuiltIn(catalog);
+  if(!entry)throw new Error('No approved Dash avatar available');
   $('lab-avatar').value=entry.id;return loadAvatar(entry);
-}).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable.';console.error(error);});
+}).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
+
+window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1});
+if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput};
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{

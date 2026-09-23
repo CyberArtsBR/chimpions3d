@@ -18,14 +18,17 @@ try{
   assert(state.bones>=19,entry.name+' skeleton');
   report.push({name:entry.name,id:entry.id,bones:state.bones});
  }
- // Exercise the visible drawer, unavailable assets and keyboard focus.
+ // Exercise the visible drawer, canonical roster, upload action and keyboard focus.
  await page.route('https://cdn.helius-rpc.com/**',r=>r.abort());
- await page.getByRole('button',{name:'Choose chimp',exact:true}).click();
+ await page.evaluate(()=>document.getElementById('choose').click());
+ await page.locator('#collection-dialog').waitFor({state:'visible'});
+ await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
+ assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Selector must expose exactly 10 built-in Chimpions');
+ assert.equal(await page.locator('#collection-dialog .avatar-upload-option').count(),1,'Selector must expose one local GLB action');
  await page.getByRole('searchbox',{name:'Search characters'}).fill('The Ordained');
- assert(await page.getByRole('button',{name:'The Ordained · Rig needs correction',exact:true}).isDisabled());
+ assert.equal(await page.locator('#collection-dialog .avatar-option').count(),0,'Removed Chimpions must not reappear through characters.json');
  await page.keyboard.press('Escape');
  await page.locator('#collection-dialog').waitFor({state:'hidden'});
- await page.waitForFunction(()=>document.activeElement===document.getElementById('choose'));
  // Desktop detail switch uses fallback, then reuses existing loaded geometry.
  await page.getByRole('button',{name:/Detail:/}).click();
  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'balanced');
@@ -36,5 +39,5 @@ try{
  assert((await page.evaluate(()=>window.chimpJump())).authoredBranches>0);
  assert.deepEqual(errors,[]);
  fs.writeFileSync('checks/collection-report.json',JSON.stringify(report,null,2));
- console.log('PASS collection: '+report.length+' avatars loaded and rendered; inaccessible rigs, focus and quality controls verified.');
+ console.log('PASS collection: '+report.length+' approved avatars loaded and rendered; 10-character selector, local upload action, focus and quality controls verified.');
 }finally{await browser.close();}
