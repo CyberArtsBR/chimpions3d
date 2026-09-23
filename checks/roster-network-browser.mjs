@@ -46,6 +46,8 @@ try{
 
   await jump.getByRole('button',{name:'Choose chimp',exact:true}).click();
   await jump.locator('#collection-dialog').waitFor({state:'visible'});
+  await jump.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
+  await jump.waitForFunction(()=>document.querySelectorAll('#collection-dialog .avatar-option').length===10);
   assert.equal(await jump.locator('#collection-dialog .avatar-option').count(),10,'Jump selector must expose exactly 10 built-ins');
   assert.equal(await jump.locator('#collection-dialog .avatar-upload-option').count(),1,'Jump selector must expose local GLB upload');
   const openedCount=jumpRequests.length;
@@ -87,6 +89,7 @@ try{
 
   await dash.locator('.dash-start-hotspot').click();
   await dash.locator('#dash-character-picker').waitFor({state:'visible'});
+  await dash.waitForFunction(()=>document.querySelectorAll('#dash-character-picker .picker-option').length===10);
   assert.equal(await dash.locator('#dash-character-picker .picker-option').count(),10,'Dash picker must expose exactly 10 built-ins');
   assert.equal(await dash.locator('#dash-character-picker .picker-upload').count(),1,'Dash picker must expose local GLB upload');
   const dashOpened=dashRequests.length;
