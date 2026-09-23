@@ -68,7 +68,7 @@ body[data-lab-state="menu"].dash-start-screen .games-back:hover{filter:brightnes
 #dash-character-picker::backdrop{background:#081710c9;backdrop-filter:blur(7px)}
 #dash-character-picker header{display:flex;align-items:center;justify-content:space-between;gap:15px}#dash-character-picker h2{font-size:23px;margin:0}
 #dash-character-picker .picker-close{color:#fff4d6;background:#ffffff14;border:1px solid #c3cba955;border-radius:12px;width:44px;height:44px;font-size:28px;cursor:pointer}
-.picker-selection-actions{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;margin:15px 0;padding:12px;border:1px solid #b8d09a40;border-radius:15px;background:#102d23}
+.picker-selection-actions{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:12px;margin:15px 0;padding:12px;border:1px solid #b8d09a40;border-radius:15px;background:#102d23}
 .picker-selection-actions button,#dash-character-picker footer button{border:1px solid #b8d09a55;background:#183c2e;color:#fff2c4;border-radius:9px;padding:10px 13px;cursor:pointer;font-weight:750}
 .picker-selection-actions .picker-play{background:#ffe081;color:#233b24;border-color:#ffe081;font-weight:900;box-shadow:0 4px #b89540}
 .picker-current{min-width:0;display:flex;align-items:center;gap:10px}.picker-current img{width:62px;height:62px;object-fit:contain;border-radius:10px;background:#081d17;filter:drop-shadow(0 4px 10px #061b16)}.picker-current p{margin:0;font-weight:800;overflow-wrap:anywhere}

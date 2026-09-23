@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {validateGLB} from './upload.js';
 
 const BONE_MAPPING={
   hips:null,spine:null,chest:null,neck:null,head:null,
@@ -25,12 +26,34 @@ function nameParts(name){
 function isDescendant(child,ancestor){for(let p=child?.parent;p;p=p.parent)if(p===ancestor)return true;return false;}
 function worldDirection(a,b){return b.getWorldPosition(new THREE.Vector3()).sub(a.getWorldPosition(new THREE.Vector3())).normalize();}
 
-export async function createLabRunnerCharacter(url){
-  const gltf=await new GLTFLoader().loadAsync(url),model=gltf.scene,root=new THREE.Group(),visual=new THREE.Group();
+export async function createLabRunnerCharacter(source){
+  const manager=new THREE.LoadingManager();
+  const isLocal=source instanceof ArrayBuffer;
+  if(isLocal){
+    validateGLB(source);
+    manager.setURLModifier(value=>{
+      if(!value.startsWith('blob:')&&!value.startsWith('data:'))throw new Error('External avatar resources are not supported.');
+      return value;
+    });
+  }
+  const loader=new GLTFLoader(manager);
+  const gltf=isLocal?await loader.parseAsync(source,''):await loader.loadAsync(source),model=gltf.scene,root=new THREE.Group(),visual=new THREE.Group();
   root.add(visual);visual.add(model);model.visible=false;
   const rig={},bases=new Map(),axes=new Map(),used=new Set(),q=new THREE.Quaternion(),delta=new THREE.Quaternion();
   let phase=0,elapsed=0,bodyOffset=0,landingPulse=0,duckBlend=0;
-  const bones=[];model.traverse(o=>{if(o.isBone)bones.push(o);});if(!bones.length)throw new Error('GLB has no bones.');
+  const bones=[],textures=new Set();let triangles=0,skinned=0;
+  model.traverse(o=>{
+    if(o.isBone)bones.push(o);
+    if(o.isSkinnedMesh)skinned++;
+    if(o.isMesh){
+      triangles+=(o.geometry.index?.count||o.geometry.attributes.position?.count||0)/3;
+      for(const material of(Array.isArray(o.material)?o.material:[o.material]))Object.values(material||{}).forEach(value=>{if(value?.isTexture)textures.add(value);});
+    }
+  });
+  if(!bones.length)throw new Error('GLB has no bones.');
+  if(!skinned)throw new Error('The avatar has no skinned mesh.');
+  if(isLocal&&triangles>300000)throw new Error('Use an avatar below 300,000 triangles.');
+  if(isLocal){let pixels=0;for(const texture of textures){const image=texture.source?.data;pixels+=(image?.width||0)*(image?.height||0);}if(pixels>48*1024*1024)throw new Error('Avatar textures are too large. Try 2K or smaller textures.');}
   for(const key of Object.keys(BONE_MAPPING)){
     const side=key.startsWith('left')?'left':key.startsWith('right')?'right':'',kind=side?key.slice(side.length):key;
     let matches=bones.filter(b=>{if(BONE_MAPPING[key])return b.name===BONE_MAPPING[key];const p=nameParts(b.name);return p.side===side&&(aliases[kind]||[]).includes(p.core);});

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {BUILT_IN_CHIMPION_NAMES,filterBuiltInRoster} from '../src/roster.js';
 
 function parseGLB(filePath){
   const b=fs.readFileSync(filePath);
@@ -72,9 +73,14 @@ function collectTextReferences(){
   return text;
 }
 
-const avatars=JSON.parse(fs.readFileSync('public/avatars.json','utf8'));
-assert(avatars.filter(a=>a.url).length>200,'Expected complete uploaded collection');
+const avatars=filterBuiltInRoster(JSON.parse(fs.readFileSync('public/avatars.json','utf8')));
+assert.equal(avatars.length,10,'Expected exactly 10 approved built-in Chimpions');
+assert.deepEqual(avatars.map(a=>a.name),BUILT_IN_CHIMPION_NAMES,'Roster order/names must match the canonical allowlist');
 assert.equal(new Set(avatars.map(a=>a.id)).size,avatars.length,'Unique IDs');
+assert(avatars.every(a=>a.url?.startsWith('model/characters/')),'Every built-in must resolve inside public/model/characters');
+const characterFiles=fs.readdirSync('public/model/characters').filter(name=>/\.glb$/i.test(name)).sort();
+assert.deepEqual(characterFiles,[...BUILT_IN_CHIMPION_NAMES].map(name=>name+'.glb').sort(),'Character directory must contain only the 10 approved GLBs');
+assert(fs.existsSync('public/model/chimpion.glb'),'Required non-roster public/model/chimpion.glb must be preserved');
 
 const avatarReport=[];
 for(const avatar of avatars.filter(a=>a.url)){
@@ -167,4 +173,4 @@ console.log('ASSET_AUDIT_SUMMARY:'+JSON.stringify(audit.summary));
 if(rootGlbs.length)console.log('ROOT_GLB_REVIEW:'+JSON.stringify(rootGlbs));
 if(duplicateGroups.length)console.log('DUPLICATE_ASSET_GROUPS:'+JSON.stringify(duplicateGroups));
 if(possiblyUnreferenced.length)console.log('POSSIBLY_UNREFERENCED:'+JSON.stringify(possiblyUnreferenced));
-console.log('PASS assets: uploaded Chimpions and branch-moss.glb are valid; audit report generated without deleting assets');
+console.log('PASS assets: exactly 10 approved Chimpion GLBs are valid; non-roster chimpion.glb and branch-moss.glb are preserved');

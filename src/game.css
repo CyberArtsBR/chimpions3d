@@ -37,6 +37,7 @@
 #avatar-list input{width:100%;border:1px solid #b5d79d55;border-radius:9px;background:#082b25;color:#fff6d5;padding:11px;margin-bottom:10px;font:inherit}
 .avatar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .avatar-option{display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px;min-width:0;border:1px solid #93b99c55;background:#163e30}
+.avatar-upload-option{display:flex;align-items:center;justify-content:center;min-height:118px;padding:12px;border:2px dashed #ffe08188;border-radius:12px;background:#183d31;color:#ffe6a2;font-weight:850;text-align:center;line-height:1.25}
 .avatar-option[aria-pressed=true]{border-color:#ffe081;background:#355333}
 .avatar-option img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px}
 .avatar-option strong{font-size:10px;overflow-wrap:anywhere}.avatar-option small{font-size:9px;color:#c7d6b7}
