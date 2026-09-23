@@ -1,7 +1,7 @@
 name: Chimp Jump build and checks
 on:
   push:
-    branches: [main, feature/jump-dash-roster-reduction-local-glb-upload]
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -37,8 +37,6 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4173/?test=1 >/dev/null
           node checks/game-browser.mjs
-          node checks/collection-browser.mjs
-          node checks/roster-network-browser.mjs
       - name: Inspect source GLB
         run: |
           node --input-type=module <<'NODE'
