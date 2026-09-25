@@ -13,6 +13,20 @@ try{
   report.samples.initial=await sample();
   for(const [key,max] of Object.entries(budgets.high))assert(report.samples.initial[key]<=max,`${key} ${report.samples.initial[key]} exceeds HIGH budget ${max}`);
 
+  await page.evaluate(()=>window.chimpJumpTest.resumeRendering());
+  const frameTimes=await page.evaluate(()=>new Promise(resolve=>{
+    const samples=[];let previous=performance.now();
+    function frame(now){
+      samples.push(now-previous);previous=now;
+      if(samples.length>=120)resolve(samples);else requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }));
+  const sorted=[...frameTimes].sort((a,b)=>a-b);
+  const percentile=p=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))];
+  report.frameTime={samples:frameTimes.length,p50Ms:Number(percentile(.50).toFixed(2)),p95Ms:Number(percentile(.95).toFixed(2)),p99Ms:Number(percentile(.99).toFixed(2)),maxMs:Number(Math.max(...frameTimes).toFixed(2))};
+  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+
   await page.evaluate(()=>{
     const g=window.chimpJumpTest.game();
     g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.nextY=10000;g.hazards=[];g.nextJetAt=Infinity;g.nextEventAt=Infinity;
