@@ -31,8 +31,13 @@ export function attachPageDiagnostics(page){
   return {errors,consoleErrors,failedRequests,sameOriginFailures};
 }
 
-export async function waitForVisualReadiness(page,{timeout=45000}={}){
-  await page.waitForFunction(()=>{const s=window.chimpJump?.();return !!s?.ready&&document.body?.dataset?.mode==='menu'&&(s.quality==='high'?(s.platformReady&&s.backgroundReady):s.treeVisible);},null,{timeout});
+export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored=true}={}){
+  await page.waitForFunction(requireAuthored=>{
+    const s=window.chimpJump?.();
+    if(!s?.ready||document.body?.dataset?.mode!=='menu')return false;
+    if(!requireAuthored)return true;
+    return s.quality==='high'?(s.platformReady&&s.backgroundReady):s.treeVisible;
+  },requireAuthored,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
     const images=[...document.images].filter(img=>!img.hidden);
@@ -44,12 +49,12 @@ export async function waitForVisualReadiness(page,{timeout=45000}={}){
   });
 }
 
-export async function gotoJump(page,{test=true,query=''}={}){
+export async function gotoJump(page,{test=true,query='',requireAuthored=true}={}){
   const params=new URLSearchParams(query);
   if(test)params.set('test','1');
   else if(!params.has('play')&&!params.has('dash'))params.set('play','jump');
   await page.goto(BASE+'/?'+params.toString(),{waitUntil:'domcontentloaded',timeout:45000});
-  await waitForVisualReadiness(page);
+  await waitForVisualReadiness(page,{requireAuthored});
 }
 
 export async function assertNoHorizontalOverflow(page,label='page'){
