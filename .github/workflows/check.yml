@@ -170,8 +170,10 @@ jobs:
             if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
             sleep 1
           done
-          CHIMP_BROWSER=firefox npm run qa:cross-browser
-          CHIMP_BROWSER=webkit npm run qa:cross-browser
+          status=0
+          CHIMP_BROWSER=firefox npm run qa:cross-browser || status=1
+          CHIMP_BROWSER=webkit npm run qa:cross-browser || status=1
+          exit $status
       - uses: actions/upload-artifact@v4
         if: always()
         with:
