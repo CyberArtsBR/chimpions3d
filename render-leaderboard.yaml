@@ -5,7 +5,7 @@ services:
     runtime: node
     plan: starter
     branch: main
-    buildCommand: node --version
+    buildCommand: node --check server/leaderboard.mjs && node --test server/tests/leaderboard.test.mjs && node checks/leaderboard-fuzz.mjs
     startCommand: node server/leaderboard.mjs
     healthCheckPath: /health
     autoDeployTrigger: checksPass
@@ -20,3 +20,7 @@ services:
         value: /var/data/scores.sqlite
       - key: ALLOWED_ORIGINS
         value: https://chimp-jump.onrender.com
+      # Render terminates public traffic behind its managed proxy/load-balancer chain.
+      # Keep proxy trust disabled by default outside this explicitly trusted deployment.
+      - key: TRUST_PROXY
+        value: "true"
