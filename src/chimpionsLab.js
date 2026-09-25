@@ -53,7 +53,7 @@ document.body.innerHTML=`
     <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><button id="dash-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="dash-avatar-file" type="file" accept=".glb" hidden><a href="./">Back to Chimp Jump</a></div>
   </section>
 
-  <section id="dash-over" class="dash-panel modal results-panel" hidden aria-labelledby="dash-results-title">
+  <section id="dash-over" class="dash-panel modal results-panel" hidden role="dialog" aria-modal="true" aria-labelledby="dash-results-title">
     <span class="eyebrow">RUN COMPLETE</span><h2 id="dash-results-title">RESULTS</h2>
     <div id="dash-result" class="results-grid">
       <div><small>SCORE</small><strong id="result-score">0</strong></div>
@@ -76,7 +76,7 @@ document.body.innerHTML=`
     </div>
   </section>
 
-  <section id="dash-paused" class="dash-panel modal" hidden aria-labelledby="dash-pause-title">
+  <section id="dash-paused" class="dash-panel modal" hidden role="dialog" aria-modal="true" aria-labelledby="dash-pause-title">
     <span class="eyebrow">RUN PAUSED</span><h2 id="dash-pause-title">PAUSED</h2>
     <p>Your run is frozen exactly where you left it.</p>
     <div class="dash-menu-actions">
@@ -302,7 +302,12 @@ function bindSettings(){
 }
 bindSettings();
 
-function haptic(pattern){if(dashSettings.haptics&&navigator.vibrate)try{navigator.vibrate(pattern)}catch{}}
+function haptic(pattern){
+  if(!dashSettings.haptics)return;
+  if(navigator.vibrate)try{navigator.vibrate(pattern)}catch{}
+  const pad=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected&&p.vibrationActuator?.playEffect);
+  if(pad)try{pad.vibrationActuator.playEffect('dual-rumble',{duration:Array.isArray(pattern)?90:55,strongMagnitude:.32,weakMagnitude:.2})}catch{}
+}
 function showFeedback(message,kind=''){
   const el=$('dash-feedback');if(!el)return;
   clearTimeout(feedbackTimer);el.textContent=message;el.dataset.kind=kind;el.classList.add('show');
@@ -771,6 +776,7 @@ window.chimpionsDashPresentationApi={
   startRun
 };
 window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,inputDevice:activeInputDevice,settings:{...dashSettings}});
+addEventListener('pagehide',()=>voice.destroy(),{once:true});
 if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput};
 
 setState('menu');run=makeRun();seedWorld();
