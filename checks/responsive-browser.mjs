@@ -54,4 +54,6 @@ try{
   }
   writeReport('checks/responsive-report.json',report);
   console.log('PASS responsive browser matrix: '+report.viewports.length+' viewports');
+}catch(error){
+  report.status='FAIL';report.error=error.message;writeReport('checks/responsive-report.json',report);throw error;
 }finally{await browser.close();}
