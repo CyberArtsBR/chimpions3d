@@ -26,6 +26,7 @@ for(let t=30;t<=300;t+=30){
 }
 assert.equal(dashStageForTime(0),1);
 assert.equal(dashStageForTime(30),2);
+assert.equal(dashDifficultySnapshot({time:0}).maxPatternDifficulty,2);
 assert(dashDifficultySnapshot({time:300}).maxPatternDifficulty>=4);
 
 const arcs=dashJumpArcProfiles();
@@ -87,6 +88,13 @@ advanceDashTutorial(tutorial,{type:'obstacle-pass'});
 assert.equal(tutorial.complete,false);
 advanceDashTutorial(tutorial,{type:'obstacle-pass'});
 assert.equal(tutorial.complete,true);
+const missedBanana=createDashTutorialState(true);
+advanceDashTutorial(missedBanana,{type:'obstacle-pass'});
+advanceDashTutorial(missedBanana,{type:'obstacle-pass'});
+advanceDashTutorial(missedBanana,{type:'obstacle-pass'});
+assert.equal(currentDashTutorialStep(missedBanana).id,'bananas-flow');
+advanceDashTutorial(missedBanana,{type:'obstacle-pass'});
+assert.equal(currentDashTutorialStep(missedBanana).id,'simple-combo');
 
 console.log(JSON.stringify({
   ok:true,
