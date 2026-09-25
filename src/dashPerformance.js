@@ -106,13 +106,7 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
     samples[sampleIndex]=frameMs;
     sampleIndex=(sampleIndex+1)%samples.length;
     sampleCount=Math.min(samples.length,sampleCount+1);
-    if(sampleCount===samples.length&&sampleIndex!==0){
-      // Keep the percentile buffer contiguous without allocating on the hot path.
-      const copy=samples.slice(sampleIndex);
-      samples.copyWithin(copy.length,0,sampleIndex);
-      samples.set(copy,0);
-      sampleIndex=0;
-    }
+    // Ring order is irrelevant to average/percentile calculations; never rotate/copy it per frame.
     evaluate(now);
   }
 
