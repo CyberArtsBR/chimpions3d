@@ -1,27 +1,78 @@
 import {scoreFor,ordinal} from './score.js';
 import {leaderboard} from './leaderboard.js';
 
+const formatDuration=value=>{
+ const seconds=Math.max(0,Math.round(Number(value)||0)),minutes=Math.floor(seconds/60);
+ return minutes?`${minutes}:${String(seconds%60).padStart(2,'0')}`:`0:${String(seconds).padStart(2,'0')}`;
+};
+
 export function createResults({retry,replay,choose,back}){
  const dialog=document.createElement('dialog');dialog.id='results-dialog';dialog.setAttribute('aria-labelledby','results-title');
- dialog.innerHTML=`<div class="eyebrow">THE CLIMB IS OVER</div><h2 id="results-title">Your expedition</h2><p id="score-formula"></p><p id="result-best"></p><div class="score-conversion"><div><small>FINAL SCORE</small><strong id="converted-score">0</strong></div><span>+</span><div><small>BANANA BONUS</small><strong id="remaining-bananas">0</strong></div></div><p id="ranking-status" role="status"></p><form id="record-name" hidden><label for="player-name">Your name · max 10 characters</label><div><input id="player-name" maxlength="10" minlength="1" required autocomplete="nickname" placeholder="CHIMPION"><button>Save record</button></div></form><button id="retry-score" hidden>Retry online submission</button><h3>All-time Top 10</h3><ol id="result-top"></ol><div class="result-actions"><button id="try-again" class="primary">Try Again</button><button id="replay-trail">Replay this trail</button><button id="choose-again">Choose your Chimpion</button><button id="back-to-games">Back to the game selection</button></div>`;
+ dialog.innerHTML=`<div class="eyebrow">THE CLIMB IS OVER</div><h2 id="results-title">Your expedition</h2><p class="result-kicker">Run summary</p><p id="result-record" hidden>New Personal Best</p><div class="result-stats"><div class="result-stat"><small>HEIGHT</small><strong id="result-height">0 m</strong></div><div class="result-stat"><small>BANANAS</small><strong id="result-bananas">0</strong></div><div class="result-stat"><small>TIME</small><strong id="result-duration">0:00</strong></div><div class="result-stat"><small>BEST</small><strong id="result-best">0 m</strong></div></div><p id="score-formula"></p><div class="score-conversion"><div><small>FINAL SCORE</small><strong id="converted-score">0</strong></div><span aria-hidden="true">+</span><div><small>BANANA BONUS</small><strong id="remaining-bananas">0</strong></div></div><p id="ranking-status" role="status" aria-live="polite" aria-atomic="true"></p><form id="record-name" hidden><label for="player-name">Your name · max 10 characters</label><div><input id="player-name" maxlength="10" minlength="1" required autocomplete="nickname" placeholder="CHIMPION"><button>Save record</button></div></form><button id="retry-score" hidden>Retry online submission</button><h3>All-time Top 10</h3><ol id="result-top"></ol><div class="result-actions"><button id="try-again" class="primary">Restart Run</button><button id="replay-trail">Replay this trail</button><button id="choose-again">Character Select</button><button id="back-to-games">Home</button></div>`;
  document.body.append(dialog);const $=id=>dialog.querySelector('#'+id);
  let run,age=0,verified=null,finished=false,generation=0;
- function renderBoard(entries){$('result-top').replaceChildren();for(const [i,row]of entries.entries()){const li=document.createElement('li');li.textContent=ordinal(i+1)+' · '+row.name+' — '+row.score.toLocaleString();$('result-top').append(li);}if(!entries.length){const li=document.createElement('li');li.textContent='No records yet. Be the first!';$('result-top').append(li);}}
- function announce(){if(!finished||!verified)return;$('ranking-status').textContent=verified.rank?'Congratulations! You got '+ordinal(verified.rank)+' place!':'Final score: '+verified.score.toLocaleString();$('record-name').hidden=!verified.rank;}
- async function submit(){const ticket=generation;$('retry-score').hidden=true;$('ranking-status').textContent='Checking your online placement…';try{if(!run.id)throw new Error('This run was played offline. Online records are unavailable.');const result=await leaderboard.finish(run.id,run.trace);if(ticket!==generation)return;verified=result;renderBoard(result.entries);if(result.rank)dispatchEvent(new Event('chimp-record'));announce();}catch(error){if(ticket!==generation)return;$('ranking-status').textContent=error.message;$('retry-score').hidden=!run.id;}}
+
+ function setSubmissionState(state,text){const node=$('ranking-status');node.dataset.state=state;node.textContent=text;}
+
+ function renderBoard(entries){
+  $('result-top').replaceChildren();
+  for(const [i,row]of entries.entries()){const li=document.createElement('li');li.textContent=ordinal(i+1)+' · '+row.name+' — '+row.score.toLocaleString();$('result-top').append(li);}
+  if(!entries.length){const li=document.createElement('li');li.textContent='No records yet. Be the first!';$('result-top').append(li);}
+ }
+
+ function announce(){
+  if(!finished||!verified)return;
+  setSubmissionState('success',verified.rank?`SCORE SUBMITTED · ${ordinal(verified.rank)} place`:`SCORE SUBMITTED · ${verified.score.toLocaleString()} points`);
+  $('record-name').hidden=!verified.rank;
+ }
+
+ async function submit(){
+  const ticket=generation;$('retry-score').hidden=true;$('record-name').hidden=true;
+  if(!run.id){setSubmissionState('offline','OFFLINE RUN · score kept locally; online records unavailable.');return;}
+  setSubmissionState('submitting','SUBMITTING SCORE…');
+  try{
+   const result=await leaderboard.finish(run.id,run.trace);if(ticket!==generation)return;verified=result;renderBoard(result.entries);if(result.rank)dispatchEvent(new Event('chimp-record'));announce();
+  }catch(error){
+   if(ticket!==generation)return;setSubmissionState('error','SCORE SUBMISSION FAILED · '+error.message);$('retry-score').hidden=false;
+  }
+ }
+
  $('retry-score').onclick=submit;
- $('record-name').onsubmit=async event=>{event.preventDefault();const ticket=generation,button=$('record-name').querySelector('button');button.disabled=true;try{const result=await leaderboard.name(run.id,$('player-name').value);if(ticket!==generation)return;renderBoard(result.entries);$('record-name').hidden=true;$('ranking-status').textContent='Congratulations! Your '+ordinal(result.rank)+' place record is saved.';}catch(error){if(ticket===generation)$('ranking-status').textContent=error.message;}finally{if(ticket===generation)button.disabled=false;}};
- $('try-again').onclick=()=>{generation++;dialog.close();retry();};$('replay-trail').onclick=()=>{generation++;const seed=run?.seed;dialog.close();replay?.(seed);};$('choose-again').onclick=()=>{generation++;dialog.close();choose();};$('back-to-games').onclick=()=>{generation++;dialog.close();back();};
- dialog.addEventListener('cancel',e=>e.preventDefault());
+ $('record-name').onsubmit=async event=>{
+  event.preventDefault();const ticket=generation,button=$('record-name').querySelector('button');button.disabled=true;
+  try{
+   const result=await leaderboard.name(run.id,$('player-name').value);if(ticket!==generation)return;renderBoard(result.entries);$('record-name').hidden=true;setSubmissionState('success','SCORE SUBMITTED · '+ordinal(result.rank)+' place record saved.');
+  }catch(error){if(ticket===generation)setSubmissionState('error','SCORE SUBMISSION FAILED · '+error.message);}
+  finally{if(ticket===generation)button.disabled=false;}
+ };
+ $('try-again').onclick=()=>{generation++;dialog.close();retry();};
+ $('replay-trail').onclick=()=>{generation++;const seed=run?.seed;dialog.close();replay?.(seed);};
+ $('choose-again').onclick=()=>{generation++;dialog.close();choose();};
+ $('back-to-games').onclick=()=>{generation++;dialog.close();back();};
+ dialog.addEventListener('cancel',event=>event.preventDefault());
+
  return {
-  open(result){generation++;run=result;age=0;finished=false;verified=null;$('replay-trail').hidden=!Number.isFinite(Number(result.seed));$('record-name').hidden=true;$('record-name').querySelector('button').disabled=false;$('player-name').value='';$('score-formula').textContent='ALTITUDE '+result.meters.toLocaleString()+' m · BANANAS '+result.bananas+' × 10';$('converted-score').textContent=String(result.meters);$('remaining-bananas').textContent=String(result.bananas*10);$('result-best').textContent='PERSONAL BEST · '+Math.floor(result.best||result.meters)+' m';$('try-again').disabled=$('choose-again').disabled=false;renderBoard([]);dialog.showModal();submit();},
-  update(dt){if(!dialog.open||finished)return;age+=dt;const t=Math.min(age/2.2,1),ease=1-(1-t)**3,total=scoreFor(run.meters,run.bananas),initial=run.meters;$('converted-score').textContent=Math.round(initial+(total-initial)*ease).toLocaleString();$('remaining-bananas').textContent=Math.round(run.bananas*10).toLocaleString();if(t===1){finished=true;$('try-again').disabled=$('choose-again').disabled=false;announce();}},
+  open(result){
+   generation++;run=result;age=0;finished=false;verified=null;
+   const meters=Math.floor(Number(result.meters)||0),bananas=Math.max(0,Number(result.bananas)||0),best=Math.floor(Number(result.best)||meters);
+   dialog.dataset.newBest=String(!!result.newBest);$('result-record').hidden=!result.newBest;
+   $('result-height').textContent=meters.toLocaleString()+' m';$('result-bananas').textContent=bananas.toLocaleString();$('result-duration').textContent=formatDuration(result.duration);$('result-best').textContent=best.toLocaleString()+' m';
+   $('replay-trail').hidden=!Number.isFinite(Number(result.seed));$('record-name').hidden=true;$('record-name').querySelector('button').disabled=false;$('player-name').value='';
+   $('score-formula').textContent='ALTITUDE '+meters.toLocaleString()+' m · BANANAS '+bananas+' × 10';
+   $('converted-score').textContent=String(meters);$('remaining-bananas').textContent=String(bananas*10);$('try-again').disabled=$('choose-again').disabled=false;renderBoard([]);setSubmissionState(result.id?'submitting':'offline',result.id?'SUBMITTING SCORE…':'OFFLINE RUN · score kept locally; online records unavailable.');
+   dialog.showModal();submit();
+  },
+  update(dt){
+   if(!dialog.open||finished)return;age+=dt;const t=Math.min(age/1.6,1),ease=1-(1-t)**3,total=scoreFor(run.meters,run.bananas),initial=run.meters;
+   $('converted-score').textContent=Math.round(initial+(total-initial)*ease).toLocaleString();$('remaining-bananas').textContent=Math.round(run.bananas*10).toLocaleString();
+   if(t===1){finished=true;$('try-again').disabled=$('choose-again').disabled=false;announce();}
+  },
   get isOpen(){return dialog.open;}
  };
 }
 
 export function createRecordBook(){
- const dialog=document.createElement('dialog');dialog.id='record-book';dialog.setAttribute('aria-labelledby','record-book-title');dialog.innerHTML='<header><h2 id="record-book-title">All-time records</h2><button aria-label="Close records">×</button></header><p role="status"></p><ol></ol><button id="older-records">Older records</button>';document.body.append(dialog);let offset=0,ticket=0;
+ const dialog=document.createElement('dialog');dialog.id='record-book';dialog.setAttribute('aria-labelledby','record-book-title');dialog.innerHTML='<header><h2 id="record-book-title">All-time records</h2><button aria-label="Close records">×</button></header><p role="status" aria-live="polite"></p><ol></ol><button id="older-records">Older records</button>';document.body.append(dialog);let offset=0,ticket=0;
  dialog.querySelector('header button').onclick=()=>dialog.close();
  async function load(){const current=++ticket,more=dialog.querySelector('#older-records'),status=dialog.querySelector('p');more.disabled=true;status.textContent='Loading records…';try{const result=await leaderboard.records(offset);if(current!==ticket)return;for(const row of result.entries){const li=document.createElement('li');li.textContent=row.name+' · '+row.score.toLocaleString()+' points · '+row.meters+' m · '+row.bananas+' bananas';dialog.querySelector('ol').append(li);}offset+=result.entries.length;more.hidden=result.entries.length<20;status.textContent=offset?'Named records are kept even after leaving the Top 10.':'No records yet.';}catch(error){if(current===ticket)status.textContent=error.message;}finally{if(current===ticket)more.disabled=false;}}
  dialog.querySelector('#older-records').onclick=load;
