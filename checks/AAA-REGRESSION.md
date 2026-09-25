@@ -1,6 +1,6 @@
 # Chimp Jump AAA Regression QA
 
-This branch adds release validation only. It does not change gameplay tuning, scoring, art direction, character animation, or backend architecture. The only application-code change gates the mutable browser test API behind `VITE_CHIMP_QA_HOOKS=1`; ordinary production builds cannot enable it with a query string.
+This branch adds release validation without changing gameplay tuning, scoring, art direction, character animation, or backend architecture. Application-code changes are limited to safe QA seams plus two defects confirmed by the new release gates: the mutable browser test API is gated behind `VITE_CHIMP_QA_HOOKS=1`, the countdown exposes the required `GO` phase, and leaderboard ticket acquisition no longer blocks visible run startup.
 
 ## Test tiers
 
@@ -38,11 +38,11 @@ The GitHub Actions `workflow_dispatch` path installs Chromium, Firefox and WebKi
 
 The manual production job visits the real public `?play=jump` route without QA hooks. It verifies the version manifest, waits for fonts/images plus rendered frames, checks that `window.chimpJumpTest` is absent, and exercises menu, Field Guide, character picker, countdown, gameplay, input, pause and 1080p layout.
 
-## Current source-level blockers exposed by the new tests
+## Confirmed defects and current limitation
 
-1. **Countdown contract:** current runtime renders `3 → 2 → 1 → 0`; the required visible `GO` state is missing. `checks/countdown-browser.mjs` intentionally fails until the runtime owner implements the required contract.
-2. **Slow leaderboard startup:** `start()` enters `starting` but awaits `leaderboard.begin()` before initializing `countdownTime`. A slow or late run-ticket response can therefore hide/delay the visible countdown. `checks/network-failures-browser.mjs` makes this a STANDARD release gate.
-3. **Visual regression baselines:** deterministic screenshots are captured for menu, Field Guide, picker, countdown, gameplay, mechanics/hazard coverage, all four biomes, pause and result. Pixel-diff gating remains in baseline-candidate mode until approved baseline images are committed; deployment is not blocked on an unreviewed flaky threshold.
+1. **Countdown contract — fixed on this branch:** the runtime now presents `3 → 2 → 1 → GO` while physics remains frozen, and `checks/countdown-browser.mjs` enforces the sequence.
+2. **Slow leaderboard startup — fixed on this branch:** run-ticket acquisition is asynchronous. The visible countdown starts immediately; an authoritative ticket seed is adopted only while the run is still frozen in `starting`. A late response is not allowed to reset active gameplay, so that run remains offline instead.
+3. **Visual regression baselines — intentionally non-blocking:** deterministic screenshots are captured for menu, Field Guide, picker, countdown, gameplay, mechanics/hazard coverage, all four biomes, pause and result. Pixel-diff gating remains in baseline-candidate mode until approved baseline images are committed; deployment is not blocked on an unreviewed flaky threshold.
 
 ## Reports and artifacts
 
