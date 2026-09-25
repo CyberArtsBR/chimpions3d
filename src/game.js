@@ -247,6 +247,7 @@ function tick(dt,control=input()){
    // The physics marks death only after the fall crosses the lower camera boundary. Keep the
    // exact current position and real-time vertical speed: no teleport, no acceleration, no pose.
    deathPoint={x:game.x,visualY:game.y,velocity:Math.min(-.1,game.vy*paceAt(game.time))};
+   runSession.finish();runSession.prepare();
    inputManager.clearGameplay();avatar.root.visible=true;syncUI();
   }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
   else if(e.type==='coin'){sound('coin');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
@@ -268,7 +269,7 @@ function tick(dt,control=input()){
 }
 function updateEnding(dt){
  fallSplash.update(dt);results.update(dt);if(mode!=='dying')return;deathAge+=dt;if(deathPoint)deathPoint.visualY+=deathPoint.velocity*dt;quickRetry.hidden=deathAge<.65;
- if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}runSession.finish();const transport=inputTrace.toTransport();const summary={id:transport.overflowed?undefined:runTicket?.id,trace:transport,meters:Math.floor(game.height),bananas:game.bananas,best,seed:runSeed,cleanLandings};window.dispatchEvent(new CustomEvent('chimp-run-finished',{detail:summary}));results.open(summary);syncUI();runSession.prepare();}
+ if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}const transport=inputTrace.toTransport();const summary={id:transport.overflowed?undefined:runTicket?.id,trace:transport,meters:Math.floor(game.height),bananas:game.bananas,best,seed:runSeed,cleanLandings};window.dispatchEvent(new CustomEvent('chimp-run-finished',{detail:summary}));results.open(summary);syncUI();}
 }
 function resize(){
  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);const courtWidth=Math.min(w,h*WIDTH/VIEW_HEIGHT),viewWidth=w/courtWidth*WIDTH,viewHeight=h/courtWidth*WIDTH;renderer.setViewport(0,0,w,h);camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();scenery.resize(viewWidth,viewHeight);document.documentElement.style.setProperty('--court',courtWidth+'px');if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');previous=performance.now();
