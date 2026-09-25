@@ -17,6 +17,15 @@ import {DASH_GAMEPLAY_VERSION} from './dash/dashSimulation.js';
 const voice=new GameAudio(true);
 voice.musicSrc=DASH_MUSIC_URL;
 
+const SETTINGS_KEY='chimpions-dash-settings-v3';
+const DEFAULT_SETTINGS={graphics:'Auto',master:100,music:72,sfx:90,ui:80,ambience:45,mute:false,reducedMotion:false,highVisibility:false,screenShake:true,haptics:true,largeTouch:false};
+function readSettings(){
+  try{return {...DEFAULT_SETTINGS,...JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}')}}catch{return {...DEFAULT_SETTINGS}}
+}
+const dashSettings=readSettings();
+voice.setVolumes({master:dashSettings.master/100,music:dashSettings.music/100,sfx:dashSettings.sfx/100,ui:dashSettings.ui/100,ambience:dashSettings.ambience/100});
+voice.setMuted(dashSettings.mute);
+
 const BASE=import.meta.env.BASE_URL;
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -26,30 +35,94 @@ document.body.innerHTML=`
 <main id="dash-stage" aria-label="Chimpions Dash">
   <div id="dash-sky"></div><div id="dash-far"></div><div id="dash-mid"></div><div id="dash-light"></div>
   <div id="dash-objects"></div><div id="dash-ground"></div><div id="dash-shadow"></div><div id="lab-3d"></div>
-  <header id="dash-hud">
+
+  <header id="dash-hud" aria-label="Run status">
     <div class="brand"><small>CHIMPIONS DASH</small><strong>CHIMPIONS DASH</strong></div>
-    <div><small>SCORE</small><strong id="dash-score">000000</strong></div>
-    <div><small>DISTANCE</small><strong id="dash-distance">0.00 KM</strong></div>
-    <div><small>BEST</small><strong id="dash-best">000000</strong></div>
-    <button id="dash-pause" aria-label="Pause">Ⅱ</button>
+    <div class="hud-stat"><small>SCORE</small><strong id="dash-score">000000</strong></div>
+    <div class="hud-stat"><small>DISTANCE</small><strong id="dash-distance">0.00 KM</strong></div>
+    <div class="hud-stat"><small>BEST</small><strong id="dash-best">000000</strong></div>
+    <div class="hud-stat hud-secondary"><small>BANANAS</small><strong id="dash-bananas">0</strong></div>
+    <div class="hud-stat hud-secondary"><small>FLOW</small><strong id="dash-flow-value">0</strong></div>
+    <div class="hud-stat hud-secondary"><small>MULTIPLIER</small><strong id="dash-mult">1.00×</strong></div>
+    <div class="hud-stat hud-secondary"><small>STAGE</small><strong id="dash-stage-number">01</strong></div>
+    <button id="dash-pause" type="button" aria-label="Pause game">Ⅱ</button>
   </header>
+
   <div id="dash-stage-label">01 / THE EMERALD WILDS</div>
-  <div id="dash-flow">🍌 <b id="dash-bananas">0</b><span>FLOW <b id="dash-mult">1.00×</b></span></div>
-  <div id="dash-tip">HOLD LEFT MOUSE / ↑ TO JUMP HIGHER · RIGHT MOUSE / ↓ TO DUCK</div>
-  <section id="dash-menu" class="dash-panel">
+  <div id="dash-input-prompt" role="note">SPACE / W / ↑ JUMP · ↓ / S / SHIFT SLIDE</div>
+  <div id="dash-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <section id="dash-menu" class="dash-panel" aria-label="Chimpions Dash start">
     <span class="eyebrow">THE JUNGLE IS CALLING</span>
     <h1>CHIMPIONS <em>DASH</em></h1>
     <h2>CHIMPIONS DASH · 2.5D</h2>
     <p>Automatic side-running at full pace. Jump, slide and read the jungle while your selected rigged Chimpion stays in motion.</p>
     <label>YOUR RUNNING MATE<select id="lab-avatar" aria-label="Choose Chimpion"></select></label>
-    <div id="lab-message" role="status">Loading Chimpion…</div>
+    <div id="lab-message" role="status" aria-live="polite">Loading Chimpion…</div>
     <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><button id="dash-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="dash-avatar-file" type="file" accept=".glb" hidden><a href="./">Back to Chimp Jump</a></div>
-    <p class="controls">Mouse: hold left to jump higher · right to duck. Controller: ↑ / ↓ or A / B.<br><kbd>SPACE</kbd>/<kbd>W</kbd>/<kbd>↑</kbd> jump · <kbd>↓</kbd>/<kbd>SHIFT</kbd>/<kbd>S</kbd>/<kbd>A</kbd> slide · <kbd>P</kbd> pause</p>
   </section>
-  <section id="dash-over" class="dash-panel modal" hidden><span class="eyebrow">RUN COMPLETE</span><h2>THE JUNGLE WON THIS ROUND</h2><p id="dash-result"></p><div class="dash-menu-actions"><button id="dash-retry" class="primary">RUN AGAIN</button><button id="dash-change">Change Chimpion</button><a href="?dash=1">Back to the home screen</a></div></section>
-  <section id="dash-paused" class="dash-panel modal" hidden><span class="eyebrow">TAKE A BREATHER</span><h2>PAUSED</h2><p>Your run is frozen exactly where you left it.</p><div class="dash-menu-actions"><button id="dash-resume" class="primary">RESUME</button><button id="dash-quit">MAIN MENU</button></div></section>
-  <div id="dash-touch"><button id="touch-slide">⇣<small>SLIDE</small></button><button id="touch-jump">↥<small>JUMP</small></button></div>
-  <div id="dash-stage-flash"></div>
+
+  <section id="dash-over" class="dash-panel modal results-panel" hidden role="dialog" aria-modal="true" aria-labelledby="dash-results-title">
+    <span class="eyebrow">RUN COMPLETE</span><h2 id="dash-results-title">RESULTS</h2>
+    <div id="dash-result" class="results-grid">
+      <div><small>SCORE</small><strong id="result-score">0</strong></div>
+      <div><small>DISTANCE</small><strong id="result-distance">0.00 KM</strong></div>
+      <div><small>BANANAS</small><strong id="result-bananas">0</strong></div>
+      <div><small>GOLDEN</small><strong id="result-golden">0</strong></div>
+      <div><small>STAGE</small><strong id="result-stage">1</strong></div>
+      <div><small>MAX FLOW</small><strong id="result-flow">0</strong></div>
+      <div><small>LONGEST COMBO</small><strong id="result-combo">0</strong></div>
+      <div><small>PERFECT JUMPS</small><strong id="result-perfect-jumps">—</strong></div>
+      <div><small>PERFECT SLIDES</small><strong id="result-perfect-slides">—</strong></div>
+      <div><small>NEAR MISSES</small><strong id="result-near-misses">—</strong></div>
+      <div><small>BEST</small><strong id="result-best">0</strong></div>
+      <div><small>PB DIFFERENCE</small><strong id="result-pb">—</strong></div>
+    </div>
+    <div class="dash-menu-actions">
+      <button id="dash-retry" class="primary">RETRY</button>
+      <button id="dash-change">CHANGE CHIMPION</button>
+      <button id="dash-main-menu">MAIN MENU</button>
+    </div>
+  </section>
+
+  <section id="dash-paused" class="dash-panel modal" hidden role="dialog" aria-modal="true" aria-labelledby="dash-pause-title">
+    <span class="eyebrow">RUN PAUSED</span><h2 id="dash-pause-title">PAUSED</h2>
+    <p>Your run is frozen exactly where you left it.</p>
+    <div class="dash-menu-actions">
+      <button id="dash-resume" class="primary">RESUME</button>
+      <button id="dash-settings-open">SETTINGS</button>
+      <button id="dash-quit">MAIN MENU</button>
+    </div>
+  </section>
+
+  <dialog id="dash-settings" aria-labelledby="dash-settings-title">
+    <form method="dialog" class="settings-shell">
+      <header><div><span class="eyebrow">PREFERENCES</span><h2 id="dash-settings-title">SETTINGS</h2></div><button class="settings-close" value="close" aria-label="Close settings">×</button></header>
+      <section><h3>GRAPHICS</h3><label>QUALITY<select id="setting-graphics"><option>Auto</option><option>Low</option><option>Balanced</option><option>High</option><option>Ultra</option></select></label></section>
+      <section><h3>AUDIO</h3>
+        <label>MASTER <output id="out-master">100</output><input id="setting-master" type="range" min="0" max="100"></label>
+        <label>MUSIC <output id="out-music">72</output><input id="setting-music" type="range" min="0" max="100"></label>
+        <label>SFX <output id="out-sfx">90</output><input id="setting-sfx" type="range" min="0" max="100"></label>
+        <label>UI <output id="out-ui">80</output><input id="setting-ui" type="range" min="0" max="100"></label>
+        <label>AMBIENCE <output id="out-ambience">45</output><input id="setting-ambience" type="range" min="0" max="100"></label>
+        <label class="setting-toggle"><input id="setting-mute" type="checkbox"> MUTE</label>
+      </section>
+      <section><h3>ACCESSIBILITY</h3>
+        <label class="setting-toggle"><input id="setting-reduced-motion" type="checkbox"> REDUCED MOTION</label>
+        <label class="setting-toggle"><input id="setting-high-visibility" type="checkbox"> HIGH VISIBILITY</label>
+        <label class="setting-toggle"><input id="setting-screen-shake" type="checkbox"> SCREEN SHAKE</label>
+        <label class="setting-toggle"><input id="setting-haptics" type="checkbox"> HAPTICS / VIBRATION</label>
+        <label class="setting-toggle"><input id="setting-large-touch" type="checkbox"> LARGE TOUCH CONTROLS</label>
+      </section>
+      <footer><button class="primary" value="close">DONE</button></footer>
+    </form>
+  </dialog>
+
+  <div id="dash-touch" aria-label="Touch controls">
+    <button id="touch-slide" type="button" aria-label="Slide"><span aria-hidden="true">⇣</span><small>SLIDE</small></button>
+    <button id="touch-jump" type="button" aria-label="Jump"><span aria-hidden="true">↥</span><small>JUMP</small></button>
+  </div>
+  <div id="dash-stage-flash" aria-hidden="true"></div>
 </main>`;
 
 const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-6,6,6,-6,.01,40);
