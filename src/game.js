@@ -89,7 +89,7 @@ let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=new Inp
 const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
 const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
-const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.19;music.preload='metadata';const audio=createAudio(music);
+const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.4;music.preload='metadata';const audio=createAudio(music);
 try{muted=localStorage.getItem('chimp-jump-muted')==='1';}catch{}audio.setMuted(muted);
 addEventListener('chimp-record',()=>audio.play('record'));document.addEventListener('click',event=>{if(event.target.closest('button')&&mode!=='playing')audio.play('menu');});
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
@@ -155,9 +155,52 @@ function start(requestedSeed=null){
 $('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
 function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
-inputManager.subscribe(({confirmPressed,pausePressed})=>{
- if(collectionDialog.open||results.isOpen||recordBook.isOpen)return;
+function controllerMenuScope(){
+ const openDialog=document.querySelector('dialog[open]');
+ if(openDialog)return openDialog;
+ if(!$('overlay').hidden)return $('overlay');
+ return document.body;
+}
+function controllerMenuControls(){
+ const scope=controllerMenuScope();
+ return [...scope.querySelectorAll('button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled)')].filter(element=>{
+  if(element.hidden||element.closest('[hidden]'))return false;
+  const style=getComputedStyle(element);
+  return style.display!=='none'&&style.visibility!=='hidden'&&style.pointerEvents!=='none';
+ });
+}
+function moveControllerMenuFocus(step){
+ const controls=controllerMenuControls();if(!controls.length)return false;
+ const current=controls.indexOf(document.activeElement);
+ const next=current<0?(step>0?0:controls.length-1):(current+(step>0?1:-1)+controls.length)%controls.length;
+ controls[next]?.focus();return true;
+}
+function confirmControllerMenu(){
+ const controls=controllerMenuControls();if(!controls.length)return false;
+ const active=controls.includes(document.activeElement)?document.activeElement:controls[0];
+ active?.focus();active?.click?.();return true;
+}
+function cancelControllerMenu(){
+ const dialog=document.querySelector('dialog[open]');
+ if(dialog){
+  const close=[...dialog.querySelectorAll('button:not(:disabled)')].find(button=>/close|back|home/i.test((button.getAttribute('aria-label')||'')+' '+(button.textContent||'')));
+  if(close){close.click();return true;}
+  if(dialog===collectionDialog){dialog.close();return true;}
+  return false;
+ }
+ if(mode==='paused'){start();return true;}
+ if(mode==='menu'){location.href='/';return true;}
+ return false;
+}
+inputManager.subscribe(({confirmPressed,cancelPressed,pausePressed,menuX,menuY,source})=>{
  if(mode==='dying'&&confirmPressed){quickRetry.click();return;}
+ const menuActive=mode!=='playing'||collectionDialog.open||results.isOpen||recordBook.isOpen;
+ if(source==='gamepad'&&menuActive){
+  const direction=menuY||menuX;
+  if(direction){moveControllerMenuFocus(direction);return;}
+  if(confirmPressed){confirmControllerMenu();return;}
+  if(cancelPressed){cancelControllerMenu();return;}
+ }
  if(pausePressed){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
 });
 addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});

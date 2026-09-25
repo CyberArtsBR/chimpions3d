@@ -48,7 +48,7 @@ const musicToggle=document.getElementById('musicToggle');
 const bgm=document.getElementById('bgm');
 let active=0,locked=false,ready=false,touchStartX=null,musicEnabled=true,musicPending=false;
 
-bgm.volume=.385;
+bgm.volume=.4;
 function updateMusicStatus(){
   const playing=!bgm.paused;
   musicStatus.textContent=playing?'Music: playing':'Music: paused';
