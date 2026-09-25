@@ -275,10 +275,10 @@ Verification was run under Node 22.16.0 using a deterministic seed-2 trace and t
 
 | Scenario | Fixed steps | Simulated duration | Mean replay CPU time |
 | --- | ---: | ---: | ---: |
-| approximately 1 minute | 4,122 | 68.70 s | 2.49 ms |
-| approximately 5 minutes | 18,742 | 312.37 s | 9.82 ms |
-| approximately 10 minutes | 36,043 | 600.72 s | 17.01 ms |
-| near maximum allowed run | 107,216 | 1,786.93 s | 93.96 ms |
+| approximately 1 minute | 4,122 | 68.70 s | 2.57 ms |
+| approximately 5 minutes | 18,742 | 312.37 s | 9.47 ms |
+| approximately 10 minutes | 36,043 | 600.72 s | 19.35 ms |
+| near maximum allowed run | 107,216 | 1,786.93 s | 90.94 ms |
 
 The benchmark script is checks/leaderboard-benchmark.mjs so these measurements can be repeated on the deployment class before release.
 
