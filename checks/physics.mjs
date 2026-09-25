@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,BANANA_HEIGHT,VINE_INSET,EVENT_INTERVAL,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt} from '../src/physics.js';
+import {Game,STEP,WIDTH,JUMP,GRAVITY,SPRING_JUMP,PLATFORM_SCALE,PLATFORM_LENGTH,JET_DURATION,ITEM_SCALE,BANANA_HEIGHT,VINE_INSET,EVENT_INTERVAL,EVENT_DURATION,paceAt,movingX,platformX,platformTravelFor,platformPhaseAt} from '../src/physics.js';
 import {scoreFor,ordinal} from '../src/score.js';
 assert.equal(scoreFor(123.9,4),163);assert.equal(scoreFor(500,0),500);assert.equal(ordinal(1),'1st');assert.equal(ordinal(2),'2nd');assert.equal(ordinal(3),'3rd');assert.equal(ordinal(10),'10th');
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);assert(2*JUMP/GRAVITY>=1.4);
@@ -161,6 +161,15 @@ assert(eventGame.event&&['banana-bloom','spring-fever'].includes(eventGame.event
 const hazardGame=fixture();hazardGame.nextJetAt=Infinity;hazardGame.y=.2;hazardGame.vy=0;hazardGame.hazards=[{id:1,type:'thorn-pod',x:0,baseX:0,y:.65,radius:.42,range:0,speed:0,phase:0}];
 const hazardEvents=hazardGame.step(0);assert(hazardEvents.some(e=>e.type==='hazard'),'Thorn pod collision emits a hazard event');
 assert(hazardGame.hazardCooldown>0,'Hazard knockback has a short repeat-hit cooldown');
+const immediateHazardRepeat=hazardGame.step(0);
+assert(!immediateHazardRepeat.some(e=>e.type==='hazard'),'Hazard cooldown must suppress immediate repeat-hit loops');
+
+let eventEnded=false;
+for(let i=0;i<Math.ceil(EVENT_DURATION/STEP)+5;i++){
+  const events=eventGame.step(0);
+  if(events.some(e=>e.type==='event-end'))eventEnded=true;
+}
+assert(eventEnded&&!eventGame.event,'Timed canopy event must finish deterministically after EVENT_DURATION');
 
 console.log('PASS canopy expansion: leaf/swing/vanish branches, hazards and timed events');
 
