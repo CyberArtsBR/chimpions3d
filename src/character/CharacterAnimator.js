@@ -146,7 +146,7 @@ export class CharacterAnimator {
     const spring = eventStrength(input.springActive);
     if (spring > 0.001 && this.springSignal <= 0.001) {
       this.springAge = 0;
-      this.springStrength = Math.max(spring, clamp01(finite(input.jetpackStrength, 0)));
+      this.springStrength = clamp01(finite(input.springStrength, spring)) || spring;
     }
     this.springSignal = spring;
     this.springAge += dt;
@@ -190,6 +190,7 @@ export class CharacterAnimator {
 
     const velocityY = finite(input.velocityY, 0);
     const velocityX = finite(input.velocityX, 0);
+    const platformVelocityX = finite(input.platformVelocityX, 0);
     const landingAnticipation = clamp01(finite(input.landingAnticipation, 0));
     const platformType = String(input.platformType || '').toLowerCase();
     const reducedMotion = !!input.reducedMotion;
@@ -201,7 +202,7 @@ export class CharacterAnimator {
     this.jetpackBlend = damp(this.jetpackBlend, jetTarget, input.jetpackActive ? 12 : 7, dt);
     this.jetpackStrength = damp(this.jetpackStrength, jetTarget, 9, dt);
 
-    const nextResult = resultKind(input.result);
+    const nextResult = resultKind(input.resultType || input.result);
     if (nextResult !== this.result) {
       this.result = nextResult;
       this.resultAge = 0;
@@ -259,7 +260,7 @@ export class CharacterAnimator {
         break;
     }
 
-    this._applyPlatformReaction(time, platformType || this.landingPlatformType, landingAnticipation, velocityX, reduction);
+    this._applyPlatformReaction(time, platformType || this.landingPlatformType, landingAnticipation, velocityX, platformVelocityX, reduction);
     this._applyHorizontalBalance(velocityX, reduction);
     this._applyWrapReaction(reduction);
     this._applySecondaryMotion(velocityY, reducedMotion, dt);
@@ -605,7 +606,7 @@ export class CharacterAnimator {
     this.targetLeanZ += -0.075 * lean;
   }
 
-  _applyPlatformReaction(time, platformType, contact, velocityX, reduction) {
+  _applyPlatformReaction(time, platformType, contact, velocityX, platformVelocityX, reduction) {
     const blend = clamp01(contact + (this.state === ANIMATION_STATES.LAND ? 0.35 : 0));
     if (blend <= 0.001) return;
 
@@ -623,7 +624,8 @@ export class CharacterAnimator {
       this._add('leftUpperArm', -stabilize * 1.5, 0, 0);
       this._add('rightUpperArm', stabilize * 1.5, 0, 0);
     } else if (platformType === 'moving') {
-      const motion = clamp(velocityX / 8, -1, 1) * 0.075 * blend * reduction;
+      const relativeVelocityX = velocityX - platformVelocityX;
+      const motion = clamp(relativeVelocityX / 8, -1, 1) * 0.075 * blend * reduction;
       this._add('hips', 0, 0, -motion);
       this._add('spine', 0, 0, -motion);
       this._add('chest', 0, 0, motion * 0.55);
