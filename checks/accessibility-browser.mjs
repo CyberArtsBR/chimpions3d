@@ -54,4 +54,6 @@ try{
   assert.deepEqual(diag.errors,[],'Accessibility flow must not raise page errors');
   writeReport('checks/accessibility-report.json',report);
   console.log('PASS accessibility: labels, focus, modal return, reduced motion, high visibility and target sizing');
+}catch(error){
+  report.status='FAIL';report.error=error.message;writeReport('checks/accessibility-report.json',report);throw error;
 }finally{await browser.close();}
