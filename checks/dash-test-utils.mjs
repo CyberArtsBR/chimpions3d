@@ -43,7 +43,10 @@ export function writeReport(name,report){
 }
 
 export async function shot(page,name){
-  await page.screenshot({path:`checks/${name}`,timeout:90000});
+  const canSuppress=await page.evaluate(()=>!!window.chimpionsDashTest?.setLongFrameGuardSuppressed).catch(()=>false);
+  if(canSuppress)await page.evaluate(()=>window.chimpionsDashTest.setLongFrameGuardSuppressed(true));
+  try{await page.screenshot({path:`checks/${name}`,timeout:90000});}
+  finally{if(canSuppress)await page.evaluate(()=>window.chimpionsDashTest.setLongFrameGuardSuppressed(false));}
 }
 
 export function externalDashFailure(entry){
