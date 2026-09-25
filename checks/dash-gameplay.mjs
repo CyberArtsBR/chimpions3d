@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {hashDashSeed,nextDashRandom} from '../src/dash/dashSeed.js';
 import {DASH_PHYSICS,dashJumpArcProfiles} from '../src/dash/dashPhysics.js';
 import {DASH_SPEED_CURVE,dashSpeedForTime,dashStageForTime,dashDifficultySnapshot} from '../src/dash/dashDifficulty.js';
-import {DASH_OBSTACLE_TYPES,requiredDashReactionTime,dashTransitionReport,validateDashObstacleGeometry} from '../src/dash/dashPatterns.js';
+import {DASH_OBSTACLE_TYPES,requiredDashReactionTime,dashTransitionReport,dashWarningReport,validateDashObstacleGeometry} from '../src/dash/dashPatterns.js';
 import {generateDashPlan,validateDashPlan} from '../src/dash/dashSimulation.js';
 import {dashMultiplier,dashFlowDecay,rewardDashObstaclePass,rewardDashBanana} from '../src/dash/dashScoring.js';
 import {createDashTutorialState,currentDashTutorialStep,advanceDashTutorial,dashTutorialPattern} from '../src/dash/dashTutorial.js';
@@ -45,6 +45,10 @@ const slide=DASH_OBSTACLE_TYPES.find(x=>x.family==='overhead');
 assert(requiredDashReactionTime(high,slide)>requiredDashReactionTime(short,short));
 const required=requiredDashReactionTime(slide,high,{chainLength:2});
 assert.equal(dashTransitionReport(slide,high,{gapDistance:500,speed:500,chainLength:2}).ok,1>=required);
+for(const obstacle of DASH_OBSTACLE_TYPES){
+  const warning=dashWarningReport(obstacle,{speed:DASH_SPEED_CURVE.cap,viewportWidth:600,obstacleWidth:obstacle.w});
+  assert(warning.ok,`${obstacle.id} warning ${warning.available.toFixed(3)}s < ${warning.required.toFixed(3)}s`);
+}
 
 const checkpoints=[0,30,60,120,180,300,600];
 let generatedPatterns=0;
