@@ -4,7 +4,7 @@ export const DASH_TUTORIAL_STEPS=Object.freeze([
   {id:'tap-jump',prompt:'TAP JUMP',families:['short'],completion:'obstacle-pass'},
   {id:'hold-jump',prompt:'HOLD JUMP',families:['wide'],completion:'obstacle-pass'},
   {id:'slide',prompt:'SLIDE',families:['overhead'],completion:'obstacle-pass'},
-  {id:'bananas-flow',prompt:'BANANAS + FLOW',families:['short'],completion:'banana'},
+  {id:'bananas-flow',prompt:'BANANAS + FLOW',families:['short'],completion:'banana-or-pass'},
   {id:'simple-combo',prompt:'JUMP → SLIDE',families:['short','overhead'],completion:'pattern-pass'}
 ]);
 
@@ -21,6 +21,7 @@ export function advanceDashTutorial(state,event){
   if(!step)return{advanced:false,complete:!!state?.complete,step:null};
   let done=false;
   if(step.completion===event.type)done=true;
+  if(step.completion==='banana-or-pass'&&(event.type==='banana'||event.type==='obstacle-pass'))done=true;
   if(step.completion==='pattern-pass'&&event.type==='obstacle-pass'){
     state.passedInPattern++;
     done=state.passedInPattern>=step.families.length;
