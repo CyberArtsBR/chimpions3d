@@ -50,7 +50,7 @@ export function dashDifficultySnapshot({
     normalizedSpeed:dashNormalizedSpeed(time),
     targetDifficulty:target,
     effectiveDifficulty:effective,
-    maxPatternDifficulty:Math.max(1,Math.min(5,Math.floor(effective+.35)))
+    maxPatternDifficulty:Math.max(2,Math.min(5,Math.floor(effective+.35)))
   };
 }
 
