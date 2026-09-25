@@ -4,6 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
+import {DASH_MUSIC_URL,dashSpriteUrl,warmDashImages} from './dashAssets.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
 import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
@@ -13,8 +14,7 @@ import {DASH_EVENTS,emitDashEvent} from './dash/dashEvents.js';
 import {DASH_TUTORIAL_KEY,createDashTutorialState,advanceDashTutorial,dashTutorialPattern} from './dash/dashTutorial.js';
 import {DASH_GAMEPLAY_VERSION} from './dash/dashSimulation.js';
 const voice=new GameAudio(true);
-const DASH_ASSETS='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/';
-voice.musicSrc=DASH_ASSETS+'chimpions-army.mp3';
+voice.musicSrc=DASH_MUSIC_URL;
 
 const BASE=import.meta.env.BASE_URL;
 const $=id=>document.getElementById(id);
@@ -84,30 +84,7 @@ const BIOMES=[
 ];
 const TYPES=DASH_OBSTACLE_TYPES;
 
-const SPRITES=DASH_ASSETS+'sprites-clean/';
-const sprite=id=>SPRITES+(id==='log-pile'?'log':id)+'.png';
-const spriteImages=new Map();
-function trimmedSprite(id){
- const url=sprite(id);if(spriteImages.has(url))return spriteImages.get(url);
- const promise=new Promise(resolve=>{
-  const image=new Image();image.crossOrigin='anonymous';
-  image.onload=()=>{
-   try{
-    const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
-    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);
-    const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    let left=canvas.width,top=canvas.height,right=-1,bottom=-1;
-    for(let y=0;y<canvas.height;y++)for(let x=0;x<canvas.width;x++)if(data[(y*canvas.width+x)*4+3]>24){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}
-    if(right<left){resolve(url);return;}
-    const cropped=document.createElement('canvas');cropped.width=right-left+1;cropped.height=bottom-top+1;
-    cropped.getContext('2d').drawImage(image,left,top,cropped.width,cropped.height,0,0,cropped.width,cropped.height);
-    resolve(cropped.toDataURL('image/png'));
-   }catch{resolve(url);}
-  };
-  image.onerror=()=>resolve(SPRITES+(id==='log-pile'?'log':id)+'.png');image.src=url;
- });
- spriteImages.set(url,promise);return promise;
-}
+const sprite=dashSpriteUrl;
 const objectLayer=$('dash-objects');
 const pools={hazard:[],banana:[]};
 const cache=new Map();
@@ -134,10 +111,9 @@ function resize3D(){
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
-  trimmedSprite(id);
-}
-for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
+warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
+const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
+if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
 let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
@@ -235,10 +211,10 @@ function acquire(kind,id,w,h){
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
   const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
-  el.src=sprite(id);el.dataset.kind=kind;el.dataset.id=id;
-  trimmedSprite(id).then(url=>{if(el.dataset.request===request&&!el.hidden){el.classList.remove('sprite-fallback');el.src=url;}});
-  el.style.width=w+'px';el.style.height=h+'px';el.style.opacity='';
-  el.onerror=()=>{el.classList.add('sprite-fallback');el.removeAttribute('src');};
+  el.dataset.kind=kind;el.dataset.id=id;el.classList.add('sprite-fallback');
+  el.onload=()=>{if(el.dataset.request===request&&!el.hidden)el.classList.remove('sprite-fallback');};
+  el.onerror=()=>{if(el.dataset.request===request){el.classList.add('sprite-fallback');el.removeAttribute('src');}};
+  el.src=sprite(id);el.style.width=w+'px';el.style.height=h+'px';el.style.opacity='';
   objectLayer.append(el);return el;
 }
 function recycle(el){
