@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {hashDashSeed,nextDashRandom} from '../src/dash/dashSeed.js';
-import {DASH_PHYSICS,dashJumpArcProfiles} from '../src/dash/dashPhysics.js';
-import {DASH_SPEED_CURVE,dashSpeedForTime,dashStageForTime,dashDifficultySnapshot} from '../src/dash/dashDifficulty.js';
+import {DASH_PHYSICS,dashJumpArcProfiles,heightAtDashArcTime} from '../src/dash/dashPhysics.js';
+import {DASH_SPEED_CURVE,dashSpeedForTime,dashStageForTime,dashDifficultySnapshot,dashVisibilityForViewport} from '../src/dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,requiredDashReactionTime,dashTransitionReport,dashWarningReport,validateDashObstacleGeometry} from '../src/dash/dashPatterns.js';
-import {generateDashPlan,validateDashPlan} from '../src/dash/dashSimulation.js';
+import {DASH_GAMEPLAY_VERSION,generateDashPlan,validateDashPlan,simulateDashReplay} from '../src/dash/dashSimulation.js';
 import {dashMultiplier,dashFlowDecay,rewardDashObstaclePass,rewardDashBanana} from '../src/dash/dashScoring.js';
 import {createDashTutorialState,currentDashTutorialStep,advanceDashTutorial,dashTutorialPattern} from '../src/dash/dashTutorial.js';
 
@@ -28,6 +28,7 @@ assert.equal(dashStageForTime(0),1);
 assert.equal(dashStageForTime(30),2);
 assert.equal(dashDifficultySnapshot({time:0}).maxPatternDifficulty,2);
 assert(dashDifficultySnapshot({time:300}).maxPatternDifficulty>=4);
+assert(dashVisibilityForViewport({time:300,viewportWidth:600})<dashVisibilityForViewport({time:300,viewportWidth:1080}));
 
 const arcs=dashJumpArcProfiles();
 assert(arcs.tap.apex>=DASH_PHYSICS.lowHeight-1,`tap apex ${arcs.tap.apex}`);
@@ -39,12 +40,34 @@ assert(arcs.full.airTime*DASH_SPEED_CURVE.cap>widest+DASH_PHYSICS.colliderWidth*
 const geometryIssues=validateDashObstacleGeometry();
 assert.deepEqual(geometryIssues,[],geometryIssues.join('\n'));
 
+function arcCanClear(type,profile,speed){
+  const obstacleTop=Math.max(...type.boxes.map(b=>b[1]+b[3]));
+  const overlapDuration=(type.w+DASH_PHYSICS.colliderWidth)/speed;
+  for(let start=0;start+overlapDuration<=profile.airTime;start+=DASH_PHYSICS.step){
+    let safe=true;
+    for(let t=start;t<=start+overlapDuration+1e-9;t+=DASH_PHYSICS.step){
+      if(heightAtDashArcTime(profile,t)+DASH_PHYSICS.colliderBottom<=obstacleTop+1){safe=false;break;}
+    }
+    if(safe)return true;
+  }
+  return false;
+}
+for(const type of DASH_OBSTACLE_TYPES.filter(x=>x.family==='short'))assert(arcCanClear(type,arcs.tap,DASH_SPEED_CURVE.cap),`tap cannot clear ${type.id}`);
+for(const type of DASH_OBSTACLE_TYPES.filter(x=>x.family==='high'||x.family==='wide'))assert(arcCanClear(type,arcs.full,DASH_SPEED_CURVE.cap),`held jump cannot clear ${type.id}`);
+for(const type of DASH_OBSTACLE_TYPES.filter(x=>x.family==='overhead')){
+  const bottom=Math.min(...type.boxes.map(b=>b[1]));
+  assert(DASH_PHYSICS.colliderBottom+DASH_PHYSICS.slidingHeight<bottom,`slide cannot clear ${type.id}`);
+  assert(DASH_PHYSICS.colliderBottom+DASH_PHYSICS.standingHeight>bottom,`standing unexpectedly clears ${type.id}`);
+}
+
 const short=DASH_OBSTACLE_TYPES.find(x=>x.family==='short');
 const high=DASH_OBSTACLE_TYPES.find(x=>x.family==='high');
 const slide=DASH_OBSTACLE_TYPES.find(x=>x.family==='overhead');
 assert(requiredDashReactionTime(high,slide)>requiredDashReactionTime(short,short));
 const required=requiredDashReactionTime(slide,high,{chainLength:2});
 assert.equal(dashTransitionReport(slide,high,{gapDistance:500,speed:500,chainLength:2}).ok,1>=required);
+assert(requiredDashReactionTime(high,slide,{chainLength:2})>arcs.full.airTime+.20,'jump → slide recovery too short');
+assert(requiredDashReactionTime(slide,high,{chainLength:2})>DASH_PHYSICS.minSlideTime+.35,'slide → jump recovery too short');
 for(const obstacle of DASH_OBSTACLE_TYPES){
   const warning=dashWarningReport(obstacle,{speed:DASH_SPEED_CURVE.cap,viewportWidth:600,obstacleWidth:obstacle.w});
   assert(warning.ok,`${obstacle.id} warning ${warning.available.toFixed(3)}s < ${warning.required.toFixed(3)}s`);
@@ -57,12 +80,27 @@ for(let seed=1;seed<=600;seed++){
     const plan=generateDashPlan({seed,time,count:18,startX:1400});
     const failures=validateDashPlan(plan);
     assert.deepEqual(failures,[],`seed ${seed} @ ${time}s: ${JSON.stringify(failures[0])}`);
+    for(const entry of plan.patterns){
+      for(let i=1;i<entry.obstacles.length;i++)assert(entry.obstacles[i].x>=entry.obstacles[i-1].x+entry.obstacles[i-1].w,'unavoidable obstacle overlap');
+    }
     const replay=generateDashPlan({seed,time,count:18,startX:1400});
     assert.deepEqual(plan,replay,`non-deterministic plan for seed ${seed} @ ${time}s`);
     generatedPatterns+=plan.patterns.length;
   }
 }
 assert(generatedPatterns>70000);
+
+const replayInputs=[
+  {time:.42,action:'jump',down:true},{time:.50,action:'jump',down:false},
+  {time:1.30,action:'slide',down:true},{time:1.62,action:'slide',down:false},
+  {time:2.08,action:'jump',down:true},{time:2.28,action:'jump',down:false}
+];
+const replayA=simulateDashReplay({seed:424242,inputTimeline:replayInputs,duration:8});
+const replayB=simulateDashReplay({seed:424242,inputTimeline:replayInputs,duration:8});
+const replayOtherSeed=simulateDashReplay({seed:424243,inputTimeline:replayInputs,duration:8});
+assert.deepEqual(replayA,replayB,'same gameplay version + seed + inputs must reproduce exactly');
+assert.equal(replayA.rulesVersion,DASH_GAMEPLAY_VERSION);
+assert.notEqual(replayA.planDigest,replayOtherSeed.planDigest,'seed must affect deterministic generated content');
 
 const run={flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,bananaCount:0,goldenBananas:0,perfectJumps:0,perfectSlides:0,nearMisses:0};
 const reward=rewardDashObstaclePass(run,short,{clearance:12});
@@ -110,5 +148,6 @@ console.log(JSON.stringify({
   generatedPatterns,
   speed:{base:round(dashSpeedForTime(0)),at60:round(dashSpeedForTime(60)),at300:round(dashSpeedForTime(300)),cap:DASH_SPEED_CURVE.cap},
   jump:{tap:round(arcs.tap.apex),standard:round(arcs.standard.apex),full:round(arcs.full.apex)},
-  scoring:{flow:round(run.flow),bonus:run.bonus,multiplier:dashMultiplier(run.flow)}
+  scoring:{flow:round(run.flow),bonus:run.bonus,multiplier:dashMultiplier(run.flow)},
+  replay:{version:DASH_GAMEPLAY_VERSION,signature:replayA.signature,collision:replayA.collision}
 },null,2));
