@@ -34,6 +34,10 @@ try{
   const critical=requestFailures.filter(r=>new URL(r.url).origin===new URL(productionBase).origin||externalDashFailure(r));
   assert.deepEqual(pageErrors,[]);
   assert.deepEqual(critical,[],'production critical requests must not fail');
+  report.status='pass';
   writeReport('dash-production-browser-report.json',report);
   console.log('PASS Dash production audit: title, picker, gameplay, input, pause, desktop/mobile, HTTP/page errors');
+}catch(error){
+  report.status='fail';report.failure=error?.stack||String(error);report.pageErrors=pageErrors;report.requests=requestFailures;
+  writeReport('dash-production-browser-report.json',report);throw error;
 }finally{await browser.close();}
