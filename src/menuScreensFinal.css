@@ -247,3 +247,7 @@ body[data-lab-state="menu"].dash-start-screen .original-dash-start{display:none!
   #dash-character-picker .picker-current{display:none}
   #dash-character-picker .picker-grid{grid-template-columns:repeat(5,minmax(110px,1fr))}
 }
+
+
+/* Hotfix: Dash artwork is the only visible entry menu; HTML controls are transparent hotspots. */
+body[data-lab-state="menu"].dash-start-screen #dash-menu>.dash-entry-actions{display:none!important}
