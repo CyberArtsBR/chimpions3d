@@ -30,7 +30,9 @@ jobs:
         env:
           CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
           CHIMP_EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
-        run: node checks/production-browser.mjs
+        run: |
+          node checks/production-browser.mjs
+          node checks/dash-production-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -38,3 +40,4 @@ jobs:
           path: |
             checks/production-*.png
             checks/production-browser-report.json
+            checks/dash-production-browser-report.json
