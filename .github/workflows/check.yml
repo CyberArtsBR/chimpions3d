@@ -104,11 +104,11 @@ jobs:
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:standard
       - name: Build network-failure QA bundle
-        if: always()
+        if: ${{ always() && !cancelled() }}
         run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
       - name: Run targeted network-failure tier
         id: network
-        if: always()
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         shell: bash
         run: |
@@ -122,10 +122,10 @@ jobs:
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:network
       - name: Generate acceptance matrix
-        if: always()
+        if: ${{ always() && !cancelled() }}
         run: node checks/acceptance-matrix.mjs
       - name: Enforce standard release gate
-        if: always()
+        if: ${{ always() && !cancelled() }}
         shell: bash
         run: |
           echo "standard outcome: ${{ steps.standard.outcome }}"
