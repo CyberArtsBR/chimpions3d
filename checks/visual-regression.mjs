@@ -7,7 +7,7 @@ const shots=[];
 async function shot(name){await page.evaluate(()=>window.chimpJumpTest?.render());await page.screenshot({path:'checks/visual-'+name+'.png',animations:'disabled',timeout:90000});shots.push(name);}
 try{
   await gotoJump(page,{test:true});
-  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+  await page.evaluate(async()=>{await window.chimpJumpTest.selectAvatar('12');window.chimpJumpTest.suspendRendering();window.chimpJumpTest.render();});
   await shot('menu');
   await page.getByRole('button',{name:'Field guide',exact:true}).click();await shot('field-guide');await page.getByRole('button',{name:'Close field guide',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();await shot('character-picker');
