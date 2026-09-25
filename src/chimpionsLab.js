@@ -159,7 +159,6 @@ const BIOMES=DASH_BIOMES.map(({name,skyTop,skyBottom})=>[name,hexColor(skyTop),h
 const TYPES=DASH_OBSTACLE_TYPES;
 
 const sprite=dashSpriteUrl;
-const trimmedSprite=async id=>sprite(id);
 const objectLayer=$('dash-objects');
 const pools={hazard:[],banana:[]};
 const cache=new Map();
@@ -373,8 +372,7 @@ function acquire(kind,id,w,h){
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
   const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
-  el.src=sprite(id);el.dataset.kind=kind;el.dataset.id=id;
-  trimmedSprite(id).then(url=>{if(el.dataset.request===request&&!el.hidden){el.classList.remove('sprite-fallback');el.src=url;}});
+  el.src=sprite(id);el.dataset.kind=kind;el.dataset.id=id;el.classList.remove('sprite-fallback');
   el.style.width=w+'px';el.style.height=h+'px';el.style.opacity='';
   el.onerror=()=>{el.classList.add('sprite-fallback');el.removeAttribute('src');};
   objectLayer.append(el);return el;
