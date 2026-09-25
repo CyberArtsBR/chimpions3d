@@ -192,25 +192,42 @@ if(!GPU_WORLD){
   if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 }
 
-let catalog=[],character=null,loading=false,currentEntry=null;
-async function loadAvatar(entry){
-  if((!entry?.url&&!entry?.buffer)||loading)return false;
+let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
+async function loadAvatar(entry,{timeoutMs=15000}={}){
+  if(!entry?.url&&!entry?.buffer)throw new Error('Invalid Chimpion asset');
   if(!entry.buffer&&character&&currentEntry?.id===entry.id)return true;
-  loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loading',{detail:{id:entry.id,name:entry.name}}));
+  const token=++avatarLoadToken;
+  loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
+  window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loading',{detail:{id:entry.id,name:entry.name}}));
+  let timeoutId=0,settled=false;
+  const createPromise=createLabRunnerCharacter(entry.buffer||BASE+entry.url);
+  createPromise.then(late=>{if(settled&&token!==avatarLoadToken)late?.dispose?.()}).catch(()=>{});
   try{
-    const next=await createLabRunnerCharacter(entry.buffer||BASE+entry.url);
+    const next=await Promise.race([
+      createPromise,
+      new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error('Chimpion load timed out')),timeoutMs)})
+    ]);
+    if(token!==avatarLoadToken){next?.dispose?.();throw new DOMException('Chimpion load cancelled','AbortError');}
+    settled=true;
     if(character){scene.remove(character.root);character.dispose();}
-    character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);
+    character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);performanceController?.invalidate?.();
     if(!entry.buffer)try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
     $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones'+(entry.buffer?' · local file':'');
     $('dash-start').disabled=false;
-    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer}}));
+    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer,boneCount:next.boneCount}}));
     return true;
   }catch(error){
-    console.error(error);$('dash-start').disabled=!character;$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-error',{detail:{id:entry?.id,name:entry?.name,message:error.message}}));
-    return false;
-  }finally{loading=false;$('lab-avatar').disabled=false;}
+    if(token===avatarLoadToken){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;}
+    console.error(error);$('dash-start').disabled=!character;
+    $('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
+    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-error',{detail:{id:entry.id,name:entry.name,message:error.message}}));
+    throw error;
+  }finally{
+    settled=true;clearTimeout(timeoutId);
+    if(token===avatarLoadToken){loading=false;$('lab-avatar').disabled=false;}
+  }
 }
+function cancelAvatarLoad(){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;$('dash-start').disabled=!character;}
 
 const hashSeed=hashDashSeed;
 const randomValue=nextDashRandom;
@@ -766,7 +783,7 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
   $('lab-avatar').value=entry.id;return loadAvatar(entry);
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
-window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad:()=>{},selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
+window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad,selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
 window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
 addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose();},{once:true});
 if(new URLSearchParams(location.search).has('test')){
