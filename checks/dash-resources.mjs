@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {openBrowserPage,waitForDash,writeReport} from './dash-test-utils.mjs';
 
-const {browser,page,pageErrors}=await openBrowserPage({viewport:{width:1440,height:900}});
+const {browser,context,page,pageErrors}=await openBrowserPage({viewport:{width:1440,height:900}});
 const report={scope:'dash-resources',samples:[],assetFailures:{}};
 try{
   await waitForDash(page);
@@ -23,36 +23,37 @@ try{
   assert(final.pools.hazards<=32&&final.pools.bananas<=32,'pools must remain capped');
   report.soak={baseline:baseline.resources,final:final.resources,pool:final.pools,renderer:final.renderer};
 
-  await page.route('**/sprites-clean/log.png',r=>r.abort('failed'));
-  await page.evaluate(()=>window.chimpionsDashTest.reset('asset-log',0));
-  await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
-  await page.evaluate(()=>window.chimpionsDashTest.spawnObstacle('log',120));
-  await page.waitForFunction(()=>document.querySelector('.hazard.log')?.classList.contains('sprite-fallback'));
-  const fallback=await page.locator('.hazard.log').evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return{background:s.backgroundImage,width:r.width,height:r.height};});
+  const failurePage=await context.newPage(),failureErrors=[];
+  failurePage.on('pageerror',error=>failureErrors.push(error.message));
+  await failurePage.route('**/sprites-clean/log.png',r=>r.abort('failed'));
+  await failurePage.route('**/jungle-v2.webp',r=>r.abort('failed'));
+  await failurePage.route('**/ground-green.png',r=>r.abort('failed'));
+  await failurePage.route('**/chimpions-army.mp3',r=>r.abort('failed'));
+  await failurePage.goto((process.env.CHIMP_TEST_URL||'http://127.0.0.1:4173')+'/?dash=1&test=1',{waitUntil:'domcontentloaded'});
+  await failurePage.waitForFunction(()=>window.chimpionsDash?.().ready,{timeout:90000});
+  await failurePage.waitForFunction(()=>document.querySelector('.dash-start-hotspot'),{timeout:30000});
+  assert(await failurePage.getByRole('button',{name:'Start Game'}).isVisible(),'background/audio failure must not block start');
+  await failurePage.evaluate(()=>window.chimpionsDashTest.reset('asset-log',0));
+  await failurePage.evaluate(()=>window.chimpionsDashTest.clearWorld());
+  await failurePage.evaluate(()=>window.chimpionsDashTest.spawnObstacle('log',120));
+  await failurePage.waitForFunction(()=>document.querySelector('.hazard.log')?.classList.contains('sprite-fallback'));
+  const fallback=await failurePage.locator('.hazard.log').evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return{background:s.backgroundImage,width:r.width,height:r.height};});
   assert(fallback.width>0&&fallback.height>0&&fallback.background!=='none','missing hazard art needs visible fallback');
   report.assetFailures.hazard=fallback;
-
-  const before=await page.evaluate(()=>window.chimpionsDash().selectedId);
-  await page.route('**/*.glb',r=>r.abort('failed'));
-  const options=await page.locator('#lab-avatar option').evaluateAll(os=>os.map(o=>o.value));
-  const target=options.find(x=>x!==before);
-  if(target){
-    await page.selectOption('#lab-avatar',target);
-    await page.waitForFunction(()=>document.querySelector('#lab-message').textContent.includes('Could not load'));
-    assert.equal(await page.evaluate(()=>window.chimpionsDash().selectedId),before);
-  }
-  report.assetFailures.glb='previous avatar preserved';
-
-  await page.unroute('**/*.glb');
-  await page.route('**/jungle-v2.webp',r=>r.abort('failed'));
-  await page.route('**/ground-green.png',r=>r.abort('failed'));
-  await page.route('**/chimpions-army.mp3',r=>r.abort('failed'));
-  await page.reload({waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.chimpionsDash?.().ready,{timeout:90000});
-  await page.waitForFunction(()=>document.querySelector('.dash-start-hotspot'),{timeout:30000});
-  assert(await page.getByRole('button',{name:'Start Game'}).isVisible(),'background/audio failure must not block start');
   report.assetFailures.backgroundAudio='Dash remained bootable with authored background/ground/music requests blocked';
 
+  const before=await failurePage.evaluate(()=>window.chimpionsDash().selectedId);
+  await failurePage.route('**/*.glb',r=>r.abort('failed'));
+  const options=await failurePage.locator('#lab-avatar option').evaluateAll(os=>os.map(o=>o.value));
+  const target=options.find(x=>x!==before);
+  if(target){
+    await failurePage.selectOption('#lab-avatar',target);
+    await failurePage.waitForFunction(()=>document.querySelector('#lab-message').textContent.includes('Could not load'));
+    assert.equal(await failurePage.evaluate(()=>window.chimpionsDash().selectedId),before);
+  }
+  report.assetFailures.glb='previous avatar preserved';
+  assert.deepEqual(failureErrors,[]);
+  await failurePage.close();
   assert.deepEqual(pageErrors,[]);
   writeReport('dash-resources-report.json',report);
   console.log('PASS dash soak/resources: 40 lifecycle cycles, bounded DOM/scene/renderer pools, asset fallback');
