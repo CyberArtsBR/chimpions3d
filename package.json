@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "qa:fast": "node checks/run-tier.mjs fast",
     "qa:standard": "node checks/run-tier.mjs standard",
-    "qa:cross-browser": "node checks/cross-browser-smoke.mjs"
+    "qa:cross-browser": "node checks/cross-browser-smoke.mjs",
+    "qa:network": "node checks/run-tier.mjs network"
   },
   "dependencies": {
     "three": "0.180.0"
