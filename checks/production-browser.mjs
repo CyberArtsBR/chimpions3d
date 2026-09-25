@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {chromium} from '@playwright/test';
 
 const base=(process.env.CHIMP_PRODUCTION_URL||'https://chimp-jump.onrender.com').replace(/\/$/,'');
-const url=base+'/?test=1';
+const url=base+'/?play=1';
 const origin=new URL(base).origin;
 const expectedCommit=process.env.CHIMP_EXPECTED_COMMIT||'';
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -42,7 +42,7 @@ async function waitForDeployment(){
       if(expectedCommit&&!revision.compatible)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
       report.version=version;
       report.revision={expected:expectedCommit,live:version.commit,exact:revision.exact,auditOnlyDrift:!revision.exact&&revision.compatible,files:revision.files};
-      const liveUrl=base+'/?test=1&revision='+encodeURIComponent(version.commit)+'&audit='+stamp;
+      const liveUrl=base+'/?play=1&revision='+encodeURIComponent(version.commit)+'&audit='+stamp;
       await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
       const remaining=Math.max(1000,Math.min(45000,deadline-Date.now()));
       await page.waitForFunction(()=>window.chimpJump?.().ready&&document.querySelector('#jump-guide-button')&&document.body?.dataset?.mode==='menu',null,{timeout:remaining});
@@ -66,10 +66,8 @@ try{
   report.deployment=await waitForDeployment();
   // Ignore transient errors from deployment polling; assertions below apply to the settled revision only.
   errors.length=0;sameOriginFailures.length=0;
-  // Match the local browser gate: control frames deterministically so a headless/SwiftShader scheduler stall
-  // cannot trigger the game's intentional safety auto-pause and masquerade as a production failure.
-  await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());
-  await page.evaluate(()=>window.chimpJumpTest?.render());
+  assert.equal(await page.evaluate(()=>typeof window.chimpJumpTest),'undefined','Production must not expose the mutable test API');
+  assert.equal(await page.evaluate(()=>Object.isFrozen(window.chimpJumpDiagnostics)),true,'Production diagnostics facade must be readonly');
 
   const menu=await snap('menu');
   assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
@@ -97,16 +95,13 @@ try{
   // cannot miss the short "starting" state before it inspects countdown and opening zoom.
   await page.evaluate(()=>document.getElementById('confirm-chimpion').click());
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:30000});
-  await page.evaluate(()=>window.chimpJumpTest?.render());
   await page.waitForFunction(()=>window.chimpJump?.().countdown===3,{timeout:5000});
   await page.waitForFunction(()=>window.chimpJump?.().cameraZoom>1.8,{timeout:5000});
-  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   const countdownState=await snap('countdown');
   assert(countdownState.cameraZoom>1.8,'Production countdown must zoom in on the Chimpion');
   assert.equal(countdownState.time,0,'Production physics must remain frozen during countdown');
   await shot('production-countdown-desktop.png');
-  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:7000});
   await page.waitForFunction(()=>window.chimpJump?.().cameraZoom<1.05,{timeout:5000});
   const playing=await snap('playing');
   assert(playing.visible,'Production avatar must be visible');
@@ -117,7 +112,7 @@ try{
   await shot('production-playing-desktop.png');
 
   await page.keyboard.down('ArrowLeft');
-  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
+  await page.waitForTimeout(450);
   assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Production keyboard steering must turn left');
   await page.keyboard.up('ArrowLeft');
 
@@ -126,7 +121,6 @@ try{
   await shot('production-pause-desktop.png');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
-  await page.evaluate(()=>window.chimpJumpTest.render());
 
   // Resume/startup intentionally has a short no-auto-pause grace window.
   // Let it expire before validating the later resize safety pause.
@@ -138,7 +132,6 @@ try{
   assert.equal(layout.scrollWidth,1920,'Production 1080p layout must not overflow horizontally');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
-  await page.evaluate(()=>window.chimpJumpTest.render());
   await shot('production-playing-desktop-1080p.png');
 
   await snap('final');
