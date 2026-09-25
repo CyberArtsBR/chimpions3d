@@ -163,6 +163,7 @@ function multiplier(flow){return flow>=100?5:flow>=80?3:flow>=60?2:flow>=40?1.5:
 
 function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
 let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
+let suppressLongFramePause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 
 function makeRun(){
@@ -602,14 +603,14 @@ if(new URLSearchParams(location.search).has('test')){
     types:TYPES.map(t=>({...t,boxes:t.boxes.map(b=>[...b])})),
     stages:Array.from({length:16},(_,i)=>i+1).map(stage=>({stage,speed:speedFor(stage),patterns:patternCatalog(stage).map(p=>({...p,items:p.items.map(item=>[...item])}))}))
   });
-  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,catalog:catalogSnapshot,hashSeed,speedFor,safeGap};
+  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,catalog:catalogSnapshot,hashSeed,speedFor,safeGap,setLongFrameGuardSuppressed:value=>{suppressLongFramePause=!!value;}};
 }
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
-  if(elapsedFrame>.3&&state==='running')pause();pollGamepad();
+  if(elapsedFrame>.3&&state==='running'&&!suppressLongFramePause)pause();pollGamepad();
   if(state==='running'){
     accumulator=Math.min(.12,accumulator+frameDt);
     let steps=0;
