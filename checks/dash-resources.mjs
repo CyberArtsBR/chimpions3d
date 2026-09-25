@@ -47,8 +47,8 @@ try{
   const options=await failurePage.locator('#lab-avatar option').evaluateAll(os=>os.map(o=>o.value));
   const target=options.find(x=>x!==before);
   if(target){
-    await failurePage.evaluate(value=>{const select=document.querySelector('#lab-avatar');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));},target);
-    await failurePage.waitForFunction(()=>document.querySelector('#lab-message').textContent.includes('Could not load'),{timeout:90000});
+    await failurePage.selectOption('#lab-avatar',target);
+    await failurePage.waitForFunction(()=>document.querySelector('#lab-message').textContent.includes('Could not load'));
     assert.equal(await failurePage.evaluate(()=>window.chimpionsDash().selectedId),before);
   }
   report.assetFailures.glb='previous avatar preserved';
