@@ -155,6 +155,7 @@ html, body {
 .cart-wrap:nth-child(2) .cart-entry { transition-delay: 90ms; }
 .cart-wrap:nth-child(3) .cart-entry { transition-delay: 180ms; }
 .cart-wrap:nth-child(4) .cart-entry { transition-delay: 270ms; }
+.cart-wrap:nth-child(5) .cart-entry { transition-delay: 360ms; }
 
 .float {
   width: 100%;
@@ -166,6 +167,7 @@ html, body {
 .cart-wrap:nth-child(2) .float { animation-delay: -.9s; }
 .cart-wrap:nth-child(3) .float { animation-delay: -1.75s; }
 .cart-wrap:nth-child(4) .float { animation-delay: -2.55s; }
+.cart-wrap:nth-child(5) .float { animation-delay: -3.15s; }
 
 @keyframes floating {
   0%,100% { transform: translateY(0) rotateZ(0deg); }

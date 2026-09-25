@@ -18,7 +18,8 @@ document.body.innerHTML=`
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Jump" data-index="0"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Jump cartridge" src="/launcher/cartridge-jump.png" /></div></div></div></div>
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Dash" data-index="1"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Dash cartridge" src="/launcher/cartridge-dash.png" /></div></div></div></div>
     <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Card Arena" data-index="2"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Card Arena cartridge" src="/launcher/cartridge-arena.png" /></div></div></div></div>
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Ski" data-index="3"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Ski cartridge" src="/launcher/cartridge-ski.avif" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Ski" data-index="3"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Ski cartridge" src="/launcher/cartridge-ski-hq.webp" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Urban Sports" data-index="4"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Urban Sports cartridge" src="/launcher/cartridge-urban-sports.webp" /></div></div></div></div>
   </div>
   <div class="play-pill">Click to Play</div>
   <div class="controls"><span class="key">A</span><span class="key">D</span><span>Select</span><span class="sep">•</span><span class="key">↵</span><span>Play</span><span class="sep">•</span><span>Click a side cartridge to center it</span></div>
@@ -34,7 +35,8 @@ const games=[
   {name:'Chimp Jump',url:'/?play=jump',image:'/launcher/cartridge-jump.png'},
   {name:'Chimp Dash',url:'/?dash=1',image:'/launcher/cartridge-dash.png'},
   {name:'Chimpions Card Arena',url:'/?arena=1',image:'/launcher/cartridge-arena.png'},
-  {name:'Chimpions Ski',url:'https://chimpions-ski.onrender.com',image:'/launcher/cartridge-ski.avif'}
+  {name:'Chimpions Ski',url:'https://chimpions-ski.onrender.com',image:'/launcher/cartridge-ski-hq.webp'},
+  {name:'Chimpions Urban Sports',url:'https://chimpions-urban-sports.onrender.com/',image:'/launcher/cartridge-urban-sports.webp'}
 ];
 
 const app=document.getElementById('app');
@@ -102,7 +104,10 @@ function layout(){
     }else{
       card.classList.add('is-far');
       const farSpread=Math.min(650,spread*1.58);
-      card.style.transform=`translate3d(${farSpread}px, 88px, -300px) scale(.60) rotateY(-34deg)`;
+      const isFarLeft=rel>cards.length/2;
+      const x=isFarLeft?-farSpread:farSpread;
+      const yaw=isFarLeft?34:-34;
+      card.style.transform=`translate3d(${x}px, 88px, -300px) scale(.60) rotateY(${yaw}deg)`;
       card.style.opacity='.78';
     }
   });
@@ -115,6 +120,7 @@ function clickCartridge(index){
   if(rel===1)rotate(1);
   else if(rel===cards.length-1)rotate(-1);
   else if(rel===2)rotate(2);
+  else if(rel===cards.length-2)rotate(-2);
 }
 function launch(){
   if(!ready||locked)return;
