@@ -7,8 +7,8 @@
     "dev": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite",
     "build": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite build && node scripts/build-version.mjs",
     "preview": "vite preview",
-    "qa:fast": "node checks/core-regression.mjs && node checks/determinism-regression.mjs && node checks/assets.mjs && node checks/asset-budget.mjs && node checks/jump-audit.mjs && node checks/production-hook-safety.mjs",
-    "qa:standard": "node checks/game-browser.mjs && node checks/collection-browser.mjs && node checks/countdown-browser.mjs && node checks/responsive-browser.mjs && node checks/accessibility-browser.mjs && node checks/network-failures-browser.mjs && node checks/runtime-resilience-browser.mjs && node checks/performance-browser.mjs && node checks/visual-regression.mjs && node checks/acceptance-matrix.mjs",
+    "qa:fast": "node checks/run-tier.mjs fast",
+    "qa:standard": "node checks/run-tier.mjs standard",
     "qa:cross-browser": "node checks/cross-browser-smoke.mjs"
   },
   "dependencies": {
