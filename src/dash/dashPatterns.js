@@ -64,6 +64,19 @@ export function dashPatternCatalog(snapshot){
   });
 }
 
+export function requiredDashWarningTime(next){
+  const c=DASH_REACTION_CONTRACT;
+  return Math.max(c.visibilityFloor,c.base[next?.action]??c.visibilityFloor);
+}
+
+export function dashWarningReport(next,{speed,viewportWidth,playerX=DASH_PHYSICS.playerX,obstacleWidth=0}={}){
+  const anticipationInset=Math.min(48,Math.max(0,obstacleWidth)*.25);
+  const visibleDistance=Math.max(0,viewportWidth-playerX-anticipationInset);
+  const available=visibleDistance/Math.max(1,speed);
+  const required=requiredDashWarningTime(next);
+  return{available,required,visibleDistance,ok:available+1e-9>=required};
+}
+
 export function requiredDashReactionTime(previous,next,{chainLength=1,requested=0}={}){
   const c=DASH_REACTION_CONTRACT;
   const base=c.base[next?.action]??c.visibilityFloor;
@@ -104,15 +117,16 @@ export function planDashPattern(holder,{time,spawnX,currentScroll=0,playerX=DASH
   for(let i=0;i<pattern.items.length;i++){
     const [family,requested]=pattern.items[i];
     const type=chooseDashObstacle(holder,{family,difficulty:pattern.difficulty,stage:snapshot.stage});
+    let transitionSpeed=null;
     if(i){
       const previous=obstacles[obstacles.length-1];
-      const speed=dashPlanningSpeed({runTime:time,worldDistance:x,currentScroll,playerX});
-      x=previous.x+previous.w+dashTransitionGapDistance(previous,type,{speed,chainLength:pattern.items.length,requested});
+      transitionSpeed=dashPlanningSpeed({runTime:time,worldDistance:previous.x+previous.w,currentScroll,playerX});
+      x=previous.x+previous.w+dashTransitionGapDistance(previous,type,{speed:transitionSpeed,chainLength:pattern.items.length,requested});
     }
-    obstacles.push({...type,x});
+    obstacles.push({...type,x,transitionSpeed});
   }
   const last=obstacles[obstacles.length-1];
-  const recoverySpeed=dashPlanningSpeed({runTime:time,worldDistance:last?.x||x,currentScroll,playerX});
+  const recoverySpeed=dashPlanningSpeed({runTime:time,worldDistance:(last?.x||x)+(last?.w||0),currentScroll,playerX});
   const recoverySeconds=Math.max(1.02,pattern.recovery+.28);
   const nextSpawn=(last?.x||x)+(last?.w||0)+recoverySpeed*recoverySeconds;
   return{pattern,snapshot,obstacles,nextSpawn,recoverySeconds};
