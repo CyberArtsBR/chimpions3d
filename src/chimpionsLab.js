@@ -813,11 +813,21 @@ if(new URLSearchParams(location.search).has('test')){
     seedWorld();setState('running');accumulator=0;last=performance.now();renderUI(0);dashGraphics.render();return snapshot();
   };
   const step=(steps=1)=>{const count=Math.max(0,Math.min(20000,Math.floor(Number(steps)||0)));for(let i=0;i<count&&state==='running';i++)updatePhysics(STEP);renderUI(0);dashGraphics.render();return snapshot();};
+  const setRun=patch=>{
+    if(!run)return snapshot();
+    const numeric=new Set(['time','stage','speed','scroll','distance','y','vy','jumpAge','jumpBuffer','coyote','slideTime','slideMin','landing','bananaCount','goldenBananas','flow','maxFlow','combo','longestCombo','bonus','score','lastDifficulty']);
+    const boolean=new Set(['grounded','jumpHeld','jumpBufferHeld','slideHeld','slideBlocked','dead','landed']);
+    for(const [key,value] of Object.entries(patch||{})){
+      if(numeric.has(key)&&Number.isFinite(value))run[key]=value;
+      else if(boolean.has(key)&&typeof value==='boolean')run[key]=value;
+    }
+    renderUI(0);return snapshot();
+  };
   const clearWorldForTest=()=>{clearWorld();dashGraphics.reset();spawnCursor=(run?.scroll||0)+metrics().vw+360;return snapshot();};
   const spawnTestObstacle=(id,offset=220)=>{const type=TYPES.find(t=>t.id===id);if(!type)throw new Error('Unknown Dash obstacle: '+id);const o=spawnObstacle(type,(run?.scroll||0)+PLAYER_X+Number(offset||0));o.patternId='test-fixture';return snapshot();};
   const spawnTestBanana=(offset=180,y=55,golden=false)=>{spawnBanana((run?.scroll||0)+PLAYER_X+Number(offset||0),Number(y||0),!!golden);return snapshot();};
   const advanceWorld=(distance=800)=>{if(!run)return snapshot();run.scroll+=Math.max(0,Number(distance)||0);run.distance=run.scroll/100;maintainWorld();renderUI(0);return snapshot();};
-  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,pollGamepad,hashSeed,speedFor:dashSpeedForTime,safeGap,catalog:()=>({constants:DASH_PHYSICS,types:TYPES,version:DASH_RULES_VERSION})};
+  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,pollGamepad,hashSeed,speedFor:dashSpeedForTime,safeGap,catalog:()=>({constants:{...DASH_PHYSICS,STEP,PLAYER_X,BASE_SPEED,GRAVITY,JUMP_IMPULSE,LOW_HEIGHT,HOLD_TIME,JUMP_BUFFER,COYOTE_TIME},types:TYPES.map(t=>({...t,boxes:t.boxes.map(b=>[...b])})),version:DASH_RULES_VERSION})};
 }
 addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose?.();},{once:true});
 
