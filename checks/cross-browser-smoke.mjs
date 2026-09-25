@@ -17,6 +17,13 @@ try{
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#collection-dialog[open]').isVisible());
   assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10);
+  await page.locator('#confirm-chimpion').click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:7000});
+  assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),name+': gameplay pause action hidden');
+  await page.getByRole('button',{name:'Pause game'}).click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused',{timeout:3000});
+  report.gameplaySmoke=true;
   assert.deepEqual(diag.errors,[],name+': page errors');
   assert.deepEqual(diag.consoleErrors,[],name+': console errors');
   assert.deepEqual(diag.sameOriginFailures,[],name+': same-origin failures');
