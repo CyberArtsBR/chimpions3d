@@ -34,6 +34,8 @@ assert(arcs.tap.apex>=DASH_PHYSICS.lowHeight-1,`tap apex ${arcs.tap.apex}`);
 assert(arcs.standard.apex>arcs.tap.apex+8);
 assert(arcs.full.apex>arcs.standard.apex+8);
 assert(arcs.full.airTime>arcs.tap.airTime);
+const widest=Math.max(...DASH_OBSTACLE_TYPES.filter(x=>x.family==='wide').map(x=>x.w));
+assert(arcs.full.airTime*DASH_SPEED_CURVE.cap>widest+DASH_PHYSICS.colliderWidth*2);
 const geometryIssues=validateDashObstacleGeometry();
 assert.deepEqual(geometryIssues,[],geometryIssues.join('\n'));
 
@@ -62,6 +64,9 @@ const run={flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,bananaCount:0,goldenB
 const reward=rewardDashObstaclePass(run,short,{clearance:12});
 assert.equal(reward.precision.perfect,true);
 assert.equal(run.perfectJumps,1);
+const flexRun={flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,bananaCount:0,goldenBananas:0,perfectJumps:0,perfectSlides:0,nearMisses:0};
+rewardDashObstaclePass(flexRun,{action:'jump-or-slide'},{clearance:12,performedAction:'slide'});
+assert.equal(flexRun.perfectSlides,1);
 assert(run.flow>0&&run.bonus>0);
 const beforeBanana=run.bonus;
 rewardDashBanana(run,false);
