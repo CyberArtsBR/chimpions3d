@@ -3,26 +3,31 @@ import {launchBrowser,gotoJump,writeReport} from './qa-browser-utils.mjs';
 
 const {browser}=await launchBrowser('chromium');
 const page=await browser.newPage({viewport:{width:1280,height:800}});
-const seen=[];
+const report={status:'PASS',suite:'countdown-browser',seen:[]};
 try{
   await gotoJump(page,{test:true});
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
   await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting');
-  const before=await page.evaluate(()=>window.chimpJump().time);
-  assert.equal(before,0,'Physics time must be zero at countdown start');
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting'&&window.chimpJump().countdown===3,{timeout:5000});
+  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
 
-  const deadline=Date.now()+6000;
-  while(Date.now()<deadline){
-    const state=await page.evaluate(()=>({mode:window.chimpJump().mode,text:document.getElementById('countdown').textContent,hidden:document.getElementById('countdown').hidden,time:window.chimpJump().time}));
-    if(!state.hidden&&state.text&&!seen.includes(state.text))seen.push(state.text);
-    if(state.mode==='playing')break;
-    await page.waitForTimeout(40);
+  assert.equal(await page.evaluate(()=>window.chimpJump().time),0,'Physics time must be zero at countdown start');
+  report.seen.push(await page.locator('#countdown').textContent());
+  for(let i=0;i<3;i++){
+    await page.evaluate(()=>window.chimpJumpTest.advanceCountdown(.75));
+    report.seen.push(await page.locator('#countdown').textContent());
+    assert.equal(await page.evaluate(()=>window.chimpJump().time),0,'Physics must remain frozen throughout countdown');
   }
-  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'playing','Countdown must transition into gameplay');
-  assert.equal(before,0);
-  assert.deepEqual(seen.slice(0,4),['3','2','1','GO'],'Countdown must visibly present 3, 2, 1, GO exactly once in order');
-  writeReport('checks/countdown-report.json',{status:'PASS',seen});
-  console.log('PASS countdown: '+seen.join(' -> '));
+  const expected=['3','2','1','GO'];
+  if(JSON.stringify(report.seen)!==JSON.stringify(expected))report.status='FAIL';
+  writeReport('checks/countdown-report.json',report);
+  assert.deepEqual(report.seen,expected,'Countdown must visibly present 3, 2, 1, GO exactly once in order');
+  await page.evaluate(()=>window.chimpJumpTest.advanceCountdown(.75));
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'playing','GO must transition into gameplay');
+  console.log('PASS countdown: '+report.seen.join(' -> '));
+}catch(error){
+  report.status='FAIL';report.error=error.message;
+  writeReport('checks/countdown-report.json',report);
+  throw error;
 }finally{await browser.close();}
