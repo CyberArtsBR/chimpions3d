@@ -242,7 +242,7 @@ async function loadAvatar(entry,{timeoutMs=15000}={}){
     window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer,boneCount:next.boneCount}}));
     return true;
   }catch(error){
-    if(token===avatarLoadToken)avatarLoadToken++;
+    if(token===avatarLoadToken){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false}
     console.error(error);
     $('dash-start').disabled=!character;
     $('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
@@ -251,7 +251,6 @@ async function loadAvatar(entry,{timeoutMs=15000}={}){
   }finally{
     settled=true;clearTimeout(timeoutId);
     if(token===avatarLoadToken){loading=false;$('lab-avatar').disabled=false}
-    else if(!loading||token+1===avatarLoadToken){loading=false;$('lab-avatar').disabled=false}
   }
 }
 function cancelAvatarLoad(){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;$('dash-start').disabled=!character}
