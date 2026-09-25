@@ -799,10 +799,10 @@ export class CharacterAnimator {
       for (let frame = 0; frame < frames; frame++) {
         const input = {
           active:true, velocityY:0, velocityX:0, bounceAge:1,
-          landingAnticipation:0, landingImpact:0, platformType:'',
-          springActive:false, hazardHit:false, hazardDirection:1,
+          landingAnticipation:0, landingImpact:0, platformType:'', platformVelocityX:0,
+          springActive:false, springStrength:1, hazardHit:false, hazardDirection:1,
           jetpackActive:false, jetpackStrength:1, wrapEvent:null,
-          dying:false, reducedMotion:false, landingQuality:'CLEAN', result:'',
+          dying:false, reducedMotion:false, landingQuality:'CLEAN', result:'', resultType:'',
         };
         configure(input, frame, frames);
         this.update(dt, time, input);
