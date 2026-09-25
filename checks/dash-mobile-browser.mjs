@@ -5,7 +5,7 @@ const {browser,page,pageErrors}=await openBrowserPage({viewport:{width:390,heigh
 const report={scope:'dash-mobile',viewports:{},touch:{}};
 try{
   await waitForDash(page);report.viewports.portrait=await assertNoOverflow(page,'phone portrait');await shot(page,'dash-menu-mobile-portrait.png');
-  await page.getByRole('button',{name:'Start Game'}).tap();await page.getByRole('button',{name:/Play with selected Chimpion/}).tap();await page.waitForFunction(()=>window.chimpionsDash().state==='running');await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
+  await page.getByRole('button',{name:'Start Game'}).tap();await page.locator('.picker-play').tap();await page.waitForFunction(()=>window.chimpionsDash().state==='running');await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
   assert(await page.locator('#touch-jump').isVisible());assert(await page.locator('#touch-slide').isVisible());await shot(page,'dash-gameplay-mobile-portrait.png');
 
   const jump=page.locator('#touch-jump');await jump.dispatchEvent('pointerdown',{pointerId:11,pointerType:'touch',button:0});await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await jump.dispatchEvent('pointercancel',{pointerId:11,pointerType:'touch'});await page.waitForTimeout(20);assert.equal((await page.evaluate(()=>window.chimpionsDashTest.snapshot())).inputs.jump.length,0);
