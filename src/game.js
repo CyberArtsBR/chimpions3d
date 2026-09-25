@@ -81,7 +81,7 @@ quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry
 const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,countdownTime=0,autoPauseAfter=0;
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='';
-let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
+let pendingEntry=null,selectionConfirmed=false,runTicket=null,runRequestGeneration=0,inputTrace=[],deathAge=0,deathPoint=null,splashed=false;
 const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
 const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
@@ -146,12 +146,22 @@ async function start(requestedSeed=null){
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
  if(mode==='menu'&&!selectionConfirmed){openSelection();return;}audio.unlock();const fresh=mode!=='paused';
  if(fresh){
-  mode='starting';syncUI();runTicket=null;inputTrace=[];cleanLandings=0;cleanPlatformIds.clear();
+  mode='starting';syncUI();runTicket=null;const runRequest=++runRequestGeneration;inputTrace=[];cleanLandings=0;cleanPlatformIds.clear();
   const replaySeed=requestedSeed===null||requestedSeed===undefined?null:(Number(requestedSeed)>>>0);
-  if(replaySeed===null){try{runTicket=await leaderboard.begin();}catch{toast('Playing offline · online records unavailable');}}
-  else toast('Practice trail · same route, no online submission');
   for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();for(const m of hazardMeshes.values())removeHazard(m);hazardMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;
-  runSeed=(replaySeed??runTicket?.seed??Math.floor(Math.random()*4294967295))>>>0;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
+  runSeed=(replaySeed??Math.floor(Math.random()*4294967295))>>>0;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
+  if(replaySeed===null){
+   leaderboard.begin().then(ticket=>{
+    if(runRequest!==runRequestGeneration)return;
+    if(mode!=='starting'||game.time!==0){toast('Playing offline · online records unavailable');return;}
+    runTicket=ticket;
+    const authoritativeSeed=Number(ticket?.seed);
+    if(Number.isFinite(authoritativeSeed)&&(authoritativeSeed>>>0)!==runSeed){
+     for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();for(const m of hazardMeshes.values())removeHazard(m);hazardMeshes.clear();scenery.reset();
+     runSeed=authoritativeSeed>>>0;game.reset(runSeed);lastTheme=-1;
+    }
+   }).catch(()=>{if(runRequest===runRequestGeneration)toast('Playing offline · online records unavailable');});
+  }else toast('Practice trail · same route, no online submission');
   music.muted=muted;music.play().catch(()=>{});mouseTarget=null;keys.clear();pointers.clear();acc=0;previous=performance.now();syncUI();return;
  }
  music.muted=muted;music.play().catch(()=>{});beginPlaying();
@@ -282,8 +292,7 @@ addEventListener('resize',quality);quality();applyBackdrop();menu('menu');
 function advanceCountdown(dt){
  if(mode!=='starting')return;
  countdownTime=Math.max(0,countdownTime-dt);
- const n=Math.max(0,Math.ceil(countdownTime/.75)-1);
- countdown.textContent=String(n);
+ countdown.textContent=countdownTime>2.25?'3':countdownTime>1.5?'2':countdownTime>.75?'1':countdownTime>0?'GO':'GO';
  if(countdownTime<=0)beginPlaying();
 }
 function renderFrame(now){
