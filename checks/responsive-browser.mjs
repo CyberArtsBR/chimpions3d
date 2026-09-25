@@ -39,7 +39,7 @@ try{
       const touch=page.locator('#touch');
       assert(await touch.isVisible(),viewport.name+': touch controls must be visible in gameplay');
       const boxes=await touch.locator('button').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height};}));
-      for(const b of boxes)assert(b.left>=0&&b.top>=0&&b.right<=innerWidth+1&&b.bottom<=innerHeight+1&&b.width>=40&&b.height>=40,viewport.name+': touch target clipped or too small');
+      for(const b of boxes)assert(b.left>=0&&b.top>=0&&b.right<=viewport.width+1&&b.bottom<=viewport.height+1&&b.width>=40&&b.height>=40,viewport.name+': touch target clipped or too small');
     }
     await page.getByRole('button',{name:'Pause game'}).click();
     await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
