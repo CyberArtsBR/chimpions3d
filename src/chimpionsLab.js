@@ -116,7 +116,6 @@ document.body.innerHTML=`
   <div id="dash-stage-flash" aria-hidden="true"></div>
 </main>`;
 
-const scene
 const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-6,6,6,-6,.01,40);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
 renderer.setClearColor(0x000000,0);
@@ -746,8 +745,6 @@ function pollGamepad(){
  }
  lastPadJump=j;lastPadSlide=s;lastPadPause=start;lastPadConfirm=confirm;lastPadNavUp=navUp;lastPadNavDown=navDown;
 }
-
-fetch(BASE+'avatars.json')
 
 fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
   catalog=filterBuiltInRoster(entries.filter(e=>e.url));
