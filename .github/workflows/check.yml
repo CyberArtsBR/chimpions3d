@@ -16,6 +16,10 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+      - name: Verify production runtime surface
+        run: node checks/runtime-production-contract.mjs
+      - name: Run runtime/input unit checks
+        run: node checks/runtime-unit.mjs
       - run: node checks/physics.mjs
       - run: node checks/assets.mjs
       - run: node checks/jump-audit.mjs
@@ -26,6 +30,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run desktop browser audit
         run: |
+          VITE_CHIMP_TEST_API=1 npm run build
           npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
