@@ -55,4 +55,6 @@ try{
 
   writeReport('checks/performance-report.json',report);
   console.log('PERFORMANCE_REPORT:'+JSON.stringify(report));
+}catch(error){
+  report.status='FAIL';report.error=error.message;writeReport('checks/performance-report.json',report);throw error;
 }finally{await browser.close();}
