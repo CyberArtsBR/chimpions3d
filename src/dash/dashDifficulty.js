@@ -29,18 +29,27 @@ export function dashDifficultyForTime(time){
   return Math.min(5,1+4*(1-Math.exp(-t/145)));
 }
 
+export function dashVisibilityForViewport({time=0,speed=dashSpeedForTime(time),viewportWidth=1080,playerX=150}={}){
+  const usable=Math.max(0,viewportWidth-playerX);
+  const targetDistance=Math.max(1,speed)*.90;
+  return Math.max(0,Math.min(1,usable/targetDistance));
+}
+
 export function dashDifficultySnapshot({
   time=0,
   previousDifficulty=1,
+  previousAction=null,
   recentPressure=0,
   recentRecovery=1,
-  recentActionVariety=.5
+  recentActionVariety=.5,
+  visibility=1
 }={}){
   const target=dashDifficultyForTime(time);
   const pressurePenalty=Math.max(0,Math.min(1,recentPressure))*.55;
+  const visibilityPenalty=(1-Math.max(0,Math.min(1,visibility)))*.45;
   const recoveryBonus=Math.max(-.35,Math.min(.35,(recentRecovery-.85)*.4));
   const varietyBonus=Math.max(-.2,Math.min(.2,(recentActionVariety-.5)*.35));
-  let effective=target-pressurePenalty+recoveryBonus+varietyBonus;
+  let effective=target-pressurePenalty-visibilityPenalty+recoveryBonus+varietyBonus;
   if(previousDifficulty>=4.5&&recentRecovery<.8)effective=Math.min(effective,2.6);
   effective=Math.max(1,Math.min(5,effective));
   return{
@@ -48,6 +57,8 @@ export function dashDifficultySnapshot({
     stage:dashStageForTime(time),
     speed:dashSpeedForTime(time),
     normalizedSpeed:dashNormalizedSpeed(time),
+    previousAction,
+    visibility:Math.max(0,Math.min(1,visibility)),
     targetDifficulty:target,
     effectiveDifficulty:effective,
     maxPatternDifficulty:Math.max(2,Math.min(5,Math.floor(effective+.35)))
