@@ -53,7 +53,7 @@ export function setupDashMenu(){
   actions.setAttribute('aria-label','Chimpions Dash menu');
   const start=document.createElement('button');
   start.type='button';start.className='dash-entry-start';
-  start.textContent='START DASH';start.setAttribute('aria-haspopup','dialog');
+  start.textContent='START DASH';start.setAttribute('aria-label','Start Game');start.setAttribute('aria-haspopup','dialog');
   const back=backButton(actions,'dash-back');back.textContent='BACK';
   actions.prepend(start);menu.append(actions);
 
@@ -68,9 +68,9 @@ export function setupDashMenu(){
       </header>
       <div class="picker-toolbar">
         <label class="picker-search-wrap">SEARCH
-          <input class="picker-search" type="search" placeholder="Search Chimpions" autocomplete="off" spellcheck="false">
+          <input class="picker-search" type="search" aria-label="Search characters" placeholder="Search Chimpions" autocomplete="off" spellcheck="false">
         </label>
-        <button class="picker-random" type="button">RANDOM</button>
+        <button class="picker-random" type="button" aria-label="Random Chimpion">RANDOM</button>
         <button class="picker-upload" type="button">UPLOAD GLB</button>
       </div>
       <div class="picker-current" aria-live="polite">
