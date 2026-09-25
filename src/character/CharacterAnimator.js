@@ -5,6 +5,7 @@ import {ANIMATION_STATES, clamp, clamp01, damp, landingProfile, smooth01} from '
 const BONE_INDEX = Object.freeze(Object.fromEntries(BONE_KEYS.map((key, index) => [key, index])));
 const EMPTY_INPUT = Object.freeze({});
 const PI = Math.PI;
+const SIDES = Object.freeze(['left','right']);
 
 const ROTATION_LIMIT = Object.freeze({
   hips:0.60, spine:0.68, chest:0.72, neck:0.52, head:0.58,
@@ -309,7 +310,7 @@ export class CharacterAnimator {
     this._set('neck', -0.015 * extension, 0, 0);
     this._set('head', -0.035 * extension, 0, 0);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       this._set(side + 'Shoulder', -0.035 * extension, 0, sign * 0.028 * push);
       this._set(side + 'UpperArm', 0.22 * compression - 0.92 * extension + sign * asym, 0, sign * 0.035 * push);
@@ -336,7 +337,7 @@ export class CharacterAnimator {
     this._set('neck', 0.014 * recover, 0, 0);
     this._set('head', -0.025 * rise + 0.015 * recover, 0, 0);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       this._set(side + 'Shoulder', -0.060 * rise, 0, sign * 0.045);
       this._set(side + 'UpperArm', -0.88 * rise - 0.48 * recover + sign * delayed, 0, sign * 0.050);
@@ -393,7 +394,7 @@ export class CharacterAnimator {
     this._set('neck', -0.010 - 0.018 * prep, 0, 0);
     this._set('head', 0.020 + 0.020 * prep, 0, 0);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       this._set(side + 'Shoulder', -0.025, 0, sign * (0.055 + 0.050 * prep));
       this._set(side + 'UpperArm', -0.34 + 0.16 * prep + sign * asym, 0, sign * (0.050 + 0.050 * prep));
@@ -424,7 +425,7 @@ export class CharacterAnimator {
     this._set('neck', -0.030 * compression, 0, -correction * 0.12);
     this._set('head', -0.045 * compression, 0, -correction * 0.22);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       const edge = correction * sign;
       this._set(side + 'Shoulder', 0.035 * compression, 0, sign * 0.045 * compression + edge * 0.08);
@@ -455,7 +456,7 @@ export class CharacterAnimator {
     this._set('neck', -0.03 * release, 0, 0);
     this._set('head', -0.055 * release + 0.025 * reaction * reduction, 0, 0);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       const stagger = sign * Math.sin(time * 3.3) * 0.025 * reduction;
       this._set(side + 'Shoulder', -0.08 * release, 0, sign * 0.09 * reaction);
@@ -506,7 +507,7 @@ export class CharacterAnimator {
     this._set('neck', -0.028 * boost, 0, 0);
     this._set('head', -0.085 * boost, 0, -stabilization * 0.25);
 
-    for (const side of ['left','right']) {
+    for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       this._set(side + 'Shoulder', -0.035 * boost, 0, sign * 0.055 * boost);
       this._set(side + 'UpperArm', -0.26 * boost + sign * stabilization, 0, sign * 0.11 * boost);
