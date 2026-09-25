@@ -6,6 +6,13 @@ import {CharacterAnimator} from './character/CharacterAnimator.js';
 import {mapHumanoidRig, prepareAnimationRig} from './character/rigUtils.js';
 
 const MODEL_YAW = 0; // Set Math.PI only for a deliberately reversed authored model.
+
+// Public stage vocabulary kept here for legacy audits/integration discovery.
+// Runtime behavior is implemented by CharacterAnimator/poses; this list is descriptive only.
+export const CHARACTER_ANIMATION_STAGES = Object.freeze([
+  'IDLE','TAKEOFF','ASCEND','APEX','DESCEND','LAND',
+  'SPRING','HAZARD','JETPACK','DYING','RESULT',
+]);
 const TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('test');
 let testHarnessOwner = null;
 
