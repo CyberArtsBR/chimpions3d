@@ -2,11 +2,18 @@ import assert from 'node:assert/strict';
 import {openBrowserPage,waitForDash,assertNoOverflow,writeReport,shot} from './dash-test-utils.mjs';
 
 const {browser,page,pageErrors}=await openBrowserPage({viewport:{width:390,height:844},mobile:true});
-const report={scope:'dash-mobile',viewports:{},touch:{}};
+const report={scope:'dash-mobile',viewports:{},touch:{},pause:{}};
+async function recoverScreenshotPause(label){
+  if(await page.evaluate(()=>window.chimpionsDash().state)==='paused'){
+    report.pause.largeFrameProtection=(report.pause.largeFrameProtection||[]).concat(label);
+    await page.evaluate(()=>window.chimpionsDashTest.resume());
+    await page.waitForFunction(()=>window.chimpionsDash().state==='running');
+  }
+}
 try{
   await waitForDash(page);report.viewports.portrait=await assertNoOverflow(page,'phone portrait');await shot(page,'dash-menu-mobile-portrait.png');
   await page.getByRole('button',{name:'Start Game'}).tap();await page.locator('.picker-play').tap();await page.waitForFunction(()=>window.chimpionsDash().state==='running');await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
-  assert(await page.locator('#touch-jump').isVisible());assert(await page.locator('#touch-slide').isVisible());await shot(page,'dash-gameplay-mobile-portrait.png');
+  assert(await page.locator('#touch-jump').isVisible());assert(await page.locator('#touch-slide').isVisible());await shot(page,'dash-gameplay-mobile-portrait.png');await recoverScreenshotPause('portrait gameplay screenshot');
 
   const jump=page.locator('#touch-jump');await jump.dispatchEvent('pointerdown',{pointerId:11,pointerType:'touch',button:0});await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await jump.dispatchEvent('pointercancel',{pointerId:11,pointerType:'touch'});await page.waitForTimeout(20);assert.equal((await page.evaluate(()=>window.chimpionsDashTest.snapshot())).inputs.jump.length,0);
   await page.evaluate(()=>window.chimpionsDashTest.reset('touch-lost',0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());await jump.dispatchEvent('pointerdown',{pointerId:12,pointerType:'touch',button:0});await jump.dispatchEvent('lostpointercapture',{pointerId:12,pointerType:'touch'});await page.waitForTimeout(20);assert.equal((await page.evaluate(()=>window.chimpionsDashTest.snapshot())).inputs.jump.length,0);report.touch.jumpCancel='pass';
