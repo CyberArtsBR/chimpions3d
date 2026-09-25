@@ -383,6 +383,7 @@ function setState(next){
 }
 function startRun(){
   if(!character||loading)return;
+  if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
   clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
   clearWorld();run=makeRun();seedWorld();setState('running');accumulator=0;
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;$('dash-tip').classList.add('show');
@@ -396,7 +397,7 @@ function finishRun(){
   setState('over');
 }
 function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();setState('paused');}
-function resume(){if(state!=='paused')return;setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
+function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
 function quit(){clearInputs();voice.setDash(false);voice.stopMusic();clearWorld();run=makeRun();setState('menu');accumulator=0;}
 
 function updatePhysics(dt){
