@@ -50,10 +50,6 @@ jobs:
           npm run qa:fast
           node checks/dash-gameplay.mjs
           node checks/dash-presentation-contract.mjs
-      - name: Run Dash deterministic integration contracts
-        run: |
-          node checks/dash-gameplay.mjs
-          node checks/dash-presentation-contract.mjs
       - name: Syntax-check browser and production suites
         run: |
           node --check checks/game-browser.mjs
@@ -79,11 +75,6 @@ jobs:
           node --check checks/dash-performance-browser.mjs
           node --check checks/dash-presentation-contract.mjs
           node --check checks/dash-presentation-browser.mjs
-          node --check checks/dash-gameplay.mjs
-          node --check checks/dash-rendering-browser.mjs
-          node --check checks/dash-performance-browser.mjs
-          node --check checks/dash-presentation-browser.mjs
-          node --check checks/dash-presentation-contract.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -131,9 +122,6 @@ jobs:
           node checks/dash-browser.mjs
           node checks/dash-mobile-browser.mjs
           node checks/dash-resources.mjs
-          node checks/dash-rendering-browser.mjs
-          node checks/dash-performance-browser.mjs
-          node checks/dash-presentation-browser.mjs
           node checks/dash-rendering-browser.mjs
           node checks/dash-performance-browser.mjs
           node checks/dash-presentation-browser.mjs
