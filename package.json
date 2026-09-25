@@ -12,7 +12,7 @@
     "qa:cross-browser": "node checks/cross-browser-smoke.mjs",
     "qa:network": "node checks/run-tier.mjs network",
     "qa:soak": "node checks/long-session-rendered.mjs",
-    "qa:production": "node checks/production-browser.mjs"
+    "qa:production": "node checks/production-browser.mjs && node checks/dash-production-browser.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
