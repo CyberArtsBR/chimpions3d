@@ -13,6 +13,17 @@ const report={status:'PASS',suite:'runtime-resilience',checks:{}};
 try{
   await gotoJump(page,{test:true});
   await startSelectedRun(page,{fastForward:true});
+
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;});
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused',{timeout:1500});
+  await page.waitForTimeout(220);
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Held controller Start must trigger only one pause edge');
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;});
+  await page.waitForTimeout(120);
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;});
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing',{timeout:1500});
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;});
+  report.checks.controllerPauseEdge=true;
   await page.waitForTimeout(1300);
 
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
