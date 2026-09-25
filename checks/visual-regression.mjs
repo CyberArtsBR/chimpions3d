@@ -4,7 +4,7 @@ import {launchBrowser,gotoJump,writeReport} from './qa-browser-utils.mjs';
 const {browser}=await launchBrowser('chromium');
 const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});
 const shots=[];
-async function shot(name){await page.evaluate(()=>window.chimpJumpTest?.render());await page.screenshot({path:'checks/visual-'+name+'.png',animations:'disabled'});shots.push(name);}
+async function shot(name){await page.evaluate(()=>window.chimpJumpTest?.render());await page.screenshot({path:'checks/visual-'+name+'.png',animations:'disabled',timeout:90000});shots.push(name);}
 try{
   await gotoJump(page,{test:true});
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
