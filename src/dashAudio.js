@@ -199,14 +199,24 @@ export class GameAudio {
       let brown=0;
       for(let i=0;i<data.length;i++){brown=(brown+(Math.random()*2-1)*.025)/1.025;data[i]=brown*.9}
       const noise=c.createBufferSource(),windFilter=c.createBiquadFilter(),windGain=c.createGain();
-      noise.buffer=buffer;noise.loop=true;windFilter.type='bandpass';windFilter.frequency.value=620;windFilter.Q.value=.45;windGain.gain.value=.034;
-      noise.connect(windFilter);windFilter.connect(windGain);windGain.connect(this.target('ambience'));noise.start();
+      const leavesFilter=c.createBiquadFilter(),leavesGain=c.createGain();
+      noise.buffer=buffer;noise.loop=true;
+      windFilter.type='bandpass';windFilter.frequency.value=620;windFilter.Q.value=.45;windGain.gain.value=.034;
+      leavesFilter.type='highpass';leavesFilter.frequency.value=2600;leavesGain.gain.value=.0045;
+      noise.connect(windFilter);windFilter.connect(windGain);windGain.connect(this.target('ambience'));
+      noise.connect(leavesFilter);leavesFilter.connect(leavesGain);leavesGain.connect(this.target('ambience'));noise.start();
 
       const insects=c.createOscillator(),insectGain=c.createGain();
       insects.type='sine';insects.frequency.value=4650;insectGain.gain.value=.003;
       insects.connect(insectGain);insectGain.connect(this.target('ambience'));insects.start();
 
-      this.windGain=windGain;this.windFilter=windFilter;this.ambienceNodes=[noise,insects];
+      const bird=c.createOscillator(),birdLfo=c.createOscillator(),birdDepth=c.createGain(),birdGain=c.createGain(),birdFilter=c.createBiquadFilter();
+      bird.type='triangle';bird.frequency.value=1780;birdLfo.type='sine';birdLfo.frequency.value=.19;birdDepth.gain.value=420;
+      birdFilter.type='bandpass';birdFilter.frequency.value=2050;birdFilter.Q.value=2.1;birdGain.gain.value=.0009;
+      birdLfo.connect(birdDepth);birdDepth.connect(bird.frequency);bird.connect(birdFilter);birdFilter.connect(birdGain);birdGain.connect(this.target('ambience'));
+      bird.start();birdLfo.start();
+
+      this.windGain=windGain;this.windFilter=windFilter;this.ambienceNodes=[noise,insects,bird,birdLfo];
     }catch{this.failed=true}
   }
 
