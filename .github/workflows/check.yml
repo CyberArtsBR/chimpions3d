@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       run_extended:
-        description: Run slow-network plus Firefox/WebKit extended suites
+        description: Run Firefox/WebKit extended suites
         required: false
         type: boolean
         default: true
@@ -57,13 +57,12 @@ jobs:
           if-no-files-found: ignore
           path: |
             checks/*-report.json
-            checks/acceptance-matrix.*
 
   standard-browser:
     name: STANDARD · Chromium E2E, responsive, a11y, network, soak
     needs: fast
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,11 +70,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: chimp-jump-fast-reports
+          path: checks
       - name: Build dedicated QA bundle
-        run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run standard browser tier
+        id: standard
+        continue-on-error: true
         shell: bash
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite.log 2>&1 &
@@ -86,11 +91,36 @@ jobs:
             sleep 1
           done
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
-          set +e
           npm run qa:standard
-          STATUS=$?
-          node checks/acceptance-matrix.mjs || true
-          exit $STATUS
+      - name: Build network-failure QA bundle
+        if: always()
+        run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
+      - name: Run targeted network-failure tier
+        id: network
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite-network.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
+          npm run qa:network
+      - name: Generate acceptance matrix
+        if: always()
+        run: node checks/acceptance-matrix.mjs
+      - name: Enforce standard release gate
+        if: always()
+        shell: bash
+        run: |
+          echo "standard outcome: ${{ steps.standard.outcome }}"
+          echo "network outcome: ${{ steps.network.outcome }}"
+          test "${{ steps.standard.outcome }}" = "success"
+          test "${{ steps.network.outcome }}" = "success"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -103,7 +133,7 @@ jobs:
             checks/acceptance-matrix.*
 
   extended:
-    name: EXTENDED · slow network and cross-browser
+    name: EXTENDED · Firefox and WebKit smoke
     needs: fast
     if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true' }}
     runs-on: ubuntu-latest
@@ -116,9 +146,9 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build dedicated QA bundle
-        run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
       - name: Install browser runtimes
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps firefox webkit
       - name: Run extended suites
         shell: bash
         run: |
@@ -129,7 +159,6 @@ jobs:
             if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
             sleep 1
           done
-          CHIMP_INCLUDE_SLOW_NETWORK=1 node checks/network-failures-browser.mjs
           CHIMP_BROWSER=firefox npm run qa:cross-browser
           CHIMP_BROWSER=webkit npm run qa:cross-browser
       - uses: actions/upload-artifact@v4
