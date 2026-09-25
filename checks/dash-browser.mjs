@@ -23,7 +23,7 @@ try{
   const search=page.getByRole('searchbox',{name:'Search characters'});await search.fill('Street');assert((await page.locator('.picker-option').count())>=1);await search.fill('');
   const options=page.locator('.picker-option');assert.equal(await options.count(),10);await options.nth(1).click();assert((await page.locator('.picker-current p').innerText()).length>0);
   const beforeRandom=await page.locator('.picker-current p').innerText();await page.getByRole('button',{name:'Random Chimpion'}).click();const afterRandom=await page.locator('.picker-current p').innerText();report.picker={beforeRandom,afterRandom,count:await options.count()};
-  await page.locator('.picker-play').click();await page.waitForFunction(()=>window.chimpionsDash().state==='running',{timeout:90000});await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
+  await page.locator('.picker-play').click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
   assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'start must release hidden button focus');await shot(page,'dash-gameplay-desktop.png');await recoverScreenshotPause('gameplay screenshot');
 
   for(const code of ['Space','KeyW','ArrowUp']){await page.keyboard.down(code);await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0,code+' must jump');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('key-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
