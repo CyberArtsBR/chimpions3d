@@ -603,7 +603,7 @@ if(new URLSearchParams(location.search).has('test')){
     types:TYPES.map(t=>({...t,boxes:t.boxes.map(b=>[...b])})),
     stages:Array.from({length:16},(_,i)=>i+1).map(stage=>({stage,speed:speedFor(stage),patterns:patternCatalog(stage).map(p=>({...p,items:p.items.map(item=>[...item])}))}))
   });
-  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,catalog:catalogSnapshot,hashSeed,speedFor,safeGap,setLongFrameGuardSuppressed:value=>{suppressLongFramePause=!!value;}};
+  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,catalog:catalogSnapshot,hashSeed,speedFor,safeGap,pollGamepad,setLongFrameGuardSuppressed:value=>{suppressLongFramePause=!!value;}};
 }
 
 setState('menu');run=makeRun();seedWorld();
