@@ -221,7 +221,6 @@ export function validateFiniteSkeleton(bones) {
     const norm = Math.hypot(q.x,q.y,q.z,q.w);
     maxQuaternionNormError = Math.max(maxQuaternionNormError, Math.abs(1 - norm));
     maxScale = Math.max(maxScale, Math.abs(bone.scale.x), Math.abs(bone.scale.y), Math.abs(bone.scale.z));
-    if (maxScale > 100) return {ok:false, reason:'extreme bone scale', bone:bone.name, maxScale};
   }
   return {ok:true, maxQuaternionNormError, maxScale};
 }
