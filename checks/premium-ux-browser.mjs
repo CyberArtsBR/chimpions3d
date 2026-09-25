@@ -16,7 +16,8 @@ const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftsh
 const report={viewports:[],deepChecks:{}};
 
 async function menuCheck(viewport){
-  const page=await browser.newPage({viewport});
+  const context=await browser.newContext({viewport});
+  const page=await context.newPage();
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('http://127.0.0.1:4173/?play=jump&test=1',{waitUntil:'domcontentloaded'});
@@ -51,19 +52,19 @@ async function menuCheck(viewport){
   await page.screenshot({path:`checks/premium-ux-menu-${slug}.png`,fullPage:false});
   report.viewports.push({viewport,...state,errors});
   assert.deepEqual(errors,[]);
-  return page;
+  return {page,context};
 }
 
 try{
-  let deepPage=null;
+  let deepSession=null;
   for(const viewport of viewports){
-    const page=await menuCheck(viewport);
-    if(viewport.width===1440)deepPage=page;
-    else await page.close();
+    const session=await menuCheck(viewport);
+    if(viewport.width===1440)deepSession=session;
+    else await session.context.close();
   }
 
-  const page=deepPage;
-  assert(page,'Desktop deep-check page was not created');
+  assert(deepSession,'Desktop deep-check page was not created');
+  const {page,context}=deepSession;
 
   await page.getByRole('button',{name:'Field Guide'}).click();
   const guide=page.locator('#jump-guide-dialog');
@@ -115,7 +116,7 @@ try{
     pauseActions:true,
     normalizedActionHook:true
   };
-  await page.close();
+  await context.close();
 
   fs.writeFileSync('checks/premium-ux-browser-report.json',JSON.stringify(report,null,2));
   console.log('PREMIUM_UX_BROWSER_REPORT:'+JSON.stringify(report));
