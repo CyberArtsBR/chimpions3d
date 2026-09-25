@@ -156,12 +156,12 @@ export function setupDashMenu(){
   }
 
   start.onclick=()=>{
-    dashApi()?.audioGesture?.();
+    dashApi()?.audioGesture?.();dashApi()?.playUi?.('click');
     if(!dialog.open)dialog.showModal();
     requestAnimationFrame(()=>search.focus());
   };
   back.onclick=()=>{dashApi()?.playUi?.('back');launcher()};
-  dialog.querySelector('.picker-close').onclick=()=>{if(busy)dashApi()?.cancelAvatarLoad?.();dialog.close()};
+  dialog.querySelector('.picker-close').onclick=()=>{dashApi()?.playUi?.('back');if(busy)dashApi()?.cancelAvatarLoad?.();dialog.close()};
   dialog.addEventListener('cancel',()=>{if(busy)dashApi()?.cancelAvatarLoad?.()});
   dialog.addEventListener('close',()=>start.focus());
   search.oninput=()=>{page=0;render()};
@@ -171,12 +171,12 @@ export function setupDashMenu(){
   dialog.querySelector('.picker-prev').onclick=()=>{page--;render();grid.querySelector('.picker-option')?.focus()};
   dialog.querySelector('.picker-next').onclick=()=>{page++;render();grid.querySelector('.picker-option')?.focus()};
   random.onclick=()=>{
-    if(!entries.length||busy)return;
+    if(!entries.length||busy)return;dashApi()?.playUi?.('click');
     selected=entries[Math.floor(Math.random()*entries.length)];
     search.value='';page=Math.max(0,Math.floor(entries.findIndex(e=>e.id===selected.id)/perPage));
     status.textContent='Random pick: '+selected.name;render();
   };
-  upload.onclick=()=>{dashApi()?.audioGesture?.();document.querySelector('#dash-upload')?.click()};
+  upload.onclick=()=>{dashApi()?.audioGesture?.();dashApi()?.playUi?.('click');document.querySelector('#dash-upload')?.click()};
 
   window.addEventListener('chimpions-dash-avatar-loading',event=>{
     if(!dialog.open)return;
@@ -202,7 +202,7 @@ export function setupDashMenu(){
     if(!selected||busy)return;
     const api=dashApi();
     if(!api){status.textContent='Dash runtime is not ready.';return}
-    api.audioGesture?.();setBusy(true,'Preparing '+selected.name+'…');
+    api.audioGesture?.();api.playUi?.('confirm');setBusy(true,'Preparing '+selected.name+'…');
     try{
       if(!selected.localReady)await api.selectAvatar(selected.id,{timeoutMs:15000});
       dialog.close();api.startRun();
