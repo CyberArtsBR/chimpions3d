@@ -161,7 +161,8 @@ export function setupDashMenu(){
     requestAnimationFrame(()=>search.focus());
   };
   back.onclick=()=>{dashApi()?.playUi?.('back');launcher()};
-  dialog.querySelector('.picker-close').onclick=()=>dialog.close();
+  dialog.querySelector('.picker-close').onclick=()=>{if(busy)dashApi()?.cancelAvatarLoad?.();dialog.close()};
+  dialog.addEventListener('cancel',()=>{if(busy)dashApi()?.cancelAvatarLoad?.()});
   dialog.addEventListener('close',()=>start.focus());
   search.oninput=()=>{page=0;render()};
   grid.addEventListener('keydown',event=>{
