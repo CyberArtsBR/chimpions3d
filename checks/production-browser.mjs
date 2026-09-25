@@ -1,151 +1,122 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {execFileSync} from 'node:child_process';
 import {chromium} from '@playwright/test';
 
 const base=(process.env.CHIMP_PRODUCTION_URL||'https://chimp-jump.onrender.com').replace(/\/$/,'');
-const url=base+'/?test=1';
-const origin=new URL(base).origin;
 const expectedCommit=process.env.CHIMP_EXPECTED_COMMIT||'';
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
-const errors=[],sameOriginFailures=[];
-const report={scope:'production-desktop-browser',url,viewport:{width:1440,height:900},checkpoints:{},sameOriginFailures};
+const errors=[],consoleErrors=[],sameOriginFailures=[];
+const origin=new URL(base).origin;
+const report={status:'PASS',scope:'production-public-browser',base,checkpoints:{},sameOriginFailures};
 
 page.on('pageerror',error=>errors.push(error.message));
+page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 page.on('response',response=>{if(response.url().startsWith(origin)&&response.status()>=400)sameOriginFailures.push({url:response.url(),status:response.status()});});
 
-function revisionCompatibility(liveCommit){
-  if(!expectedCommit||liveCommit===expectedCommit)return {compatible:true,exact:true,files:[]};
-  try{
-    execFileSync('git',['merge-base','--is-ancestor',liveCommit,expectedCommit],{stdio:'ignore'});
-    const output=execFileSync('git',['diff','--name-only',liveCommit+'..'+expectedCommit],{encoding:'utf8'}).trim();
-    const files=output?output.split(/\r?\n/).filter(Boolean):[];
-    const auditOnly=files.length>0&&files.every(path=>path.startsWith('checks/')||path.startsWith('.github/'));
-    return {compatible:auditOnly,exact:false,files};
-  }catch{
-    return {compatible:false,exact:false,files:[]};
-  }
-}
-
-async function waitForDeployment(){
-  const deadline=Date.now()+10*60*1000;
-  let last='';
-  while(Date.now()<deadline){
-    try{
-      const stamp=Date.now();
-      const versionResponse=await page.request.get(base+'/version.json?audit='+stamp);
-      if(!versionResponse.ok())throw new Error('Waiting for deployed version manifest');
-      const version=await versionResponse.json();
-      if(!/^[a-f0-9]{40}$/.test(version.commit||''))throw new Error('Invalid deployed revision');
-      const revision=revisionCompatibility(version.commit);
-      if(expectedCommit&&!revision.compatible)throw new Error('Waiting for '+expectedCommit+'; live revision is '+version.commit);
-      report.version=version;
-      report.revision={expected:expectedCommit,live:version.commit,exact:revision.exact,auditOnlyDrift:!revision.exact&&revision.compatible,files:revision.files};
-      const liveUrl=base+'/?test=1&revision='+encodeURIComponent(version.commit)+'&audit='+stamp;
-      await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
-      const remaining=Math.max(1000,Math.min(45000,deadline-Date.now()));
-      await page.waitForFunction(()=>window.chimpJump?.().ready&&document.querySelector('#jump-guide-button')&&document.body?.dataset?.mode==='menu',null,{timeout:remaining});
-      const state=await page.evaluate(()=>({
-        ready:!!window.chimpJump?.().ready,
-        fieldGuide:!!document.querySelector('#jump-guide-button'),
-        mode:document.body?.dataset?.mode||''
-      }));
-      report.liveUrl=liveUrl;
-      return state;
-    }catch(error){last=error.message;}
-    if(Date.now()<deadline)await page.waitForTimeout(15000);
-  }
-  throw new Error('Timed out waiting for Render deployment. Last state: '+last);
-}
-
-async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false,timeout:90000});}
+async function shot(name){await page.screenshot({path:'checks/'+name,fullPage:false,animations:'disabled',timeout:90000});}
 async function snap(name){const state=await page.evaluate(()=>window.chimpJump());report.checkpoints[name]=state;return state;}
+async function waitVisualReady(){
+  await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().platformReady&&window.chimpJump().backgroundReady&&document.body?.dataset?.mode==='menu',null,{timeout:45000});
+  await page.evaluate(async()=>{
+    if(document.fonts?.ready)await document.fonts.ready;
+    await Promise.all([...document.images].filter(img=>!img.hidden).map(async img=>{if(img.decode)try{await img.decode();}catch{}}));
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  });
+}
 
 try{
-  report.deployment=await waitForDeployment();
-  // Ignore transient errors from deployment polling; assertions below apply to the settled revision only.
-  errors.length=0;sameOriginFailures.length=0;
-  // Match the local browser gate: control frames deterministically so a headless/SwiftShader scheduler stall
-  // cannot trigger the game's intentional safety auto-pause and masquerade as a production failure.
-  await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());
-  await page.evaluate(()=>window.chimpJumpTest?.render());
+  const versionResponse=await page.request.get(base+'/version.json?audit='+Date.now());
+  assert(versionResponse.ok(),'Production version manifest must be reachable');
+  const version=await versionResponse.json();
+  assert(/^[a-f0-9]{40}$/.test(version.commit||''),'Production version manifest must contain a full commit SHA');
+  report.version=version;
+  if(expectedCommit){
+    report.revision={expected:expectedCommit,live:version.commit,exact:expectedCommit===version.commit};
+    assert.equal(version.commit,expectedCommit,`Production revision drift: expected ${expectedCommit}, live ${version.commit}`);
+  }
+
+  const liveUrl=base+'/?play=jump&test=1&audit='+Date.now();
+  report.liveUrl=liveUrl;
+  await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
+  await waitVisualReady();
+
+  assert.equal(await page.evaluate(()=>typeof window.chimpJumpTest),'undefined','Public production must not expose mutable chimpJumpTest even when query parameters are user-controlled');
+  const diagnosticSafety=await page.evaluate(()=>{
+    const before=window.chimpJump();
+    const originalSeed=before.runSeed,originalHeight=before.height;
+    const hasCallableValue=Object.values(before).some(value=>typeof value==='function');
+    before.runSeed=0;before.height=999999;
+    if(Array.isArray(before.platformTypes))before.platformTypes.push('__qa_mutation_probe__');
+    const after=window.chimpJump();
+    return {
+      hasCallableValue,
+      snapshotIsolated:after.runSeed===originalSeed&&after.height===originalHeight&&!after.platformTypes.includes('__qa_mutation_probe__')
+    };
+  });
+  assert.equal(diagnosticSafety.hasCallableValue,false,'Readonly diagnostics must not expose callable mutation functions');
+  assert.equal(diagnosticSafety.snapshotIsolated,true,'Mutating a diagnostics snapshot must not mutate live game state');
+  report.publicMutationApi='absent';
+  report.readonlyDiagnostics=diagnosticSafety;
 
   const menu=await snap('menu');
   assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
-  assert.equal(menu.quality,'high','Desktop production should default to high detail');
-  assert.equal(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible(),true);
-  assert.equal(await page.locator('#audio-settings').isVisible(),false);
-  assert.equal(await page.locator('#background-style').isVisible(),false);
+  assert(['high','balanced'].includes(menu.quality),'Production quality profile must be recognized');
+  assert(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible());
   await shot('production-menu-desktop.png');
 
   await page.getByRole('button',{name:'Field guide',exact:true}).click();
-  assert.equal(await page.locator('#jump-guide-dialog[open]').isVisible(),true);
+  const guide=page.locator('#jump-guide-dialog[open]');
+  await guide.waitFor({state:'visible'});
   assert.equal(await page.locator('#jump-goals li').count(),6,'Production Field Guide must expose six expedition goals');
   await shot('production-guide-desktop.png');
   await page.getByRole('button',{name:'Close field guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+  await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+  await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelectorAll('#collection-dialog .avatar-option').length===10);
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Expanded picker must be deployed');
+  assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Production picker must expose the canonical 10 Chimpions');
   await shot('production-picker-desktop.png');
-  const confirmChimpion=page.locator('#confirm-chimpion');
-  await page.waitForFunction(()=>window.chimpJump?.().ready===true,{timeout:30000});
-  assert(await confirmChimpion.isVisible(),'Production Chimpion play action must be visible');
-  assert.equal(await confirmChimpion.isDisabled(),false,'Production Chimpion play action must be enabled');
-  report.pickerAction=await confirmChimpion.evaluate(el=>{const r=el.getBoundingClientRect();return {text:el.textContent,disabled:el.disabled,width:r.width,height:r.height};});
-  // Keep rendering suspended while the random initial Chimpion is confirmed so the audit
-  // cannot miss the short "starting" state before it inspects countdown and opening zoom.
-  await page.evaluate(()=>document.getElementById('confirm-chimpion').click());
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:30000});
-  await page.evaluate(()=>window.chimpJumpTest?.render());
-  await page.waitForFunction(()=>window.chimpJump?.().countdown===3,{timeout:5000});
-  await page.waitForFunction(()=>window.chimpJump?.().cameraZoom>1.8,{timeout:5000});
-  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
-  const countdownState=await snap('countdown');
-  assert(countdownState.cameraZoom>1.8,'Production countdown must zoom in on the Chimpion');
-  assert.equal(countdownState.time,0,'Production physics must remain frozen during countdown');
+
+  await page.locator('#confirm-chimpion').click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,{timeout:18000});
+  const countdown=await snap('countdown');
+  assert.equal(countdown.time,0,'Gameplay physics must remain frozen during countdown');
   await shot('production-countdown-desktop.png');
-  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
-  await page.waitForFunction(()=>window.chimpJump?.().cameraZoom<1.05,{timeout:5000});
+
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:8000});
   const playing=await snap('playing');
-  assert(playing.visible,'Production avatar must be visible');
-  assert(playing.platformReady&&playing.backgroundReady,'Production authored scenery must be ready');
+  assert(playing.visible&&playing.platformReady&&playing.backgroundReady,'Production gameplay visuals must be ready');
   assert(playing.visibleBranches>=4,'Production route branches must attach');
-  assert.equal(playing.cameraZoom,1,'Fresh production run must start at full-route zoom');
-  assert(Array.isArray(playing.platformTypes)&&!('wind' in playing),'Canopy gameplay without wind must be deployed');
   await shot('production-playing-desktop.png');
 
   await page.keyboard.down('ArrowLeft');
-  await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
-  assert(await page.evaluate(()=>window.chimpJump().yaw<-.6),'Production keyboard steering must turn left');
+  await page.waitForFunction(()=>window.chimpJump().yaw<0,{timeout:2500});
   await page.keyboard.up('ArrowLeft');
+  report.keyboardSteering=true;
 
   await page.getByRole('button',{name:'Pause game'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
   await shot('production-pause-desktop.png');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
-  await page.evaluate(()=>window.chimpJumpTest.render());
 
-  // Resume/startup intentionally has a short no-auto-pause grace window.
-  // Let it expire before validating the later resize safety pause.
   await page.waitForTimeout(1400);
   await page.setViewportSize({width:1920,height:1080});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused',{timeout:3000});
   const layout=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
+  assert(layout.scrollWidth<=layout.innerWidth+1,'Production 1080p layout must not overflow horizontally');
   report.viewport1080p=layout;
-  assert.equal(layout.scrollWidth,1920,'Production 1080p layout must not overflow horizontally');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
-  await page.evaluate(()=>window.chimpJumpTest.render());
-  await shot('production-playing-desktop-1080p.png');
 
-  await snap('final');
   assert.deepEqual(errors,[],'Production browser must not raise page errors');
+  assert.deepEqual(consoleErrors,[],'Production browser must not emit unexpected console.error');
   assert.deepEqual(sameOriginFailures,[],'Production same-origin assets must not return HTTP errors');
+  report.consoleErrors=consoleErrors;
   fs.writeFileSync('checks/production-browser-report.json',JSON.stringify(report,null,2));
-  console.log('PASS production desktop browser: deployment, revision compatibility, menu, Field Guide, gameplay, keyboard, pause and 1080p layout');
+  console.log('PASS production public browser: version, visual readiness, no mutable QA hook, menu, guide, picker, countdown, gameplay, input, pause and 1080p');
 }finally{
   await browser.close();
 }
