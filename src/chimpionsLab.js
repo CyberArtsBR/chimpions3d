@@ -544,30 +544,36 @@ function setState(next){
   $('dash-menu').hidden=next!=='menu';$('dash-over').hidden=next!=='over';$('dash-paused').hidden=next!=='paused';
 }
 function startRun(options={}){
-  if(!character||loading)return;
-  clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
+  if(!character||loading)return false;
+  if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+  voice.unlock();clearInputs();voice.stopMusic();voice.startMusic();voice.startAmbience();voice.play('click');
   const seed=Number.isInteger(options?.seed)?options.seed:null;
   const tutorial=typeof options?.tutorial==='boolean'?options.tutorial:shouldRunDashTutorial();
   clearWorld();dashGraphics.reset();run=makeRun({seed,tutorial});seedWorld();setState('running');accumulator=0;
-  $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;
+  $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;showFeedback('GO!','stage');
   if(!run.tutorial.enabled){
-    $('dash-tip').textContent=DEFAULT_DASH_TIP;$('dash-tip').classList.add('show');
-    setTimeout(()=>$('dash-tip')?.classList.remove('show'),4200);
+    const prompt=$('dash-input-prompt');if(prompt)prompt.textContent=DEFAULT_DASH_TIP;
   }
-  last=performance.now();
+  last=performance.now();return true;
 }
 function finishRun(){
   if(!run||run.dead)return;
-  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.play(run.score>best?'record':'dead');
-  emitDashEvent(DASH_EVENTS.death,dashMeta({score:Math.floor(run.score),distance:run.distance,combo:run.combo}));
-  best=Math.max(best,Math.floor(run.score));try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
+  const previousBest=best,score=Math.floor(run.score),isRecord=score>previousBest;
+  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.stopAmbience();voice.play(isRecord?'record':'dead');
+  dashGraphics.emit(isRecord?'record':'death',{x:runnerWorldX,y:groundWorldY+.8,intensity:isRecord?1:.8});
+  emitDashEvent(DASH_EVENTS.death,dashMeta({score,distance:run.distance,combo:run.combo}));
+  haptic([35,28,55]);best=Math.max(best,score);try{localStorage.setItem('chimpions-dash-best-v2',best)}catch{}
   hudText('dash-best',String(best).padStart(6,'0'));
-  $('dash-result').textContent=`${Math.floor(run.score)} points · ${(run.distance/1000).toFixed(2)} km · ${run.bananaCount} bananas · stage ${run.stage}`;
-  setState('over');
+  hudText('result-score',score);hudText('result-distance',(run.distance/1000).toFixed(2)+' KM');hudText('result-bananas',run.bananaCount);
+  hudText('result-golden',run.goldenBananas);hudText('result-stage',run.stage);hudText('result-flow',Math.round(run.maxFlow));
+  hudText('result-combo',run.longestCombo);hudText('result-perfect-jumps',run.perfectJumps);hudText('result-perfect-slides',run.perfectSlides);
+  hudText('result-near-misses',run.nearMisses);hudText('result-best',best);
+  hudText('result-pb',previousBest?((score-previousBest)>=0?'+':'')+(score-previousBest):'NEW BASELINE');
+  setState('over');requestAnimationFrame(()=>$('dash-retry')?.focus());
 }
-function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();setState('paused');}
-function resume(){if(state!=='paused')return;setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
-function quit(){clearInputs();voice.setDash(false);voice.stopMusic();clearWorld();run=makeRun();setState('menu');accumulator=0;}
+function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();voice.stopAmbience();setState('paused');requestAnimationFrame(()=>$('dash-resume')?.focus())}
+function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0}
+function quit(){clearInputs();voice.setDash(false);voice.stopMusic();voice.stopAmbience();clearWorld();run=makeRun();setState('menu');accumulator=0}
 
 function updatePhysics(dt){
   if(state!=='running'||!run||run.dead)return;
