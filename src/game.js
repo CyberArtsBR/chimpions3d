@@ -89,7 +89,7 @@ const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loo
 try{muted=localStorage.getItem('chimp-jump-muted')==='1';}catch{}audio.setMuted(muted);
 addEventListener('chimp-record',()=>audio.play('record'));document.addEventListener('click',event=>{if(event.target.closest('button')&&mode!=='playing')audio.play('menu');});
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
-const keys=new Set(),pointers=new Map();let mouseTarget=null,padPrevious=[];
+const keys=new Set(),pointers=new Map();let mouseTarget=null,padPrevious=[],padStartLatched=false;
 const input=()=>{
  const keyboard=Number(keys.has('ArrowRight')||keys.has('KeyD')||[...pointers.values()].includes(1))-Number(keys.has('ArrowLeft')||keys.has('KeyA')||[...pointers.values()].includes(-1));
  const pad=readPad(navigator.getGamepads?.()||[]);if(keyboard)return keyboard;if(pad.axis)return pad.axis;
@@ -98,10 +98,12 @@ const input=()=>{
 renderer.domElement.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse'||mode!=='playing')return;const court=Math.min(innerWidth,innerHeight*WIDTH/VIEW_HEIGHT);mouseTarget=Math.max(-WIDTH/2+.3,Math.min(WIDTH/2-.3,(e.clientX-innerWidth/2)/court*WIDTH));});
 renderer.domElement.addEventListener('pointerleave',()=>mouseTarget=null);
 function pollPad(){
- const pad=readPad(navigator.getGamepads?.()||[]);
- if(collectionDialog.open){if(pad.buttons[0]&&!padPrevious[0])$('confirm-chimpion').click();padPrevious=pad.buttons;return;}
- if(results.isOpen||recordBook.isOpen){if(results.isOpen&&pad.buttons[0]&&!padPrevious[0])document.getElementById('try-again').click();padPrevious=pad.buttons;return;}
- if(pad.axis)mouseTarget=null;if(pad.buttons[9]&&!padPrevious[9]){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
+ const pad=readPad(navigator.getGamepads?.()||[]),startPressed=!!pad.buttons[9];
+ if(collectionDialog.open){if(pad.buttons[0]&&!padPrevious[0])$('confirm-chimpion').click();padPrevious=pad.buttons;padStartLatched=startPressed;return;}
+ if(results.isOpen||recordBook.isOpen){if(results.isOpen&&pad.buttons[0]&&!padPrevious[0])document.getElementById('try-again').click();padPrevious=pad.buttons;padStartLatched=startPressed;return;}
+ if(pad.axis)mouseTarget=null;
+ if(startPressed&&!padStartLatched){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
+ padStartLatched=startPressed;
  if(pad.buttons[0]&&!padPrevious[0]){if(mode==='dying')quickRetry.click();else if(mode!=='playing'&&!collectionDialog.open)start();}padPrevious=pad.buttons;
 }
 const themes=[
