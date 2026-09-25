@@ -6,6 +6,7 @@ import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
 import {DASH_MUSIC_URL,dashSpriteUrl,warmDashImages} from './dashAssets.js';
 import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
+import {createDashPerformanceController} from './dashPerformance.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
 import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
@@ -143,6 +144,29 @@ key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
 const dashGraphics=createDashWorldRenderer({scene,camera,renderer,hemisphere:hemi,keyLight:key,rimLight:rim,pixelsToWorld:1/40});
 const GPU_WORLD=true;
+const qualityOrder=['LOW','BALANCED','HIGH','ULTRA'];
+window.addEventListener('chimpions-dash-quality-change',event=>{
+  const detail=event.detail||{};
+  let tier=String(detail.tier||'BALANCED').toUpperCase();
+  if(detail.requested==='AUTO'&&detail.autoStep>1){
+    const index=Math.max(0,qualityOrder.indexOf(tier)-Math.floor(detail.autoStep/2));
+    tier=qualityOrder[index]||'LOW';
+  }
+  if(qualityOrder.includes(tier)&&dashGraphics.qualityName!==tier)dashGraphics.setQuality(tier);
+});
+const performanceController=createDashPerformanceController({
+  renderer,scene,keyLight:key,
+  getRuntimeStats:()=>({
+    hazards:obstacles.length,bananas:bananas.length,
+    poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},
+    domGameplayNodes:objectLayer.childElementCount,
+    graphics:dashGraphics.stats()
+  })
+});
+window.chimpionsDashPerformance={
+  setQuality:quality=>performanceController.setQuality(quality),
+  diagnostics:()=>performanceController.diagnostics()
+};
 
 const {
   step:STEP,playerX:PLAYER_X,gravity:GRAVITY,jumpImpulse:JUMP_IMPULSE,lowHeight:LOW_HEIGHT,
@@ -182,7 +206,7 @@ function resize3D(){
   dashGraphics.resize({viewW,viewH,groundY:groundWorldY});
 }
 resize3D();
-addEventListener('resize',()=>{resize3D();renderObjects();});
+addEventListener('resize',()=>{resize3D();renderObjects();performanceController.invalidate();});
 
 warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
 const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
@@ -252,7 +276,7 @@ function applySettings(){
   document.body.classList.toggle('dash-high-visibility',!!dashSettings.highVisibility);
   document.body.classList.toggle('dash-large-touch',!!dashSettings.largeTouch);
   voice.setVolumes({master:dashSettings.master/100,music:dashSettings.music/100,sfx:dashSettings.sfx/100,ui:dashSettings.ui/100,ambience:dashSettings.ambience/100});
-  voice.setMuted(dashSettings.mute);const requested=String(dashSettings.graphics||'Auto').toUpperCase();const resolved=requested==='AUTO'?(matchMedia('(pointer:coarse)').matches?'BALANCED':'HIGH'):requested;try{dashGraphics.setQuality(resolved)}catch{}
+  voice.setMuted(dashSettings.mute);const requested=String(dashSettings.graphics||'Auto').toUpperCase();try{performanceController.setQuality(requested,{persist:false})}catch{}
 }
 function bindSettings(){
   const dialog=$('dash-settings');
@@ -540,7 +564,7 @@ function movePlayer(dt){
   }else run.grounded=false;
 }
 function setState(next){
-  state=next;document.body.dataset.labState=next;
+  state=next;document.body.dataset.labState=next;performanceController.invalidate();
   $('dash-menu').hidden=next!=='menu';$('dash-over').hidden=next!=='over';$('dash-paused').hidden=next!=='paused';
 }
 function startRun(options={}){
@@ -836,12 +860,15 @@ renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
   if(elapsedFrame>.3&&state==='running')pause();pollGamepad();
+  performanceController.observeFrame(elapsedFrame*1000,state,now);
   if(state==='running'){
     accumulator=Math.min(.12,accumulator+frameDt);
     let steps=0;
     while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
   }else accumulator=0;
-  renderUI(frameDt);dashGraphics.render();
+  if(performanceController.shouldRender(now,state)){
+    renderUI(frameDt);dashGraphics.render();performanceController.markRendered(now);
+  }
 });
 
 window.chimpionsLab=()=>({
