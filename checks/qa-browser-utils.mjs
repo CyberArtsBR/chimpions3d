@@ -47,6 +47,7 @@ export async function waitForVisualReadiness(page,{timeout=45000}={}){
 export async function gotoJump(page,{test=true,query=''}={}){
   const params=new URLSearchParams(query);
   if(test)params.set('test','1');
+  else if(!params.has('play')&&!params.has('dash'))params.set('play','jump');
   await page.goto(BASE+'/?'+params.toString(),{waitUntil:'domcontentloaded',timeout:45000});
   await waitForVisualReadiness(page);
 }
