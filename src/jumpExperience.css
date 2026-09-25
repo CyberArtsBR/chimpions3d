@@ -14,6 +14,7 @@ body[data-mode=playing] #jump-menu-tools,body[data-mode=playing] #jump-control-h
 body[data-mode=dying] #jump-menu-tools,body[data-mode=dying] #jump-control-hint,
 body[data-mode=starting] #jump-menu-tools,body[data-mode=starting] #jump-control-hint{display:none}
 body:not([data-mode=menu]) #jump-runtime-status{display:none}
+body:not([data-mode=menu]) #jump-home-button{display:none!important}
 
 #jump-guide-dialog,#jump-settings-dialog{width:min(760px,94vw);max-height:90dvh;overflow:auto;border:1px solid #ceb77b;border-radius:22px;padding:22px;background:radial-gradient(circle at 15% 0,#5f7e4c24,transparent 34%),linear-gradient(145deg,#244637,#0c2523);color:#fff2d4;box-shadow:0 30px 100px #000b;font-family:ui-rounded,'Trebuchet MS',system-ui,sans-serif}
 #jump-settings-dialog{width:min(590px,94vw)}
@@ -55,6 +56,9 @@ body[data-mode=playing] #hud .coins strong{font-size:20px}
 body[data-mode=playing] #pause,body[data-mode=playing] #mute{width:44px;height:44px;border-radius:12px;background:#092b27d6}
 #canopy-event{max-width:min(42vw,230px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #toast{z-index:90;max-width:min(86vw,520px);text-align:center;border:1px solid #e7d69b44;box-shadow:0 8px 28px #0006;backdrop-filter:blur(7px)}
+#toast[data-kind=success]{border-color:#cde68a80;background:#173d2fe8;color:#efffc9}
+#toast[data-kind=warning]{border-color:#ffd17c88;background:#48371fe8;color:#fff0c4}
+#toast[data-kind=error]{border-color:#ff9e8588;background:#4b211de8;color:#fff0ea}
 #countdown.countdown-pulse{animation:countdown-pop .42s cubic-bezier(.2,.85,.3,1)}
 @keyframes countdown-pop{0%{transform:scale(.78);opacity:.25}65%{transform:scale(1.07);opacity:1}100%{transform:scale(1);opacity:1}}
 
