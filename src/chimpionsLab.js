@@ -163,6 +163,7 @@ function multiplier(flow){return flow>=100?5:flow>=80?3:flow>=60?2:flow>=40?1.5:
 
 function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
 let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
+let suppressLongFramePause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 
 function makeRun(){
@@ -293,7 +294,7 @@ function spawnPattern(){
       const previous=created.at(-1);
       x=previous.x+previous.w+planningSpeed(x)*safeGap(previous,type,gap);
     }
-    const o=spawnObstacle(type,x);created.push(o);
+    const o=spawnObstacle(type,x);o.patternId=def.id;o.patternDifficulty=def.difficulty;created.push(o);
     if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
@@ -383,6 +384,7 @@ function setState(next){
 }
 function startRun(){
   if(!character||loading)return;
+  if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
   clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
   clearWorld();run=makeRun();seedWorld();setState('running');accumulator=0;
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;$('dash-tip').classList.add('show');
@@ -396,7 +398,7 @@ function finishRun(){
   setState('over');
 }
 function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();setState('paused');}
-function resume(){if(state!=='paused')return;setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
+function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();last=performance.now();accumulator=0;}
 function quit(){clearInputs();voice.setDash(false);voice.stopMusic();clearWorld();run=makeRun();setState('menu');accumulator=0;}
 
 function updatePhysics(dt){
@@ -509,7 +511,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 
 function touchHold(id,start,end){
   const el=$(id);
-  el.onpointerdown=e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);start();};
+  el.onpointerdown=e=>{e.preventDefault();try{el.setPointerCapture?.(e.pointerId)}catch{}start();};
   el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{e?.preventDefault?.();end();};
 }
 touchHold('touch-jump',()=>setInput('jump','touch',true),()=>setInput('jump','touch',false));
@@ -552,13 +554,63 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
 window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1});
-if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput};
+if(new URLSearchParams(location.search).has('test')){
+  const snapshot=()=>{
+    let sceneObjects=0;scene.traverse(()=>sceneObjects++);
+    return{
+      state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,
+      run:run?{
+        seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,
+        y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,
+        slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,
+        bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score
+      }:null,
+      inputs:{jump:[...heldJump],slide:[...heldSlide]},
+      obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),
+      bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),
+      pools:{hazards:pools.hazard.length,bananas:pools.banana.length},
+      renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},
+      resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},
+      standBlocked:run?overheadBlocksStand():false
+    };
+  };
+  const reset=(seed='dash-regression',time=0)=>{
+    clearInputs();voice.stopMusic();clearWorld();run=makeRun();
+    run.seed=hashSeed(seed);run.seedState=run.seed;run.time=Math.max(0,Number(time)||0);
+    run.stage=Math.floor((run.time+1e-7)/30)+1;run.speed=speedFor(run.stage);seedWorld();setState('running');accumulator=0;last=performance.now();
+    renderUI(0);renderer.render(scene,camera);return snapshot();
+  };
+  const step=(steps=1)=>{
+    const count=Math.max(0,Math.min(20000,Math.floor(Number(steps)||0)));
+    for(let i=0;i<count&&state==='running';i++)updatePhysics(STEP);
+    renderUI(0);renderer.render(scene,camera);return snapshot();
+  };
+  const setRun=patch=>{
+    if(!run)return snapshot();
+    const allowed=new Set(['time','stage','speed','scroll','distance','y','vy','grounded','jumpHeld','jumpAge','jumpBuffer','jumpBufferHeld','coyote','slideHeld','slideTime','slideMin','slideBlocked','landing','dead','bananaCount','goldenBananas','flow','maxFlow','combo','longestCombo','bonus','score','lastDifficulty']);
+    for(const [key,value] of Object.entries(patch||{}))if(allowed.has(key)&&Number.isFinite(value)||allowed.has(key)&&typeof value==='boolean')run[key]=value;
+    renderUI(0);return snapshot();
+  };
+  const clearWorldForTest=()=>{clearWorld();spawnCursor=(run?.scroll||0)+metrics().vw+360;return snapshot();};
+  const spawnTestObstacle=(id,offset=220)=>{
+    const type=TYPES.find(t=>t.id===id);if(!type)throw new Error('Unknown Dash obstacle: '+id);
+    const o=spawnObstacle(type,(run?.scroll||0)+PLAYER_X+Number(offset||0));o.patternId='test-fixture';return snapshot();
+  };
+  const spawnTestBanana=(offset=180,y=55,golden=false)=>{spawnBanana((run?.scroll||0)+PLAYER_X+Number(offset||0),Number(y||0),!!golden);return snapshot();};
+  const advanceWorld=(distance=800)=>{if(!run)return snapshot();run.scroll+=Math.max(0,Number(distance)||0);run.distance=run.scroll/100;maintainWorld();renderUI(0);return snapshot();};
+  const catalogSnapshot=()=>({
+    constants:{STEP,PLAYER_X,BASE_SPEED,GRAVITY,JUMP_IMPULSE,LOW_HEIGHT,HOLD_TIME,JUMP_BUFFER,COYOTE_TIME},
+    types:TYPES.map(t=>({...t,boxes:t.boxes.map(b=>[...b])})),
+    stages:Array.from({length:16},(_,i)=>i+1).map(stage=>({stage,speed:speedFor(stage),patterns:patternCatalog(stage).map(p=>({...p,items:p.items.map(item=>[...item])}))}))
+  });
+  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,setRun,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,catalog:catalogSnapshot,hashSeed,speedFor,safeGap,pollGamepad,setLongFrameGuardSuppressed:value=>{suppressLongFramePause=!!value;}};
+}
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
-  if(elapsedFrame>.3&&state==='running')pause();pollGamepad();
+  if(elapsedFrame>.3&&state==='running'&&!suppressLongFramePause)pause();pollGamepad();
   if(state==='running'){
     accumulator=Math.min(.12,accumulator+frameDt);
     let steps=0;

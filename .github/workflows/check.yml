@@ -14,13 +14,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - run: npm run build
       - run: node checks/physics.mjs
       - run: node checks/assets.mjs
       - run: node checks/jump-audit.mjs
       - name: Check production audit syntax
-        run: node --check checks/production-browser.mjs
+        run: |
+          node --check checks/production-browser.mjs
+          node --check checks/dash-production-browser.mjs
+          node --check checks/dash-physics.mjs
+          node --check checks/dash-patterns.mjs
+          node --check checks/dash-browser.mjs
+          node --check checks/dash-mobile-browser.mjs
+          node --check checks/dash-resources.mjs
       - name: Install desktop browser test runtime
         run: |
           npx playwright install --with-deps chromium
@@ -37,6 +44,16 @@ jobs:
           done
           curl -fsS http://127.0.0.1:4173/?test=1 >/dev/null
           node checks/game-browser.mjs
+          node checks/dash-physics.mjs
+          node checks/dash-patterns.mjs
+          node checks/dash-browser.mjs
+          node checks/dash-mobile-browser.mjs
+          node checks/dash-resources.mjs
+      - name: Audit current Dash production
+        continue-on-error: true
+        env:
+          CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+        run: node checks/dash-production-browser.mjs
       - name: Inspect source GLB
         run: |
           node --input-type=module <<'NODE'
