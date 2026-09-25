@@ -34,12 +34,41 @@ const avatars=[
   ['3','The Adolescent'],
   ['9','The Angsty'],
   ['11','The Apologetic'],
-]
+];
+const requiredAnimationScenarios=[
+  ['IDLE','IDLE'],
+  ['TAKEOFF','TAKEOFF'],
+  ['ASCEND','ASCEND'],
+  ['APEX','APEX'],
+  ['DESCEND','DESCEND'],
+  ['LAND','LAND'],
+  ['HARD LAND','LAND'],
+  ['SPRING','SPRING'],
+  ['HAZARD','HAZARD'],
+  ['JETPACK','JETPACK'],
+  ['DYING','DYING'],
+];
+
 const report={avatars:[],errors,network};
 const preparing='Preparing pose and checking skeleton…';
 
 function saveReport(){
   fs.writeFileSync('checks/avatar-browser-report.json',JSON.stringify(report,null,2));
+}
+
+function assertAnimationReport(name,animation){
+  assert(animation,`${name}: missing character animation test harness`);
+  assert.equal(animation.ok,true,`${name}: animation exercise failed: ${animation.failures?.join('; ')}`);
+  assert(animation.maxQuaternionNormError<=1e-4,`${name}: quaternion drift ${animation.maxQuaternionNormError}`);
+  assert(animation.maxVisualScaleDeviation<=.20,`${name}: unsafe visual scale deviation ${animation.maxVisualScaleDeviation}`);
+  assert(animation.maxBoneScaleDelta<=1e-7,`${name}: bone scale changed by ${animation.maxBoneScaleDelta}`);
+  assert(animation.maxResetAngularError<=1e-6,`${name}: accumulated pose drift ${animation.maxResetAngularError}`);
+
+  for(const [label,expected] of requiredAnimationScenarios){
+    const state=animation.states.find(item=>item.label===label);
+    assert(state,`${name}: missing ${label} animation scenario`);
+    assert(state.observed.includes(expected),`${name}: ${label} did not enter ${expected}; observed ${state.observed.join(',')}`);
+  }
 }
 
 try{
@@ -78,6 +107,17 @@ try{
       item.state=await page.evaluate(()=>window.chimpJump());
       assert(item.state.ready,`${name} must leave the game ready`);
       assert(item.state.visible,`${name} must be visible after loading`);
+
+      await page.evaluate(()=>window.chimpJumpTest?.suspendRendering());
+      item.animation=await page.evaluate(()=>{
+        const harness=window.__chimpCharacterAnimationTest;
+        if(!harness) return null;
+        return harness.exercise();
+      });
+      assertAnimationReport(name,item.animation);
+      await page.evaluate(()=>window.chimpJumpTest?.resumeRendering());
+      await page.waitForTimeout(60);
+
       await page.locator('#world canvas[data-engine]').screenshot({path:`checks/avatar-${id}.png`});
       item.ok=true;
       console.log('AVATAR_OK:'+JSON.stringify(item));
@@ -95,9 +135,8 @@ try{
   }
   assert.deepEqual(errors,[]);
   console.log('AVATAR_BROWSER_REPORT:'+JSON.stringify(report));
-  console.log('PASS avatars: all ten approved Chimpions load through the real browser character pipeline');
+  console.log('PASS avatars: all ten approved Chimpions load and pass the procedural animation state matrix');
 }finally{
   saveReport();
   await browser.close();
 }
-
