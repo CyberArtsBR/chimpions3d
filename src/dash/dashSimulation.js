@@ -1,6 +1,6 @@
 import {normalizeDashSeed,nextDashRandom} from './dashSeed.js';
 import {dashSpeedForTime,dashStageForTime} from './dashDifficulty.js';
-import {DASH_PHYSICS,gravityForDashJump,releaseDashJump} from './dashPhysics.js';
+import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dashPhysics.js';
 import {planDashPattern,dashTransitionReport} from './dashPatterns.js';
 
 export const DASH_GAMEPLAY_VERSION='dash-aaa-1';
@@ -101,7 +101,7 @@ function replayHash(value){
 export function simulateDashReplay({seed=1,inputTimeline=[],duration=12,rulesVersion=DASH_GAMEPLAY_VERSION}={}){
   const p=DASH_PHYSICS;
   const plan=generateDashPlan({seed,time:0,count:Math.max(24,Math.ceil(duration*2.5)),startX:900,currentScroll:0});
-  const obstacles=plan.patterns.flatMap(entry=>entry.obstacles.map(o=>({...o,patternId:entry.pattern.id}))).sort((a,b)=>a.x-b.x);
+  const obstacles=plan.patterns.flatMap(entry=>entry.obstacles.map(o=>({...o,patternId:entry.pattern.id,passed:false}))).sort((a,b)=>a.x-b.x);
   const events=[...inputTimeline].map((event,index)=>({...event,index})).sort((a,b)=>a.time-b.time||a.index-b.index);
   const state={y:0,vy:0,jumpHeld:false,jumpAge:0,jumpBuffer:0,jumpBufferHeld:false,coyote:p.coyoteTime,slideHeld:false,slideTime:0,slideMin:0,grounded:true};
   let time=0,scroll=0,eventIndex=0,passed=0,collision=null;
@@ -116,20 +116,24 @@ export function simulateDashReplay({seed=1,inputTimeline=[],duration=12,rulesVer
         if(event.down&&state.y===0){state.slideMin=Math.max(state.slideMin,p.minSlideTime);state.slideTime=Math.max(state.slideTime,p.minSlideTime);}
       }
     }
+    const previousPlayer=replayBox(state,scroll);
     replayStepPlayer(state,p.step);
     time+=p.step;
     scroll+=dashSpeedForTime(time)*p.step;
     const player=replayBox(state,scroll);
     for(const obstacle of obstacles){
-      if(obstacle.x+obstacle.w<player.x){passed++;obstacle.x=-Infinity;continue;}
+      if(obstacle.passed)continue;
+      if(obstacle.x+obstacle.w<player.x){obstacle.passed=true;passed++;continue;}
       if(obstacle.x>player.x+player.w)break;
-      if(replayObstacleBoxes(obstacle).some(box=>replayHit(player,box))){
-        collision={time,obstacleId:obstacle.id,patternId:obstacle.patternId,action:obstacle.action};
+      let contact=Infinity;
+      for(const box of replayObstacleBoxes(obstacle))contact=Math.min(contact,sweptDashContact(previousPlayer,player,box));
+      if(contact!==Infinity){
+        collision={time:Number((time-p.step+p.step*contact).toFixed(6)),obstacleId:obstacle.id,patternId:obstacle.patternId,action:obstacle.action};
         break;
       }
     }
   }
-  const planDigest=replayHash(obstacles.filter(o=>Number.isFinite(o.x)).slice(0,40).map(o=>`${o.patternId}:${o.id}:${o.x.toFixed(3)}`).join('|'));
+  const planDigest=replayHash(obstacles.slice(0,40).map(o=>`${o.patternId}:${o.id}:${o.x.toFixed(3)}`).join('|'));
   const result={
     rulesVersion,seed:plan.seed,time:Number(time.toFixed(6)),stage:dashStageForTime(time),
     speed:Number(dashSpeedForTime(time).toFixed(6)),distance:Number((scroll/100).toFixed(6)),
