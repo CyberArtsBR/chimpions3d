@@ -52,6 +52,8 @@ try{
   report.checks.minTargetPx=32;
 
   assert.deepEqual(diag.errors,[],'Accessibility flow must not raise page errors');
+  assert.deepEqual(diag.consoleErrors,[],'Accessibility flow must not emit console errors');
+  assert.deepEqual(diag.sameOriginFailures,[],'Accessibility flow must not have same-origin HTTP failures');
   writeReport('checks/accessibility-report.json',report);
   console.log('PASS accessibility: labels, focus, modal return, reduced motion, high visibility and target sizing');
 }catch(error){
