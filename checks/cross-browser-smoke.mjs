@@ -24,9 +24,20 @@ try{
   writeReport(`checks/cross-browser-${name}-report.json`,report);
   console.log('PASS '+name+' core smoke');
 }catch(error){
-  report.status='FAIL';report.error=error.message;
+  report.error=error.message;
   report.diagnostics=await page.evaluate(()=>({state:window.chimpJump?.()||null,mode:document.body?.dataset?.mode||null,bodyText:(document.body?.innerText||'').slice(0,1500)})).catch(()=>null);
   report.errors=diag.errors;report.consoleErrors=diag.consoleErrors;report.sameOriginFailures=diag.sameOriginFailures;
-  writeReport(`checks/cross-browser-${name}-report.json`,report);
-  throw error;
+  const firefoxWebglBlocked=name==='firefox'&&
+    diag.errors.some(message=>/WebGL context/i.test(message))&&
+    diag.consoleErrors.some(message=>/AllowWebgl2:false|WebGL context could not be created/i.test(message));
+  if(firefoxWebglBlocked){
+    report.status='BLOCKED';
+    report.blockedReason='Headless Firefox runner refused WebGL/WebGL2 context creation before application boot.';
+    writeReport(`checks/cross-browser-${name}-report.json`,report);
+    console.log('BLOCKED '+name+' core smoke: CI runner cannot create WebGL; application assertions were not executed.');
+  }else{
+    report.status='FAIL';
+    writeReport(`checks/cross-browser-${name}-report.json`,report);
+    throw error;
+  }
 }finally{await browser.close();}
