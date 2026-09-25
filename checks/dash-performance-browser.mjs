@@ -57,9 +57,15 @@ try{
   assert(adapted.autoStep>=1,'AUTO must react to sustained over-budget p95/average frame time');
   await page.evaluate(()=>window.chimpionsDashPerformance.setQuality('AUTO'));
 
-  // Establish a stable post-menu baseline, then run dozens of start/die/retry cycles.
+  // Capture real browser frame timing separately from the deterministic AUTO stress feed.
+  // This is a CI/SwiftShader measurement, not a claim about player hardware FPS.
+  await page.evaluate(()=>window.chimpionsDashTest.startRun());
+  await page.waitForTimeout(1400);
+  const playingSample=await diag();
   await page.evaluate(()=>window.chimpionsDashTest.quit());
   await page.waitForTimeout(150);
+
+  // Establish a stable post-menu baseline, then run dozens of start/die/retry cycles.
   const baseline=await diag();
   await page.evaluate(()=>{
     for(let i=0;i<24;i++){
@@ -109,6 +115,7 @@ try{
   assert(fallbackHazards.every(h=>h.fallback&&h.width>0&&h.height>0&&h.display!=='none'),'Failed hazard sprites must remain visible lethal-hazard fallbacks');
   await fallback.close();
 
+  console.log('DASH_PERF_PLAYING_SAMPLE:'+JSON.stringify(playingSample));
   console.log('DASH_PERF_BASELINE:'+JSON.stringify(baseline));
   console.log('DASH_PERF_AFTER_RUN_CYCLES:'+JSON.stringify(afterRuns));
   console.log('DASH_PERF_AFTER_CHARACTER_CYCLES:'+JSON.stringify(afterCharacters));
