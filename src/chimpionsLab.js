@@ -186,11 +186,9 @@ function resize3D(){
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-if(!GPU_WORLD){
-  warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
-  const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
-  if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
-}
+warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
+const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
+if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
 let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
 async function loadAvatar(entry,{timeoutMs=15000}={}){
