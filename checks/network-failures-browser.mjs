@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {launchBrowser,BASE,attachPageDiagnostics,gotoJump,writeReport} from './qa-browser-utils.mjs';
+import {launchBrowser,attachPageDiagnostics,gotoJump,writeReport} from './qa-browser-utils.mjs';
 
 const {browser}=await launchBrowser('chromium');
 const includeSlow=process.env.CHIMP_INCLUDE_SLOW_NETWORK!=='0';
@@ -13,43 +13,51 @@ if(includeSlow)scenarios.push({
   handler:async route=>{await new Promise(r=>setTimeout(r,4000));await route.fulfill({status:200,contentType:'application/json',body:'{"id":"late","seed":7}'});}
 });
 
-const report={status:'PASS',suite:'network-failures',includeSlow,scenarios:[]};
+const report={status:'PASS',suite:'network-failures',includeSlow,scenarios:[],failures:[]};
 try{
   for(const scenario of scenarios){
     const page=await browser.newPage({viewport:{width:1280,height:800}});
     const diag=attachPageDiagnostics(page);
     let runRequests=0;
-    await page.route('**/__qa_leaderboard__/api/runs',route=>{runRequests++;return scenario.handler(route);});
-    await gotoJump(page,{test:true});
-    await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
-    await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
-    const started=Date.now();
-    await page.locator('#confirm-chimpion').click();
-    await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:1500});
-    if(scenario.name==='slow-late-response'){
-      // This is the release invariant: the visible countdown must not wait for a slow leaderboard ticket.
-      await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,{timeout:1200});
-    }else{
-      await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,{timeout:2500});
+    const item={name:scenario.name,status:'PASS'};
+    try{
+      await page.route('**/__qa_leaderboard__/api/runs',route=>{runRequests++;return scenario.handler(route);});
+      await gotoJump(page,{test:true});
+      await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+      await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+      const started=Date.now();
+      await page.locator('#confirm-chimpion').click();
+      await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:1500});
+      const budget=scenario.name==='slow-late-response'?1200:2500;
+      await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,null,{timeout:budget});
+      item.latencyMs=Date.now()-started;
+      assert(runRequests>0,scenario.name+': QA build did not contact configured leaderboard endpoint');
+      assert.deepEqual(diag.errors,[],scenario.name+': page errors');
+    }catch(error){
+      item.status='FAIL';item.error=error.message;report.failures.push(scenario.name);
+    }finally{
+      item.runRequests=runRequests;item.pageErrors=diag.errors;report.scenarios.push(item);await page.close();
     }
-    const latencyMs=Date.now()-started;
-    assert(runRequests>0,`${scenario.name}: QA build did not contact configured leaderboard endpoint`);
-    report.scenarios.push({name:scenario.name,runRequests,latencyMs,pageErrors:diag.errors});
-    assert.deepEqual(diag.errors,[],scenario.name+': page errors');
-    await page.close();
   }
 
   const offline=await browser.newPage({viewport:{width:1280,height:800}});
-  await offline.context().setOffline(true);
-  // Load once online first so application assets are present, then exercise a disconnected run start.
-  await offline.context().setOffline(false);await gotoJump(offline,{test:true});await offline.context().setOffline(true);
-  await offline.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
-  await offline.locator('#collection-dialog[open]').waitFor({state:'visible'});
-  await offline.locator('#confirm-chimpion').click();
-  await offline.waitForFunction(()=>window.chimpJump?.().countdown===3,{timeout:2500});
-  report.scenarios.push({name:'offline',countdownStarted:true});
-  await offline.context().setOffline(false);await offline.close();
+  const item={name:'offline',status:'PASS'};
+  try{
+    await gotoJump(offline,{test:true});
+    await offline.context().setOffline(true);
+    await offline.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
+    await offline.locator('#collection-dialog[open]').waitFor({state:'visible'});
+    await offline.locator('#confirm-chimpion').click();
+    await offline.waitForFunction(()=>window.chimpJump?.().countdown===3,null,{timeout:2500});
+    item.countdownStarted=true;
+  }catch(error){
+    item.status='FAIL';item.error=error.message;report.failures.push('offline');
+  }finally{
+    await offline.context().setOffline(false);await offline.close();report.scenarios.push(item);
+  }
 
+  report.status=report.failures.length?'FAIL':'PASS';
   writeReport('checks/network-failures-report.json',report);
+  assert.deepEqual(report.failures,[],'Network startup failures: '+report.failures.join(', '));
   console.log('PASS network failures: '+report.scenarios.map(s=>s.name).join(', '));
 }finally{await browser.close();}
