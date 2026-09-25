@@ -1,0 +1,16 @@
+/* GPU Dash presentation: legacy DOM plates remain in the DOM as a zero-risk fallback,
+   but stop painting once the Three.js world is initialized. */
+.dash-gpu-world #dash-sky,.dash-gpu-world #dash-far,.dash-gpu-world #dash-mid,.dash-gpu-world #dash-light,
+.dash-gpu-world #dash-ground,.dash-gpu-world #dash-objects,.dash-gpu-world #dash-shadow{visibility:hidden!important;opacity:0!important}
+.dash-gpu-world #lab-3d{z-index:7}
+.dash-gpu-world #lab-3d canvas{filter:saturate(calc(1.035 + var(--dash-speed-grade,0))) contrast(1.035);will-change:filter}
+.dash-gpu-world #dash-stage{background:#0b211c}
+.dash-gpu-world #dash-stage::after{
+  z-index:17;background:
+    radial-gradient(ellipse at 48% 47%,transparent 44%,rgba(2,11,8,.18) 72%,rgba(1,7,5,.55) 100%),
+    linear-gradient(180deg,rgba(255,255,255,.015),transparent 35%,rgba(0,0,0,.08));
+  box-shadow:inset 0 -70px 105px rgba(2,12,8,.35);mix-blend-mode:normal
+}
+body[data-lab-state=paused].dash-gpu-world #lab-3d,
+.dash-gpu-world body[data-lab-state=paused] #lab-3d{filter:saturate(.72) brightness(.72)}
+@media(prefers-reduced-motion:reduce){.dash-gpu-world #lab-3d canvas{filter:saturate(1.02) contrast(1.02)}}
