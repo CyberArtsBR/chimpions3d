@@ -28,8 +28,36 @@ function triangles(json){
   return total;
 }
 
+function vertices(json){
+  const positions=new Set();
+  for(const mesh of json.meshes||[])for(const primitive of mesh.primitives||[]){
+    const accessor=primitive.attributes?.POSITION;
+    if(accessor!==undefined)positions.add(accessor);
+  }
+  let total=0;
+  for(const accessor of positions)total+=json.accessors?.[accessor]?.count||0;
+  return total;
+}
+
+function embeddedImageBytes(json,image){
+  if(image.bufferView!==undefined)return json.bufferViews?.[image.bufferView]?.byteLength||0;
+  if(typeof image.uri==='string'&&image.uri.startsWith('data:')){
+    const comma=image.uri.indexOf(',');
+    if(comma>=0){
+      const body=image.uri.slice(comma+1);
+      return image.uri.slice(0,comma).includes(';base64')?Math.floor(body.length*3/4):Buffer.byteLength(decodeURIComponent(body));
+    }
+  }
+  return null;
+}
+
 function assetInfo(name,bytes,json){
   const jointIndexes=[...new Set((json.skins||[]).flatMap(s=>s.joints||[]))];
+  const images=(json.images||[]).map((image,index)=>({
+    index,mimeType:image.mimeType||null,uri:image.uri||null,bufferView:image.bufferView??null,
+    encodedBytes:embeddedImageBytes(json,image)
+  }));
+  const largestTexture=images.reduce((largest,image)=>(image.encodedBytes||0)>(largest?.encodedBytes||0)?image:largest,null);
   return {
     name,bytes,
     extensionsUsed:json.extensionsUsed||[],
@@ -38,9 +66,11 @@ function assetInfo(name,bytes,json){
     joints:(json.skins||[]).reduce((n,s)=>n+(s.joints?.length||0),0),
     jointNames:jointIndexes.map(i=>json.nodes?.[i]?.name||`node#${i}`),
     skinnedNodes:(json.nodes||[]).filter(n=>n.mesh!==undefined&&n.skin!==undefined).length,
-    triangles:triangles(json),nodes:(json.nodes||[]).length,meshes:(json.meshes||[]).length,
+    triangles:triangles(json),vertices:vertices(json),
+    nodes:(json.nodes||[]).length,meshes:(json.meshes||[]).length,
     materials:(json.materials||[]).length,textures:(json.textures||[]).length,
-    images:(json.images||[]).map(i=>({mimeType:i.mimeType||null,uri:i.uri||null,bufferView:i.bufferView??null})),
+    animations:(json.animations||[]).length,
+    images,largestTexture
   };
 }
 
@@ -72,6 +102,32 @@ function collectTextReferences(){
   }
   return text;
 }
+
+const dashCriticalAssets=[
+  'public/dash/assets/jungle-v2.1f8e991e.webp',
+  'public/dash/assets/ground-green.5163bede.png',
+  'public/dash/assets/sprites/log.bdc546a2.png',
+  'public/dash/assets/sprites/mushroom.ed146566.png',
+  'public/dash/assets/sprites/thorns.9c23d2a8.png',
+  'public/dash/assets/sprites/stump.79b7a74b.png',
+  'public/dash/assets/sprites/spike.9209c4ec.png',
+  'public/dash/assets/sprites/puddle.63b40637.png',
+  'public/dash/assets/sprites/spike-patch.30ffeb5a.png',
+  'public/dash/assets/sprites/branch.9e282e4d.png',
+  'public/dash/assets/sprites/vine.4fa7e992.png',
+  'public/dash/assets/sprites/canopy.953eaa4e.png',
+  'public/dash/assets/sprites/banana.7595c6cd.png',
+  'public/dash/assets/sprites/golden.f3ec3655.png'
+];
+for(const file of dashCriticalAssets)assert(fs.existsSync(file),'Missing localized Dash critical asset: '+file);
+const dashLabSource=fs.readFileSync('src/chimpionsLab.js','utf8');
+const dashCssSource=fs.readFileSync('src/chimpionsLab.css','utf8');
+assert(!dashLabSource.includes('getImageData('),'Dash must not alpha-scan sprites at runtime');
+assert(!dashLabSource.includes('trimmedSprite('),'Dash runtime sprite trimming must stay removed');
+assert(!dashLabSource.includes('raw.githubusercontent.com'),'Dash critical runtime code must not use GitHub Raw assets');
+assert(!dashCssSource.includes('raw.githubusercontent.com'),'Dash CSS scenery must be same-origin');
+const dashCriticalBytes=dashCriticalAssets.reduce((n,file)=>n+fs.statSync(file).size,0);
+console.log('DASH_LOCAL_ASSET_REPORT:'+JSON.stringify({files:dashCriticalAssets.length,bytes:dashCriticalBytes}));
 
 const avatars=filterBuiltInRoster(JSON.parse(fs.readFileSync('public/avatars.json','utf8')));
 assert.equal(avatars.length,10,'Expected exactly 10 approved built-in Chimpions');
@@ -156,7 +212,9 @@ const audit={
     audioCount:audioFiles.length,
     imageCount:imageFiles.length,
     duplicateGroupCount:duplicateGroups.length,
-    possiblyUnreferencedCount:possiblyUnreferenced.length
+    possiblyUnreferencedCount:possiblyUnreferenced.length,
+    dashCriticalAssetCount:dashCriticalAssets.length,
+    dashCriticalAssetBytes:dashCriticalBytes
   },
   byExtension,
   branch:branchReport,

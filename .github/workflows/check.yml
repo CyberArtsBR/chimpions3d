@@ -46,7 +46,10 @@ jobs:
       - name: Build production bundle
         run: npm run build
       - name: Run fast deterministic gates
-        run: npm run qa:fast
+        run: |
+          npm run qa:fast
+          node checks/dash-gameplay.mjs
+          node checks/dash-presentation-contract.mjs
       - name: Syntax-check browser and production suites
         run: |
           node --check checks/game-browser.mjs
@@ -67,6 +70,11 @@ jobs:
           node --check checks/dash-browser.mjs
           node --check checks/dash-mobile-browser.mjs
           node --check checks/dash-resources.mjs
+          node --check checks/dash-gameplay.mjs
+          node --check checks/dash-rendering-browser.mjs
+          node --check checks/dash-performance-browser.mjs
+          node --check checks/dash-presentation-contract.mjs
+          node --check checks/dash-presentation-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -114,6 +122,9 @@ jobs:
           node checks/dash-browser.mjs
           node checks/dash-mobile-browser.mjs
           node checks/dash-resources.mjs
+          node checks/dash-rendering-browser.mjs
+          node checks/dash-performance-browser.mjs
+          node checks/dash-presentation-browser.mjs
       - name: Build network-failure QA bundle
         if: ${{ always() && !cancelled() }}
         run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
