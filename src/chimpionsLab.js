@@ -188,25 +188,43 @@ warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
 const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
 if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
-let catalog=[],character=null,loading=false,currentEntry=null;
-async function loadAvatar(entry){
-  if((!entry?.url&&!entry?.buffer)||loading)return false;
+let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
+async function loadAvatar(entry,{timeoutMs=15000}={}){
+  if(!entry?.url&&!entry?.buffer)throw new Error('Invalid Chimpion asset');
   if(!entry.buffer&&character&&currentEntry?.id===entry.id)return true;
+  const token=++avatarLoadToken;
   loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
+  window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loading',{detail:{id:entry.id,name:entry.name}}));
+  let timeoutId=0,settled=false;
+  const createPromise=createLabRunnerCharacter(entry.buffer||BASE+entry.url);
+  createPromise.then(late=>{if(settled&&token!==avatarLoadToken)late?.dispose?.()}).catch(()=>{});
   try{
-    const next=await createLabRunnerCharacter(entry.buffer||BASE+entry.url);
-    if(character){scene.remove(character.root);character.dispose();}
+    const next=await Promise.race([
+      createPromise,
+      new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error('Chimpion load timed out')),timeoutMs)})
+    ]);
+    if(token!==avatarLoadToken){next?.dispose?.();throw new DOMException('Chimpion load cancelled','AbortError')}
+    settled=true;
+    if(character){scene.remove(character.root);character.dispose()}
     character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);
-    if(!entry.buffer)try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
+    if(!entry.buffer)try{localStorage.setItem('chimpions-lab-avatar',entry.id)}catch{}
     $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones'+(entry.buffer?' · local file':'');
     $('dash-start').disabled=false;
-    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer}}));
+    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer,boneCount:next.boneCount}}));
     return true;
   }catch(error){
-    console.error(error);$('dash-start').disabled=!character;$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
-    return false;
-  }finally{loading=false;$('lab-avatar').disabled=false;}
+    if(token===avatarLoadToken){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false}
+    console.error(error);
+    $('dash-start').disabled=!character;
+    $('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
+    window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-error',{detail:{id:entry.id,name:entry.name,message:error.message}}));
+    throw error;
+  }finally{
+    settled=true;clearTimeout(timeoutId);
+    if(token===avatarLoadToken){loading=false;$('lab-avatar').disabled=false}
+  }
 }
+function cancelAvatarLoad(){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;$('dash-start').disabled=!character}
 
 const hashSeed=hashDashSeed;
 const randomValue=nextDashRandom;
