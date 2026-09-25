@@ -4,6 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
+import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
 import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
@@ -61,12 +62,14 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.05;
 $('lab-3d').append(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xe9f6df,0x24372b,2.35));
+const hemi=new THREE.HemisphereLight(0xe9f6df,0x24372b,2.35);scene.add(hemi);
 const key=new THREE.DirectionalLight(0xffe5aa,3.2);
 key.position.set(-4,8,7);key.castShadow=true;key.shadow.mapSize.set(1024,1024);
 key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=6;key.shadow.camera.bottom=-3;
 key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
+const dashGraphics=createDashWorldRenderer({scene,camera,renderer,hemisphere:hemi,keyLight:key,rimLight:rim,pixelsToWorld:1/40});
+const GPU_WORLD=true;
 
 const {
   step:STEP,playerX:PLAYER_X,gravity:GRAVITY,jumpImpulse:JUMP_IMPULSE,lowHeight:LOW_HEIGHT,
@@ -76,12 +79,8 @@ const {
 }=DASH_PHYSICS;
 const BASE_SPEED=dashSpeedForTime(0),DASH_RULES_VERSION=DASH_GAMEPLAY_VERSION;
 const DEFAULT_DASH_TIP='HOLD LEFT MOUSE / ↑ TO JUMP HIGHER · RIGHT MOUSE / ↓ TO DUCK';
-const BIOMES=[
- ['THE EMERALD WILDS','#73c897','#174e3d'],['CANOPY RUN','#5bb98d','#123e34'],
- ['WATERFALL GORGE','#83cbd3','#24556a'],['LOST TEMPLE','#d6b978','#4c553c'],
- ['MOONLIT JUNGLE','#797ac7','#161f4e'],['STORM FOREST','#708799','#172b37'],
- ['VOLCANIC WILDS','#e98a58','#49262d'],['CHIMPION DREAMSCAPE','#d78bd0','#293066']
-];
+const hexColor=value=>'#'+Number(value).toString(16).padStart(6,'0');
+const BIOMES=DASH_BIOMES.map(({name,skyTop,skyBottom})=>[name,hexColor(skyTop),hexColor(skyBottom)]);
 const TYPES=DASH_OBSTACLE_TYPES;
 
 const SPRITES=DASH_ASSETS+'sprites-clean/';
@@ -125,19 +124,20 @@ const WORLD_UNIT=1/40,AVATAR_HEIGHT=84;
 let viewH=12.5,viewW=12.5,runnerWorldX=-3,groundWorldY=-4;
 function resize3D(){
   const w=innerWidth,h=innerHeight,m=metrics();
-  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.2:1.6));
+  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?Math.min(1.2,dashGraphics.pixelRatioCap):dashGraphics.pixelRatioCap));
   viewW=m.vw*WORLD_UNIT;viewH=h/m.scale*WORLD_UNIT;camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;camera.updateProjectionMatrix();
   camera.position.set(0,0,12);camera.lookAt(0,0,0);
   runnerWorldX=-viewW/2+viewW*(PLAYER_X/m.vw);
   groundWorldY=viewH/2-viewH*(m.groundScreen/h);
+  dashGraphics.resize({viewW,viewH,groundY:groundWorldY});
 }
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
+if(!GPU_WORLD)for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
   trimmedSprite(id);
 }
-for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
+if(!GPU_WORLD)for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
 
 let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
@@ -232,6 +232,7 @@ function overheadBlocksStand(){
 
 const sweptContact=sweptDashContact;
 function acquire(kind,id,w,h){
+  if(GPU_WORLD)return null;
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
   const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
@@ -349,7 +350,7 @@ function maintainWorld(){
   }
 }
 function renderObjects(){
-  if(!run)return;
+  if(GPU_WORLD||!run)return;
   const m=metrics();
   for(const o of obstacles){
     const x=(o.x-run.scroll)*m.scale;
@@ -370,7 +371,7 @@ function jump(held=true){
   if(!run||state!=='running'||run.dead)return;
   if(run.y===0||run.coyote>0){
     run.slideHeld=false;run.slideTime=0;run.slideMin=0;run.slideBlocked=false;
-    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');
+    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');dashGraphics.emit('takeoff',{x:runnerWorldX,y:groundWorldY+.08});
     emitDashEvent(DASH_EVENTS.jump,dashMeta({held,y:run.y,vy:run.vy}));return;
   }
   run.jumpBuffer=JUMP_BUFFER;run.jumpBufferHeld=held;
@@ -384,7 +385,7 @@ function slide(on){
   const was=run.slideHeld;
   run.slideHeld=on;
   if(on&&!was&&run.y===0){
-    if(!run.slideTime)voice.play('slide');
+    if(!run.slideTime)voice.play('slide');dashGraphics.emit('slide',{x:runnerWorldX-.3,y:groundWorldY+.08});
     emitDashEvent(DASH_EVENTS.slideStart,dashMeta({y:run.y}));
   }else if(!on&&was){
     emitDashEvent(DASH_EVENTS.slideEnd,dashMeta({blocked:run.slideBlocked}));
@@ -403,7 +404,7 @@ function movePlayer(dt){
   run.jumpAge+=dt;run.y+=run.vy*dt-gravity*dt*dt/2;run.vy-=gravity*dt;
   if(previousVy>0&&run.vy<=0)emitDashEvent(DASH_EVENTS.apex,dashMeta({y:run.y}));
   if(run.y<=0){
-    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');
+    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');dashGraphics.emit('land',{x:runnerWorldX,y:groundWorldY+.06});
     emitDashEvent(DASH_EVENTS.land,dashMeta({}));
     if(run.jumpBuffer>0)jump(run.jumpBufferHeld);
   }else run.grounded=false;
@@ -417,7 +418,7 @@ function startRun(options={}){
   clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
   const seed=Number.isInteger(options?.seed)?options.seed:null;
   const tutorial=typeof options?.tutorial==='boolean'?options.tutorial:shouldRunDashTutorial();
-  clearWorld();run=makeRun({seed,tutorial});seedWorld();setState('running');accumulator=0;
+  clearWorld();dashGraphics.reset();run=makeRun({seed,tutorial});seedWorld();setState('running');accumulator=0;
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;
   if(!run.tutorial.enabled){
     $('dash-tip').textContent=DEFAULT_DASH_TIP;$('dash-tip').classList.add('show');
@@ -427,7 +428,7 @@ function startRun(options={}){
 }
 function finishRun(){
   if(!run||run.dead)return;
-  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.play(run.score>best?'record':'dead');
+  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();const isRecord=run.score>best;voice.play(isRecord?'record':'dead');dashGraphics.emit(isRecord?'record':'death',{x:runnerWorldX,y:groundWorldY+.8,intensity:isRecord?1:.8});
   emitDashEvent(DASH_EVENTS.death,dashMeta({score:Math.floor(run.score),distance:run.distance,combo:run.combo}));
   best=Math.max(best,Math.floor(run.score));try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
   hudText('dash-best',String(best).padStart(6,'0'));
@@ -444,7 +445,7 @@ function updatePhysics(dt){
   const stage=dashStageForTime(run.time);
   if(stage!==run.stage){
     const previousStage=run.stage;run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');
-    emitDashEvent(DASH_EVENTS.stageChange,dashMeta({previousStage,stage}));
+    emitDashEvent(DASH_EVENTS.stageChange,dashMeta({previousStage,stage}));dashGraphics.emit('stage',{x:0,y:groundWorldY+viewH*.3,intensity:.9});
   }
   run.speed=dashSpeedForTime(run.time);
   const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
@@ -496,7 +497,7 @@ function updatePhysics(dt){
       emitFlowTransition(flowBefore,b.golden?'golden-banana':'banana');
       emitDashEvent(b.golden?DASH_EVENTS.goldenBanana:DASH_EVENTS.banana,dashMeta({golden:b.golden,points,x:b.x,y:b.y}));
       handleTutorialEvent('banana');
-      b.el.classList.add('collected');
+      b.el?.classList.add('collected');dashGraphics.emit(b.golden?'goldenBanana':'banana',{x:runnerWorldX,y:groundWorldY+b.y*WORLD_UNIT,intensity:b.golden?1:.7});
     }
   }
   run.score=Math.floor(run.distance*10)+run.bonus;
@@ -529,8 +530,10 @@ function renderUI(dt){
   hudText('dash-stage-label',String(active.stage).padStart(2,'0')+' / '+biome[0]);
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
+  const graphicsSliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked);
+  dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
   if(character){
-    const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
+    const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
     character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
     character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
     const jumpWorld=active.y*WORLD_UNIT;
@@ -538,7 +541,7 @@ function renderUI(dt){
   }
   active.landed=false;
   const shadow=$('dash-shadow');
-  if(shadow){
+  if(shadow&&!GPU_WORLD){
     const jump=active.y*m.scale;
     shadow.style.left=Math.round(PLAYER_X*m.scale)+'px';
     shadow.style.width=Math.round(104*m.scale)+'px';
@@ -638,11 +641,11 @@ renderer.setAnimationLoop(now=>{
     let steps=0;
     while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
   }else accumulator=0;
-  renderUI(frameDt);renderer.render(scene,camera);
+  renderUI(frameDt);dashGraphics.render();
 });
 
 window.chimpionsLab=()=>({
   state,ready:!!character,selected:currentEntry?.id,score:Math.floor(run?.score||0),
   distance:run?.distance||0,stage:run?.stage||1,bananas:run?.bananaCount||0,best,
-  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,pool:{hazards:pools.hazard.length,bananas:pools.banana.length}
+  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats()
 });
