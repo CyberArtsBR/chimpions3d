@@ -7,6 +7,7 @@ const scenarios=[
   {name:'500',handler:route=>route.fulfill({status:500,contentType:'application/json',body:'{"error":"qa-500"}'})},
   {name:'404',handler:route=>route.fulfill({status:404,contentType:'application/json',body:'{"error":"qa-404"}'})},
   {name:'abort',handler:route=>route.abort('connectionfailed')},
+  {name:'timeout',handler:route=>route.abort('timedout')},
 ];
 if(includeSlow)scenarios.push({
   name:'slow-late-response',
@@ -32,6 +33,16 @@ try{
       await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,null,{timeout:budget});
       item.latencyMs=Date.now()-started;
       assert(runRequests>0,scenario.name+': QA build did not contact configured leaderboard endpoint');
+      if(scenario.name==='slow-late-response'){
+        const seedBefore=await page.evaluate(()=>window.chimpJump().runSeed);
+        await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
+        await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+        await page.waitForTimeout(4300);
+        const late=await page.evaluate(()=>({mode:window.chimpJump().mode,seed:window.chimpJump().runSeed}));
+        assert.equal(late.mode,'playing','Late run-ticket response must not interrupt active gameplay');
+        assert.equal(late.seed,seedBefore,'Late run-ticket response must not reset an active route seed');
+        item.lateResponsePreservedActiveRun=true;
+      }
       assert.deepEqual(diag.errors,[],scenario.name+': page errors');
     }catch(error){
       item.status='FAIL';item.error=error.message;report.failures.push(scenario.name);
