@@ -102,6 +102,13 @@ assert.deepEqual(replayA,replayB,'same gameplay version + seed + inputs must rep
 assert.equal(replayA.rulesVersion,DASH_GAMEPLAY_VERSION);
 assert.notEqual(replayA.planDigest,replayOtherSeed.planDigest,'seed must affect deterministic generated content');
 
+const graphicsTierReplays={};
+for(const graphicsTier of ['LOW','BALANCED','HIGH','ULTRA','AUTO']){
+  // Graphics quality is deliberately absent from the authoritative simulation API.
+  graphicsTierReplays[graphicsTier]=simulateDashReplay({seed:424242,inputTimeline:replayInputs,duration:8});
+  assert.deepEqual(graphicsTierReplays[graphicsTier],replayA,`${graphicsTier} graphics tier must not alter deterministic gameplay`);
+}
+
 const run={flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,bananaCount:0,goldenBananas:0,perfectJumps:0,perfectSlides:0,nearMisses:0};
 const reward=rewardDashObstaclePass(run,short,{clearance:12});
 assert.equal(reward.precision.perfect,true);
