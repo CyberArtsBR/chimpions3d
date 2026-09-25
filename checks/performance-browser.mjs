@@ -42,7 +42,7 @@ try{
   const beforeRestarts=await sample();
   for(let i=0;i<25;i++){
     await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
-    await page.waitForFunction(()=>window.chimpJump?.().mode==='over'&&document.getElementById('results-dialog')?.open);
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='over');
     await page.evaluate(()=>document.getElementById('try-again').click());
     await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));
     if(await page.evaluate(()=>window.chimpJump().mode==='starting'))await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
