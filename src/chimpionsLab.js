@@ -175,17 +175,19 @@ function makeRun(){
   };
 }
 
-function playerBox(){
+const previousPlayerBox={x:0,y:0,w:32,h:78,sliding:false};
+const currentPlayerBox={x:0,y:0,w:32,h:78,sliding:false};
+function playerBox(out){
   const sliding=run.y===0&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked);
-  return{x:PLAYER_X-16,y:run.y+5,w:32,h:sliding?31:78,sliding};
+  out.x=PLAYER_X-16;out.y=run.y+5;out.w=32;out.h=sliding?31:78;out.sliding=sliding;
+  return out;
 }
-function rectHit(a,x,y,w,h){return a.x<x+w&&a.x+a.w>x&&a.y<y+h&&a.y+a.h>y;}
+function rectHit(ax,ay,aw,ah,bx,by,bw,bh){return ax<bx+bw&&ax+aw>bx&&ay<by+bh&&ay+ah>by;}
 function overheadBlocksStand(){
-  const stand={x:PLAYER_X-16,y:5,w:32,h:78};
   for(const o of obstacles){
     if(o.hit||!['overhead','flex'].includes(o.family))continue;
     for(const b of o.boxes){
-      if(rectHit(stand,o.x-run.scroll+b[0],b[1],b[2],b[3]))return true;
+      if(rectHit(PLAYER_X-16,5,32,78,o.x-run.scroll+b[0],b[1],b[2],b[3]))return true;
     }
   }
   return false;
@@ -422,11 +424,11 @@ function updatePhysics(dt){
   const stage=Math.floor((run.time+1e-7)/30)+1;
   if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');}
   run.speed=speedFor(run.stage);
-  const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
+  const oldScroll=run.scroll,previousBox=playerBox(previousPlayerBox),oldY=run.y;
   previousBox.x+=oldScroll;
   movePlayer(dt);
   run.scroll+=run.speed*dt;run.distance=run.scroll/100;
-  let p=playerBox();p.x+=run.scroll;
+  let p=playerBox(currentPlayerBox);p.x+=run.scroll;
   let collision=null,contact=Infinity;
   for(const o of obstacles){
     if(o.hit)continue;
@@ -438,7 +440,7 @@ function updatePhysics(dt){
   if(collision){
     run.scroll=oldScroll+(run.scroll-oldScroll)*contact;
     run.y=oldY+(run.y-oldY)*contact;run.distance=run.scroll/100;
-    p=playerBox();p.x+=run.scroll;
+    p=playerBox(currentPlayerBox);p.x+=run.scroll;
   }
   for(const o of obstacles){
     if(o!==collision&&!o.passed&&o.x+o.w<run.scroll+PLAYER_X-18){
