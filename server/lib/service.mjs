@@ -47,7 +47,7 @@ export function createLeaderboardService({
     store.createRun({id,seed,started:now,expires,ruleset:CURRENT_RULESET_VERSION,protocolVersion,traceVersion});securityLog('run_created',{rulesetVersion:CURRENT_RULESET_VERSION,traceVersion});
     sendJson(res,201,{...versionEnvelope(),runId:id,id,seed,createdAt:now,expiresAt:expires});return;
    }
-   const match=url.pathname.match(/^\/api\/runs\/([a-f0-9]{48})\/(finish|name)$/);
+   const match=url.pathname.match(/^\/api\/runs\/([^/]+)\/(finish|name)$/);
    if(!match)fail(404,'NOT_FOUND','Not found');
    method(req,res,'POST');const [,runId,action]=match;limit(action==='finish'?'runFinish':'runName',req,res);
    if(!RUN_ID_RE.test(runId))fail(404,'RUN_NOT_FOUND','Run not found');
