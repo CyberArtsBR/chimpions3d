@@ -143,6 +143,7 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
     return {
       requestedQuality:requested,qualityTier:q.tier,autoStep,
       dpr:renderer.getPixelRatio(),dprMax:q.dprMax,
+      budget:{averageFrameMs:q.profile.avgBudgetMs,p95FrameMs:q.profile.p95BudgetMs,idleFps:q.profile.idleFps},
       averageFrameMs:Number(averageMs.toFixed(2)),p95FrameMs:Number(p95Ms.toFixed(2)),
       frameSamples:sampleCount,renderedFrames,skippedFrames,
       renderer:{calls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures},
