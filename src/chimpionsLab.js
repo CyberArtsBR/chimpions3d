@@ -180,7 +180,7 @@ function makeRun(options={}){
     bananaCount:0,goldenBananas:0,flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,score:0,
     perfectJumps:0,perfectSlides:0,nearMisses:0,
     tutorial:createDashTutorialState(!!options.tutorial),tutorialPatternActive:false,
-    landed:false,lastDifficulty:1,recentPressure:0,recentRecovery:1,recentActionVariety:.5
+    landed:false,lastDifficulty:1,recentPressure:0,recentRecovery:1,recentActionVariety:.5,recentActions:[]
   };
 }
 function dashMeta(extra={}){
@@ -317,6 +317,11 @@ function spawnPattern(){
   run.lastDifficulty=def.difficulty;
   run.recentRecovery=def.recovery;
   run.recentPressure=Math.min(1,def.difficulty/5);
+  for(const obstacle of created){
+    run.recentActions.push(obstacle.action);
+    if(run.recentActions.length>6)run.recentActions.shift();
+  }
+  run.recentActionVariety=run.recentActions.length?new Set(run.recentActions).size/run.recentActions.length:.5;
   if(def.tutorial){
     run.tutorialPatternActive=true;
     $('dash-tip').textContent=def.prompt;
@@ -472,14 +477,15 @@ function updatePhysics(dt){
     if(o!==collision&&!o.passed&&o.x+o.w<run.scroll+PLAYER_X-18){
       o.passed=true;
       const flowBefore=run.flow;
-      const result=rewardDashObstaclePass(run,o,{clearance:o.minClearance,riskLine:o.tookRiskLine});
+      const performedAction=o.family==='flex'?(o.tookRiskLine?'jump':'slide'):o.action;
+      const result=rewardDashObstaclePass(run,o,{clearance:o.minClearance,riskLine:o.tookRiskLine,performedAction});
       emitFlowTransition(flowBefore,'obstacle-pass');
       emitDashEvent(DASH_EVENTS.obstaclePass,dashMeta({
         obstacleId:o.id,obstacleType:o.family,patternId:o.patternId||'',precisionMargin:o.minClearance,
-        action:o.action,riskLine:o.tookRiskLine
+        action:o.action,performedAction,riskLine:o.tookRiskLine
       }));
       if(result.precision.nearMiss)emitDashEvent(DASH_EVENTS.nearMiss,dashMeta({obstacleId:o.id,patternId:o.patternId||'',precisionMargin:o.minClearance}));
-      else if(result.precision.perfect)emitDashEvent(o.action==='slide'?DASH_EVENTS.perfectSlide:DASH_EVENTS.perfectJump,dashMeta({obstacleId:o.id,patternId:o.patternId||'',precisionMargin:o.minClearance}));
+      else if(result.precision.perfect)emitDashEvent(performedAction==='slide'?DASH_EVENTS.perfectSlide:DASH_EVENTS.perfectJump,dashMeta({obstacleId:o.id,patternId:o.patternId||'',precisionMargin:o.minClearance,performedAction}));
       handleTutorialEvent('obstacle-pass');
     }
   }
