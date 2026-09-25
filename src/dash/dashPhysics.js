@@ -89,3 +89,20 @@ export function heightAtDashArcTime(profile,time){
   }
   return 0;
 }
+
+
+export function sweptDashContact(a0,a1,b){
+  let enter=0,exit=1;
+  const constraints=[
+    [a0.x+a0.w-b.x,a1.x+a1.w-b.x],
+    [b.x+b.w-a0.x,b.x+b.w-a1.x],
+    [a0.y+a0.h-b.y,a1.y+a1.h-b.y],
+    [b.y+b.h-a0.y,b.y+b.h-a1.y]
+  ];
+  for(const [from,to] of constraints){
+    if(from<=0&&to<=0)return Infinity;
+    if(from<=0)enter=Math.max(enter,-from/(to-from));
+    else if(to<=0)exit=Math.min(exit,from/(from-to));
+  }
+  return enter<exit?enter:Infinity;
+}
