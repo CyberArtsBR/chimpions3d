@@ -17,8 +17,8 @@ export function setupJumpExperience(){
   const status=document.createElement('div');status.id='jump-runtime-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.hidden=true;
   const goalToast=document.createElement('div');goalToast.id='jump-goal-toast';goalToast.setAttribute('role','status');goalToast.hidden=true;
 
-  const dialog=document.createElement('dialog');dialog.id='jump-guide-dialog';
-  dialog.innerHTML=`<header><div><small>CHIMP JUMP</small><h2>Field guide</h2></div><button class="guide-close" aria-label="Close field guide">×</button></header>
+  const dialog=document.createElement('dialog');dialog.id='jump-guide-dialog';dialog.setAttribute('aria-labelledby','jump-guide-title');
+  dialog.innerHTML=`<header><div><small>CHIMP JUMP</small><h2 id="jump-guide-title">Field guide</h2></div><button class="guide-close" aria-label="Close field guide">×</button></header>
     <section><h3>Controls</h3><p>Steer while the chimp auto-jumps with Arrow keys or A/D, mouse, or gamepad. P or Escape pauses.</p></section>
     <section><h3>Read the branches</h3><div class="guide-branches"><span>↔ <b>Moving</b></span><span>╱ <b>Fragile</b></span><span>↑ <b>Spring</b></span><span>🍃 <b>Leaf</b></span><span>⌁ <b>Swing</b></span><span>◌ <b>Vanish</b></span></div><p>Leaves drift and swings sway. Vanishing branches disappear after you land. Small, optional branches pay more bananas; solid branches form the main route.</p></section>
     <section><h3>Canopy surprises</h3><p>Avoid thorn pods. Banana Bloom adds rewards, and Spring Fever boosts springs. Watch the event badge for the active effect.</p></section>
