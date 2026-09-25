@@ -17,9 +17,19 @@ try{
   report.checks.visibleButtonsLabeled=count;
 
   await page.keyboard.press('Tab');
-  const active=await page.evaluate(()=>({tag:document.activeElement?.tagName,id:document.activeElement?.id,outline:getComputedStyle(document.activeElement).outlineStyle}));
+  const active=await page.evaluate(()=>{
+    const style=getComputedStyle(document.activeElement);
+    return {tag:document.activeElement?.tagName,id:document.activeElement?.id,outlineStyle:style.outlineStyle,outlineWidth:style.outlineWidth,boxShadow:style.boxShadow};
+  });
   assert(active.tag&&active.tag!=='BODY','Keyboard focus must enter interactive UI');
+  assert(active.outlineStyle!=='none'||active.boxShadow!=='none','Keyboard focus must have a visible focus indicator');
   report.checks.keyboardFocus=active;
+
+  for(const selector of ['#results-dialog','#record-book']){
+    const dialog=page.locator(selector);
+    assert((await dialog.getAttribute('aria-label'))||(await dialog.getAttribute('aria-labelledby')),selector+' must be labeled');
+  }
+  report.checks.resultsDialogsLabeled=true;
 
   await page.getByRole('button',{name:'Field guide',exact:true}).click();
   const guide=page.locator('#jump-guide-dialog[open]');
