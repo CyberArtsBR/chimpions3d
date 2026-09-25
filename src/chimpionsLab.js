@@ -723,7 +723,7 @@ function setInput(kind,source,on){
  if(!active&&was){if(kind==='jump')releaseJump();else slide(false);}
 }
 function clearInputs(){heldJump.clear();heldSlide.clear();keys.clear();releaseJump();if(run){run.slideHeld=false;run.jumpBuffer=0;}voice.setDash(false);}
-const jumpCodes=new Set(['Space','KeyW','ArrowUp']),slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS','KeyA']);
+const jumpCodes=new Set(['Space','KeyW','ArrowUp']),slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS']);
 addEventListener('keydown',e=>{
   if(e.target.closest('input,select,textarea,button,a'))return;
   setInputDevice('keyboard');voice.unlock();
