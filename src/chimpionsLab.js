@@ -560,16 +560,26 @@ function movePlayer(dt){
   }else run.grounded=false;
 }
 function setState(next){
-  state=next;document.body.dataset.labState=next;
-  $('dash-menu').hidden=next!=='menu';$('dash-over').hidden=next!=='over';$('dash-paused').hidden=next!=='paused';
+  state=next;
+  document.body.dataset.labState=next;
+  document.body.classList.toggle('dash-start-screen',next==='menu');
+  const menu=$('dash-menu'),over=$('dash-over'),paused=$('dash-paused');
+  menu.hidden=next!=='menu';over.hidden=next!=='over';paused.hidden=next!=='paused';
+  // Runtime-authoritative visibility. Inline !important prevents illustrated
+  // menu CSS from ever covering gameplay after Start on cached/older browsers.
+  if(next==='menu')menu.style.removeProperty('display');
+  else menu.style.setProperty('display','none','important');
 }
 function startRun(options={}){
   if(!character||loading)return false;
   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-  voice.unlock();clearInputs();voice.stopMusic();voice.startMusic();voice.startAmbience();voice.play('click');
   const seed=Number.isInteger(options?.seed)?options.seed:null;
   const tutorial=typeof options?.tutorial==='boolean'?options.tutorial:shouldRunDashTutorial();
-  clearWorld();dashGraphics.reset();run=makeRun({seed,tutorial});seedWorld();setState('running');accumulator=0;performanceController.resetFrameWindow();
+  clearInputs();clearWorld();dashGraphics.reset();run=makeRun({seed,tutorial});seedWorld();
+  // Hide the illustrated entry screen before starting gameplay audio. This
+  // makes the visual transition synchronous with the click that starts the run.
+  setState('running');accumulator=0;performanceController.resetFrameWindow();
+  voice.unlock();voice.stopMusic();voice.startMusic();voice.startAmbience();voice.play('click');
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;
   if(!run.tutorial.enabled){
     $('dash-tip').textContent=DEFAULT_DASH_TIP;$('dash-tip').classList.add('show');

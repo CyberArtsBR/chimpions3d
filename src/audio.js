@@ -3,11 +3,16 @@
 export function createAudio(music){
  let context,master,muted=false,intensity=0;
  const buffers=new Map();
- let settings={music:.19,sfx:.65};
+ let settings={music:.16,sfx:.65};
  try{settings={...settings,...JSON.parse(localStorage.getItem('chimp-audio')||'{}')};}catch{}
- for(const key of ['music','sfx'])settings[key]=Number.isFinite(settings[key])?Math.max(0,Math.min(1,settings[key])):(key==='music'?.19:.65);
+ for(const key of ['music','sfx'])settings[key]=Number.isFinite(settings[key])?Math.max(0,Math.min(1,settings[key])):(key==='music'?.16:.65);
+ // Product request: reduce music to 40% of the previous launcher/game loudness.
+ // Force the migrated value once so an older localStorage preference cannot
+ // silently restore the louder mix after deployment.
+ settings.music=.16;
+ try{localStorage.setItem('chimp-audio',JSON.stringify(settings));}catch{}
  function syncMusic(){
-  music.volume=settings.music*(.9+.1*intensity);
+  music.volume=settings.music;
   music.playbackRate=.985+.055*intensity;
  }
  syncMusic();
