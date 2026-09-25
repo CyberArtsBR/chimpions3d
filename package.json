@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite",
     "build": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite build && node scripts/build-version.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:premium-ux": "node checks/premium-ux-browser.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
