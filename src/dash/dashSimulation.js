@@ -25,7 +25,7 @@ export function validateDashPlan(plan){
     for(let i=1;i<entry.obstacles.length;i++){
       const previous=entry.obstacles[i-1],next=entry.obstacles[i];
       const gap=next.x-(previous.x+previous.w);
-      const report=dashTransitionReport(previous,next,{gapDistance:gap,speed:entry.snapshot.speed,chainLength:entry.obstacles.length,requested:entry.pattern.items[i][1]});
+      const report=dashTransitionReport(previous,next,{gapDistance:gap,speed:next.transitionSpeed||entry.snapshot.speed,chainLength:entry.obstacles.length,requested:entry.pattern.items[i][1]});
       if(!report.ok)failures.push({patternId:entry.pattern.id,stage:entry.snapshot.stage,speed:entry.snapshot.speed,previous:previous.id,next:next.id,gap,...report});
     }
   }
