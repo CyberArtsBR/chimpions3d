@@ -234,6 +234,69 @@ function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-
 let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 
+let feedbackTimer=0,activeInputDevice=matchMedia('(pointer:coarse)').matches?'touch':'keyboard';
+function setInputDevice(device){
+  if(!['keyboard','mouse','touch','gamepad'].includes(device)||activeInputDevice===device)return;
+  activeInputDevice=device;document.body.dataset.inputDevice=device;
+  const prompt=$('dash-input-prompt');if(!prompt)return;
+  prompt.textContent=device==='gamepad'?'A / D-PAD ↑ JUMP · B / D-PAD ↓ SLIDE · MENU PAUSE':
+    device==='touch'?'TOUCH JUMP / SLIDE CONTROLS':
+    device==='mouse'?'LEFT MOUSE JUMP · RIGHT MOUSE SLIDE':
+    'SPACE / W / ↑ JUMP · ↓ / S / SHIFT SLIDE';
+}
+document.body.dataset.inputDevice=activeInputDevice;
+
+function saveSettings(){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(dashSettings))}catch{}}
+function applySettings(){
+  document.body.classList.toggle('dash-reduced-motion',!!dashSettings.reducedMotion);
+  document.body.classList.toggle('dash-high-visibility',!!dashSettings.highVisibility);
+  document.body.classList.toggle('dash-large-touch',!!dashSettings.largeTouch);
+  voice.setVolumes({master:dashSettings.master/100,music:dashSettings.music/100,sfx:dashSettings.sfx/100,ui:dashSettings.ui/100,ambience:dashSettings.ambience/100});
+  voice.setMuted(dashSettings.mute);const requested=String(dashSettings.graphics||'Auto').toUpperCase();const resolved=requested==='AUTO'?(matchMedia('(pointer:coarse)').matches?'BALANCED':'HIGH'):requested;try{dashGraphics.setQuality(resolved)}catch{}
+}
+function bindSettings(){
+  const dialog=$('dash-settings');
+  const map={master:'setting-master',music:'setting-music',sfx:'setting-sfx',ui:'setting-ui',ambience:'setting-ambience'};
+  $('setting-graphics').value=dashSettings.graphics;
+  for(const [key,id] of Object.entries(map)){
+    const input=$(id),out=$('out-'+key);input.value=dashSettings[key];out.value=dashSettings[key];
+    input.addEventListener('input',()=>{dashSettings[key]=Number(input.value);out.value=input.value;applySettings();saveSettings()});
+  }
+  for(const [key,id] of [['mute','setting-mute'],['reducedMotion','setting-reduced-motion'],['highVisibility','setting-high-visibility'],['screenShake','setting-screen-shake'],['haptics','setting-haptics'],['largeTouch','setting-large-touch']]){
+    const input=$(id);input.checked=!!dashSettings[key];input.addEventListener('change',()=>{dashSettings[key]=input.checked;applySettings();saveSettings()});
+  }
+  $('setting-graphics').addEventListener('change',event=>{dashSettings.graphics=event.target.value;applySettings();saveSettings()});
+  $('dash-settings-open').onclick=()=>{voice.play('click');dialog.showModal();requestAnimationFrame(()=>$('setting-graphics').focus())};
+  dialog.addEventListener('close',()=>{$('dash-resume')?.focus()});
+  applySettings();
+}
+bindSettings();
+
+function haptic(pattern){
+  if(!dashSettings.haptics)return;
+  if(navigator.vibrate)try{navigator.vibrate(pattern)}catch{}
+  const pad=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected&&p.vibrationActuator?.playEffect);
+  if(pad)try{pad.vibrationActuator.playEffect('dual-rumble',{duration:Array.isArray(pattern)?90:55,strongMagnitude:.32,weakMagnitude:.2})}catch{}
+}
+function showFeedback(message,kind=''){
+  const el=$('dash-feedback');if(!el)return;
+  clearTimeout(feedbackTimer);el.textContent=message;el.dataset.kind=kind;el.classList.add('show');
+  if(['perfect','multiplier'].includes(kind))haptic(16);
+  feedbackTimer=setTimeout(()=>el.classList.remove('show'),900);
+}
+const feedbackSound={
+  'PERFECT JUMP':'perfect-jump','PERFECT SLIDE':'perfect-slide','CLOSE CALL':'near-miss',
+  'MULTIPLIER UP':'multiplier','STAGE CHANGE':'stage','COMBO BREAK':'hit'
+};
+window.addEventListener('chimpions-dash-feedback',event=>{
+  const label=String(event.detail?.label||'').toUpperCase();if(!label)return;
+  showFeedback(label,event.detail?.kind||'');
+  if(feedbackSound[label])voice.play(feedbackSound[label],{gain:.72});
+});
+window.addEventListener('chimpions-dash-foot-contact',()=>{if(state==='running')voice.play('footstep',{gain:.42,pitch:.96+Math.random()*.08})});
+
+
+
 function shouldRunDashTutorial(){
   try{return localStorage.getItem(DASH_TUTORIAL_KEY)!=='done';}catch{return false;}
 }
