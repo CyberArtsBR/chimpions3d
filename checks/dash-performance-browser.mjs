@@ -81,11 +81,11 @@ try{
   assert(ids.length>=3,'Expected multiple approved Dash avatars');
   for(let i=0;i<6;i++){
     const id=ids[(ids.indexOf(original)+1+i)%ids.length];
-    await page.selectOption('#lab-avatar',id);
+    await page.evaluate(id=>{const select=document.getElementById('lab-avatar');select.value=id;select.dispatchEvent(new Event('change',{bubbles:true}));},id);
     await page.waitForFunction(id=>window.chimpionsDash().selectedId===id,id,{timeout:45000});
     await page.evaluate(()=>{window.chimpionsDashTest.startRun();window.chimpionsDashTest.quit();});
   }
-  await page.selectOption('#lab-avatar',original);
+  await page.evaluate(id=>{const select=document.getElementById('lab-avatar');select.value=id;select.dispatchEvent(new Event('change',{bubbles:true}));},original);
   await page.waitForFunction(id=>window.chimpionsDash().selectedId===id,original,{timeout:45000});
   await page.waitForTimeout(400);
   const afterCharacters=await diag();
