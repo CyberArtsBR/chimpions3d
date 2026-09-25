@@ -59,6 +59,8 @@ try{
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+  await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelectorAll('#collection-dialog .avatar-option').length===10);
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Expanded picker must be deployed');
   assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Production picker must expose the canonical 10 Chimpions');
   await shot('production-picker-desktop.png');
@@ -95,6 +97,7 @@ try{
   report.viewport1080p=layout;
 
   assert.deepEqual(errors,[],'Production browser must not raise page errors');
+  assert.deepEqual(consoleErrors,[],'Production browser must not emit unexpected console.error');
   assert.deepEqual(sameOriginFailures,[],'Production same-origin assets must not return HTTP errors');
   report.consoleErrors=consoleErrors;
   fs.writeFileSync('checks/production-browser-report.json',JSON.stringify(report,null,2));
