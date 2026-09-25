@@ -25,6 +25,12 @@ try{
   const sorted=[...frameTimes].sort((a,b)=>a-b);
   const percentile=p=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*p))];
   report.frameTime={samples:frameTimes.length,p50Ms:Number(percentile(.50).toFixed(2)),p95Ms:Number(percentile(.95).toFixed(2)),p99Ms:Number(percentile(.99).toFixed(2)),maxMs:Number(Math.max(...frameTimes).toFixed(2))};
+  const postFrameMode=await page.evaluate(()=>window.chimpJump().mode);
+  report.frameTime.safetyPauseObserved=postFrameMode==='paused';
+  if(postFrameMode==='paused'){
+    await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+    await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  }
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
 
   await page.evaluate(()=>{
