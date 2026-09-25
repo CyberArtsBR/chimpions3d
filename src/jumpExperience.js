@@ -43,10 +43,11 @@ export function setupJumpExperience(){
   document.body.dataset.uiReady='loading';
   document.body.dataset.menuReady='loading';
 
-  const toolDock=document.createElement('nav');toolDock.id='jump-menu-tools';toolDock.setAttribute('aria-label','Game help and options');
+  const toolDock=document.createElement('nav');toolDock.id='jump-menu-tools';toolDock.setAttribute('aria-label','Game navigation, help and options');
   const guideButton=makeButton('jump-guide-button','Field Guide');guideButton.setAttribute('aria-haspopup','dialog');
   const optionsButton=makeButton('jump-options-button','Options');optionsButton.setAttribute('aria-haspopup','dialog');
-  toolDock.append(guideButton,optionsButton);
+  const homeButton=makeButton('jump-home-button','Home');homeButton.setAttribute('aria-label','Back to game selection');
+  toolDock.append(guideButton,optionsButton,homeButton);
 
   const hint=document.createElement('div');hint.id='jump-control-hint';hint.textContent=matchMedia('(pointer: coarse)').matches?'Hold ◀ ▶ to steer · auto-jump':'← → / A D · mouse · gamepad · auto-jump';
 
@@ -86,6 +87,13 @@ export function setupJumpExperience(){
   const reduced=settings.querySelector('#jump-reduced-motion'),visibility=settings.querySelector('#jump-high-visibility'),list=dialog.querySelector('#jump-goals');
   const gameplayToast=document.getElementById('toast');
   gameplayToast?.setAttribute('aria-live','polite');gameplayToast?.setAttribute('aria-atomic','true');
+
+  function classifyToast(){
+    if(!gameplayToast)return;
+    const text=gameplayToast.textContent||'';
+    gameplayToast.dataset.kind=/failed|unavailable|error/i.test(text)?'error':/offline|thorn|knockback|move!/i.test(text)?'warning':/milestone|boost|bonus|complete|submitted/i.test(text)?'success':'info';
+  }
+  if(gameplayToast){new MutationObserver(classifyToast).observe(gameplayToast,{childList:true,characterData:true,subtree:true});classifyToast();}
 
   function applyPrefs(){
     prefs.reducedMotion=!!prefs.reducedMotion;prefs.highVisibility=!!prefs.highVisibility;
@@ -206,6 +214,7 @@ export function setupJumpExperience(){
 
   guideButton.onclick=()=>openGuide(guideButton);
   optionsButton.onclick=()=>openSettings(optionsButton);
+  homeButton.onclick=()=>{location.href='/';};
   dialog.querySelector('.guide-close').onclick=()=>dialog.close();
   settings.querySelector('.settings-close').onclick=()=>settings.close();
   dialog.addEventListener('close',()=>restoreFocus(dialog));
