@@ -340,9 +340,9 @@ function handleTutorialEvent(type){
   emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:result.complete?'complete':'advance',event:type,step:run.tutorial.index}));
   if(result.complete){
     try{localStorage.setItem(DASH_TUTORIAL_KEY,'done');}catch{}
-    $('dash-tip').textContent='TRAINING COMPLETE · RUN!';
-    $('dash-tip').classList.add('show');
-    setTimeout(()=>{if(state==='running'&&run?.tutorial?.complete)$('dash-tip')?.classList.remove('show');},2200);
+    $('dash-input-prompt').textContent='TRAINING COMPLETE · RUN!';
+    $('dash-input-prompt').classList.add('show');
+    setTimeout(()=>{if(state==='running'&&run?.tutorial?.complete)$('dash-input-prompt')?.classList.remove('show');},2200);
   }
 }
 
@@ -453,8 +453,8 @@ function spawnPattern(){
   run.recentActionVariety=run.recentActions.length?new Set(run.recentActions).size/run.recentActions.length:.5;
   if(def.tutorial){
     run.tutorialPatternActive=true;
-    $('dash-tip').textContent=def.prompt;
-    $('dash-tip').classList.add('show');
+    $('dash-input-prompt').textContent=def.prompt;
+    $('dash-input-prompt').classList.add('show');
     emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'prompt',step:run.tutorial.index,id:def.id,prompt:def.prompt}));
   }
   return true;
@@ -581,7 +581,7 @@ function updatePhysics(dt){
   const stage=dashStageForTime(run.time);
   if(stage!==run.stage){
     const previousStage=run.stage;run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');
-    emitDashEvent(DASH_EVENTS.stageChange,dashMeta({previousStage,stage}));dashGraphics.emit('stage',{x:0,y:groundWorldY+viewH*.3,intensity:.9});
+    emitDashEvent(DASH_EVENTS.stageChange,dashMeta({previousStage,stage}));dashGraphics.emit('stage',{x:0,y:groundWorldY+viewH*.3,intensity:.9});showFeedback('STAGE CHANGE','stage');
   }
   run.speed=dashSpeedForTime(run.time);
   const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
@@ -662,7 +662,10 @@ function renderUI(dt){
   hudText('dash-distance',(active.distance/1000).toFixed(2)+' KM');
   hudText('dash-best',String(best).padStart(6,'0'));
   hudText('dash-bananas',active.bananaCount);
+  hudText('dash-flow-value',Math.round(active.flow));
   hudText('dash-mult',multiplier(active.flow).toFixed(2)+'×');
+  hudText('dash-stage-number',String(active.stage).padStart(2,'0'));
+  voice.setSpeed(active.speed/BASE_SPEED);
   hudText('dash-stage-label',String(active.stage).padStart(2,'0')+' / '+biome[0]);
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
@@ -699,11 +702,12 @@ function clearInputs(){heldJump.clear();heldSlide.clear();keys.clear();releaseJu
 const jumpCodes=new Set(['Space','KeyW','ArrowUp']),slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS','KeyA']);
 addEventListener('keydown',e=>{
   if(e.target.closest('input,select,textarea,button,a'))return;
+  setInputDevice('keyboard');voice.unlock();
   if(jumpCodes.has(e.code)||slideCodes.has(e.code)||e.code==='KeyP'){e.preventDefault();keys.add(e.code);}
   if(jumpCodes.has(e.code)&&!e.repeat)setInput('jump',e.code,true);
   if(slideCodes.has(e.code))setInput('slide',e.code,true);
   if(e.code==='KeyP'&&!e.repeat)(state==='paused'?resume():pause());
-  if(e.code==='Escape'&&state!=='menu')quit();
+  if(e.code==='Escape'&&!e.repeat){if($('dash-settings')?.open)$('dash-settings').close();else if(state==='running')pause();else if(state==='paused')resume();else if(state==='over')quit();}
 });
 addEventListener('keyup',e=>{
   keys.delete(e.code);
@@ -715,7 +719,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 
 function touchHold(id,start,end){
   const el=$(id);
-  el.onpointerdown=e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);start();};
+  el.onpointerdown=e=>{e.preventDefault();setInputDevice('touch');voice.unlock();try{el.setPointerCapture?.(e.pointerId)}catch{}start();};
   el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{e?.preventDefault?.();end();};
 }
 touchHold('touch-jump',()=>setInput('jump','touch',true),()=>setInput('jump','touch',false));
@@ -723,6 +727,7 @@ touchHold('touch-slide',()=>setInput('slide','touch',true),()=>setInput('slide',
 $('dash-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('dash-stage').addEventListener('pointerdown',event=>{
  if(event.pointerType!=='mouse'||state!=='running'||event.target.closest('button,a,select,input'))return;
+ setInputDevice('mouse');voice.unlock();
  if(event.button!==0&&event.button!==2)return;event.preventDefault();
  setInput(event.button===0?'jump':'slide','mouse',true);
 });
@@ -730,11 +735,18 @@ addEventListener('pointerup',event=>{if(event.pointerType==='mouse'){if(event.bu
 addEventListener('pointercancel',()=>{setInput('jump','mouse',false);setInput('slide','mouse',false);});
 
 $('dash-pause').onclick=()=>state==='paused'?resume():pause();
-$('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-start').onclick=startRun;
+$('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-main-menu').onclick=quit;$('dash-start').onclick=startRun;
 $('dash-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math.floor(Math.random()*catalog.length)];$('lab-avatar').value=entry.id;loadAvatar(entry);};
 $('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
 $('dash-upload').onclick=()=>$('dash-avatar-file').click();
-$('dash-avatar-file').onchange=async event=>{const file=event.target.files[0];event.target.value='';if(!file)return;try{const buffer=await readLocalGLB(file);await loadAvatar({id:'local-custom',name:file.name.replace(/\.glb$/i,''),buffer,local:true});}catch(error){$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');}};
+$('dash-avatar-file').onchange=async event=>{
+  const file=event.target.files[0];event.target.value='';if(!file)return;
+  try{
+    if(file.size>40*1024*1024)throw new Error('GLB exceeds the 40 MB local upload limit');
+    const buffer=await readLocalGLB(file);
+    await loadAvatar({id:'local-custom',name:file.name.replace(/\.glb$/i,''),buffer,local:true},{timeoutMs:20000});
+  }catch(error){$('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'')}
+};
 
 function pollGamepad(){
  const p=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected);
