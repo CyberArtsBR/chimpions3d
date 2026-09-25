@@ -302,18 +302,20 @@ function spawnPattern(){
   let x=spawnCursor;
   for(let i=0;i<def.items.length;i++){
     const[family,gap]=def.items[i],type=chooseFamily(family,def.difficulty);
+    let transitionSpeed=null;
     if(i){
       const previous=created.at(-1);
-      x=previous.x+previous.w+planningSpeed(x)*safeGap(previous,type,gap,def.items.length);
+      transitionSpeed=planningSpeed(previous.x+previous.w);
+      x=previous.x+previous.w+transitionSpeed*safeGap(previous,type,gap,def.items.length);
     }
     const o=spawnObstacle(type,x);
-    o.patternId=def.id;o.riskReward=!!def.riskReward;o.tutorial=!!def.tutorial;o.tookRiskLine=false;
+    o.patternId=def.id;o.riskReward=!!def.riskReward;o.tutorial=!!def.tutorial;o.tookRiskLine=false;o.plannedSpeed=transitionSpeed||run.speed;
     created.push(o);
     if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
   const lastO=created.at(-1);
-  spawnCursor=(lastO?.x||x)+(lastO?.w||0)+planningSpeed(x)*(Math.max(1.02,def.recovery+.28)+randomValue(run)*.24);
+  spawnCursor=(lastO?.x||x)+(lastO?.w||0)+planningSpeed((lastO?.x||x)+(lastO?.w||0))*(Math.max(1.02,def.recovery+.28)+randomValue(run)*.24);
   run.lastDifficulty=def.difficulty;
   run.recentRecovery=def.recovery;
   run.recentPressure=Math.min(1,def.difficulty/5);
