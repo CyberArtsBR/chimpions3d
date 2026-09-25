@@ -53,14 +53,21 @@ export const DASH_REACTION_CONTRACT=Object.freeze({
   visibilityFloor:.42
 });
 
+const ACTION_BY_FAMILY=Object.freeze({short:'jump',high:'high-jump',wide:'high-jump',overhead:'slide',flex:'jump-or-slide'});
+
 export function dashPatternCatalog(snapshot){
   const {stage,maxPatternDifficulty}=snapshot;
   return PATTERNS.filter(p=>p.minStage<=stage&&(!p.maxStage||stage<=p.maxStage)&&p.difficulty<=maxPatternDifficulty).map(p=>{
     let weight=p.baseWeight;
+    const firstAction=ACTION_BY_FAMILY[p.items[0]?.[0]]||null;
     if(p.id==='duck-under'&&stage>=5)weight=6;
     if(p.id==='wide-leap'&&stage===1)weight=1.4;
     if(p.difficulty>=4&&snapshot.effectiveDifficulty<3.6)weight*=.35;
-    return{...p,weight};
+    if(snapshot.previousAction&&firstAction===snapshot.previousAction)weight*=1.08;
+    if(snapshot.previousAction==='slide'&&firstAction==='high-jump'&&p.difficulty>=4)weight*=.72;
+    if(snapshot.previousAction==='high-jump'&&firstAction==='slide'&&p.difficulty>=4)weight*=.76;
+    if(snapshot.visibility<.9&&p.difficulty>=4)weight*=.72;
+    return{...p,firstAction,weight};
   });
 }
 
@@ -102,16 +109,16 @@ export function chooseDashObstacle(holder,{family,difficulty,stage}){
   return list[dashRandomInt(holder,list.length)]||DASH_OBSTACLE_TYPES[0];
 }
 
-export function chooseDashPattern(holder,{time,previousDifficulty=1,recentPressure=0,recentRecovery=1,recentActionVariety=.5}={}){
-  const snapshot=dashDifficultySnapshot({time,previousDifficulty,recentPressure,recentRecovery,recentActionVariety});
+export function chooseDashPattern(holder,{time,previousDifficulty=1,previousAction=null,recentPressure=0,recentRecovery=1,recentActionVariety=.5,visibility=1}={}){
+  const snapshot=dashDifficultySnapshot({time,previousDifficulty,previousAction,recentPressure,recentRecovery,recentActionVariety,visibility});
   let options=dashPatternCatalog(snapshot);
   if(previousDifficulty>=4)options=options.filter(p=>p.difficulty<=2.5);
   const pattern=chooseDashWeighted(holder,options);
   return{pattern,snapshot};
 }
 
-export function planDashPattern(holder,{time,spawnX,currentScroll=0,playerX=DASH_PHYSICS.playerX,previousDifficulty=1}={}){
-  const {pattern,snapshot}=chooseDashPattern(holder,{time,previousDifficulty});
+export function planDashPattern(holder,{time,spawnX,currentScroll=0,playerX=DASH_PHYSICS.playerX,previousDifficulty=1,previousAction=null,visibility=1}={}){
+  const {pattern,snapshot}=chooseDashPattern(holder,{time,previousDifficulty,previousAction,visibility});
   const obstacles=[];
   let x=spawnX;
   for(let i=0;i<pattern.items.length;i++){
