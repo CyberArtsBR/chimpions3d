@@ -138,7 +138,9 @@ export async function loadCharacter(url, overrides = {}) {
       landingAnticipation:0,
       landingImpact:0,
       platformType:'',
+      platformVelocityX:0,
       springActive:false,
+      springStrength:1,
       hazardHit:false,
       hazardDirection:1,
       jetpackActive:false,
@@ -173,7 +175,9 @@ export async function loadCharacter(url, overrides = {}) {
           ? Math.max(0, Math.min(1, feel.landingImpact))
           : Math.max(0, Math.min(1, (landing - 0.84) / 0.16));
         legacyInput.platformType = feel.platformType || '';
+        legacyInput.platformVelocityX = Number.isFinite(feel.platformVelocityX) ? feel.platformVelocityX : 0;
         legacyInput.springActive = feel.springActive || false;
+        legacyInput.springStrength = Number.isFinite(feel.springStrength) ? feel.springStrength : 1;
         legacyInput.hazardHit = feel.hazardHit || false;
         legacyInput.hazardDirection = feel.hazardDirection ?? 1;
         legacyInput.jetpackActive = !!feel.jetpackActive;
@@ -182,7 +186,7 @@ export async function loadCharacter(url, overrides = {}) {
         legacyInput.dying = !!feel.dying;
         legacyInput.reducedMotion = !!feel.reducedMotion;
         legacyInput.landingQuality = feel.landingQuality || 'CLEAN';
-        legacyInput.result = feel.result || '';
+        legacyInput.result = feel.resultType || feel.result || '';
         return animator.update(dt, time, legacyInput);
       },
 
