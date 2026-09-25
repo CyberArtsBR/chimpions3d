@@ -42,7 +42,22 @@ try{
   await waitVisualReady();
 
   assert.equal(await page.evaluate(()=>typeof window.chimpJumpTest),'undefined','Public production must not expose mutable chimpJumpTest even when query parameters are user-controlled');
+  const diagnosticSafety=await page.evaluate(()=>{
+    const before=window.chimpJump();
+    const originalSeed=before.runSeed,originalHeight=before.height;
+    const hasCallableValue=Object.values(before).some(value=>typeof value==='function');
+    before.runSeed=0;before.height=999999;
+    if(Array.isArray(before.platformTypes))before.platformTypes.push('__qa_mutation_probe__');
+    const after=window.chimpJump();
+    return {
+      hasCallableValue,
+      snapshotIsolated:after.runSeed===originalSeed&&after.height===originalHeight&&!after.platformTypes.includes('__qa_mutation_probe__')
+    };
+  });
+  assert.equal(diagnosticSafety.hasCallableValue,false,'Readonly diagnostics must not expose callable mutation functions');
+  assert.equal(diagnosticSafety.snapshotIsolated,true,'Mutating a diagnostics snapshot must not mutate live game state');
   report.publicMutationApi='absent';
+  report.readonlyDiagnostics=diagnosticSafety;
 
   const menu=await snap('menu');
   assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
