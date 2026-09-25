@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import {Game,STEP} from '../src/physics.js';
+import {scoreFor} from '../src/score.js';
 
 function inputAt(seed,tick){
   const phase=(tick+seed*17)%240;
@@ -14,7 +15,7 @@ function snap(g){
   return {
     time:Number(g.time.toFixed(9)),x:Number(g.x.toFixed(9)),y:Number(g.y.toFixed(9)),
     vx:Number(g.vx.toFixed(9)),vy:Number(g.vy.toFixed(9)),height:Number(g.height.toFixed(9)),
-    bounces:g.bounces,bananas:g.bananas,dead:g.dead,jetRemaining:Number(g.jetRemaining.toFixed(9)),
+    bounces:g.bounces,bananas:g.bananas,score:scoreFor(g.height,g.bananas),dead:g.dead,jetRemaining:Number(g.jetRemaining.toFixed(9)),
     event:g.event?{type:g.event.type,endsAt:Number(g.event.endsAt?.toFixed?.(9)??g.event.endsAt)}:null,
     platforms:g.platforms.map(p=>[p.id,p.type,Number(p.x.toFixed(8)),Number(p.y.toFixed(8)),!!p.broken,!!p.coin]),
     hazards:g.hazards.map(h=>[h.id,h.type,Number(h.x.toFixed(8)),Number(h.y.toFixed(8))])
