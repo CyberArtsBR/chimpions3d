@@ -571,7 +571,11 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
 window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,quality:performanceController?.diagnostics().qualityTier||'HIGH',dpr:renderer.getPixelRatio()});
-if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput};
+if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={
+  startRun,finishRun,pause,resume,quit,setInput,
+  samplePerformance:(frameMs,now)=>performanceController.observeFrame(frameMs,'running',now),
+  diagnostics:()=>performanceController.diagnostics()
+};
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
