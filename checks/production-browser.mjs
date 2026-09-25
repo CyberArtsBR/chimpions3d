@@ -36,7 +36,7 @@ try{
     assert.equal(version.commit,expectedCommit,`Production revision drift: expected ${expectedCommit}, live ${version.commit}`);
   }
 
-  const liveUrl=base+'/?play=jump&audit='+Date.now();
+  const liveUrl=base+'/?play=jump&test=1&audit='+Date.now();
   report.liveUrl=liveUrl;
   await page.goto(liveUrl,{waitUntil:'domcontentloaded',timeout:45000});
   await waitVisualReady();
