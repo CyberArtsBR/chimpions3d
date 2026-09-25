@@ -19,6 +19,11 @@ try{
   assert((await page.evaluate(()=>window.chimpionsDash().vy))>0,'production keyboard jump must work immediately after picker');
   await page.keyboard.up('Space');
   await shot(page,'production-dash-gameplay-desktop.png');
+  if(await page.evaluate(()=>window.chimpionsDash().state)==='paused'){
+    report.largeFrameProtection='production auto-paused after a long screenshot frame';
+    await page.getByRole('button',{name:'RESUME'}).click();
+    await page.waitForFunction(()=>window.chimpionsDash().state==='running');
+  }
 
   await page.getByRole('button',{name:'Pause'}).click();
   await page.waitForFunction(()=>window.chimpionsDash().state==='paused');
