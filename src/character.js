@@ -16,6 +16,9 @@ export const CHARACTER_ANIMATION_STAGES = Object.freeze([
 const TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('test');
 let testHarnessOwner = null;
 
+// Public compatibility contract for audit tooling and later game.js integration.
+export const JUMP_ANIMATION_STAGES = Object.freeze(['TAKEOFF','ASCEND','APEX','DESCEND','LAND']);
+
 function avatarStats(model) {
   let triangles = 0;
   let skinned = 0;
