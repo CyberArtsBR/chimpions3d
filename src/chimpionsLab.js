@@ -5,12 +5,13 @@ import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump} from './dash/dashPhysics.js';
-import {dashDifficultySnapshot,dashPlanningSpeed,dashSpeedForTime,dashStageForTime} from './dash/dashDifficulty.js';
+import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
 import {hashDashSeed,nextDashRandom,chooseDashWeighted} from './dash/dashSeed.js';
 import {dashMultiplier,dashFlowDecay,rewardDashObstaclePass,rewardDashBanana,dashObstacleClearance} from './dash/dashScoring.js';
 import {DASH_EVENTS,emitDashEvent} from './dash/dashEvents.js';
 import {DASH_TUTORIAL_KEY,createDashTutorialState,advanceDashTutorial,dashTutorialPattern} from './dash/dashTutorial.js';
+import {DASH_GAMEPLAY_VERSION} from './dash/dashSimulation.js';
 const voice=new GameAudio(true);
 const DASH_ASSETS='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/';
 voice.musicSrc=DASH_ASSETS+'chimpions-army.mp3';
@@ -73,7 +74,7 @@ const {
   standingHeight:STANDING_HEIGHT,slidingHeight:SLIDING_HEIGHT,colliderWidth:COLLIDER_WIDTH,
   colliderInsetX:COLLIDER_INSET_X,colliderBottom:COLLIDER_BOTTOM
 }=DASH_PHYSICS;
-const BASE_SPEED=dashSpeedForTime(0),DASH_RULES_VERSION='dash-aaa-1';
+const BASE_SPEED=dashSpeedForTime(0),DASH_RULES_VERSION=DASH_GAMEPLAY_VERSION;
 const DEFAULT_DASH_TIP='HOLD LEFT MOUSE / ↑ TO JUMP HIGHER · RIGHT MOUSE / ↓ TO DUCK';
 const BIOMES=[
  ['THE EMERALD WILDS','#73c897','#174e3d'],['CANOPY RUN','#5bb98d','#123e34'],
@@ -187,7 +188,7 @@ function dashMeta(extra={}){
   return{
     seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,
     runTime:run?.time||0,stage:run?.stage||1,speed:run?.speed||BASE_SPEED,
-    flow:run?.flow||0,multiplier:multiplier(run?.flow||0),...extra
+    flow:run?.flow||0,multiplier:multiplier(run?.flow||0),normalizedSpeed:dashNormalizedSpeed(run?.time||0),...extra
   };
 }
 function emitFlowTransition(before,reason){
@@ -276,9 +277,12 @@ function lowTrail(start,end,count=5){
   for(let i=0;i<count;i++)spawnBanana(start+(i+.5)*(end-start)/count,23,false);
 }
 function patternCatalog(){
+  const viewportWidth=metrics().vw;
+  const visibility=dashVisibilityForViewport({time:run.time,speed:run.speed,viewportWidth,playerX:PLAYER_X});
   return dashPatternCatalog(dashDifficultySnapshot({
-    time:run.time,previousDifficulty:run.lastDifficulty,recentPressure:run.recentPressure,
-    recentRecovery:run.recentRecovery,recentActionVariety:run.recentActionVariety
+    time:run.time,previousDifficulty:run.lastDifficulty,previousAction:run.recentActions.at(-1)||null,
+    recentPressure:run.recentPressure,recentRecovery:run.recentRecovery,
+    recentActionVariety:run.recentActionVariety,visibility
   }));
 }
 function chooseWeighted(list){return chooseDashWeighted(run,list);}
@@ -311,7 +315,10 @@ function spawnPattern(){
     const o=spawnObstacle(type,x);
     o.patternId=def.id;o.riskReward=!!def.riskReward;o.tutorial=!!def.tutorial;o.tookRiskLine=false;o.plannedSpeed=transitionSpeed||run.speed;
     created.push(o);
-    if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
+    if(type.family==='flex'){
+      lowTrail(x-38,x+type.w+28,3);
+      bananaArc(x-48,x+type.w+42,112,6,.18);
+    }else if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
   const lastO=created.at(-1);
@@ -535,7 +542,7 @@ function renderUI(dt){
 
   if(character){
     const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
-    character.update(dt,{state:animState,speed:active.speed/265,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
+    character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
     character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
     const jumpWorld=active.y*WORLD_UNIT;
     character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
@@ -626,7 +633,7 @@ window.chimpionsDash=()=>({
   state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,
   seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,
   sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,
-  speed:run?.speed||BASE_SPEED,flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,
+  speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,
   bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,
   nearMisses:run?.nearMisses||0,tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null
 });
