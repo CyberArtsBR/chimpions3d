@@ -4,6 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
+import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
 const voice=new GameAudio(true);
 const DASH_ASSETS='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/';
 voice.musicSrc=DASH_ASSETS+'chimpions-army.mp3';
@@ -53,20 +54,18 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.05;
 $('lab-3d').append(renderer.domElement);
 
-scene.add(new THREE.HemisphereLight(0xe9f6df,0x24372b,2.35));
+const hemi=new THREE.HemisphereLight(0xe9f6df,0x24372b,2.35);scene.add(hemi);
 const key=new THREE.DirectionalLight(0xffe5aa,3.2);
 key.position.set(-4,8,7);key.castShadow=true;key.shadow.mapSize.set(1024,1024);
 key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=6;key.shadow.camera.bottom=-3;
 key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
+const dashGraphics=createDashWorldRenderer({scene,camera,renderer,hemisphere:hemi,keyLight:key,rimLight:rim,pixelsToWorld:1/40});
+const GPU_WORLD=true;
 
 const STEP=1/120,PLAYER_X=150,BASE_SPEED=397.5,GRAVITY=2200,JUMP_IMPULSE=600,LOW_HEIGHT=70,HOLD_TIME=.22,JUMP_BUFFER=.16,COYOTE_TIME=.10;
-const BIOMES=[
- ['THE EMERALD WILDS','#73c897','#174e3d'],['CANOPY RUN','#5bb98d','#123e34'],
- ['WATERFALL GORGE','#83cbd3','#24556a'],['LOST TEMPLE','#d6b978','#4c553c'],
- ['MOONLIT JUNGLE','#797ac7','#161f4e'],['STORM FOREST','#708799','#172b37'],
- ['VOLCANIC WILDS','#e98a58','#49262d'],['CHIMPION DREAMSCAPE','#d78bd0','#293066']
-];
+const hexColor=value=>'#'+Number(value).toString(16).padStart(6,'0');
+const BIOMES=DASH_BIOMES.map(({name,skyTop,skyBottom})=>[name,hexColor(skyTop),hexColor(skyBottom)]);
 const TYPES=[
  {id:'log',name:'fallen log',family:'short',action:'jump',w:64,h:38,boxes:[[9,0,46,28]],minStage:1,difficulty:1,recovery:.58},
  {id:'mushroom',name:'mushrooms',family:'short',action:'jump',w:58,h:38,boxes:[[11,0,36,27]],minStage:1,difficulty:1,recovery:.58},
@@ -122,19 +121,20 @@ const WORLD_UNIT=1/40,AVATAR_HEIGHT=84;
 let viewH=12.5,viewW=12.5,runnerWorldX=-3,groundWorldY=-4;
 function resize3D(){
   const w=innerWidth,h=innerHeight,m=metrics();
-  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.2:1.6));
+  renderer.setSize(w,h);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?Math.min(1.2,dashGraphics.pixelRatioCap):dashGraphics.pixelRatioCap));
   viewW=m.vw*WORLD_UNIT;viewH=h/m.scale*WORLD_UNIT;camera.left=-viewW/2;camera.right=viewW/2;camera.top=viewH/2;camera.bottom=-viewH/2;camera.updateProjectionMatrix();
   camera.position.set(0,0,12);camera.lookAt(0,0,0);
   runnerWorldX=-viewW/2+viewW*(PLAYER_X/m.vw);
   groundWorldY=viewH/2-viewH*(m.groundScreen/h);
+  dashGraphics.resize({viewW,viewH,groundY:groundWorldY});
 }
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
+if(!GPU_WORLD)for(const id of [...new Set(TYPES.map(t=>t.id==='log-pile'?'log':t.id)),'banana','golden']){
   trimmedSprite(id);
 }
-for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
+if(!GPU_WORLD)for(const src of [DASH_ASSETS+'jungle-v2.webp',DASH_ASSETS+'ground-green.png']){const im=new Image();im.decoding='async';im.src=src;}
 
 let catalog=[],character=null,loading=false,currentEntry=null;
 async function loadAvatar(entry){
@@ -208,6 +208,7 @@ function sweptContact(a0,a1,b){
  return enter<exit?enter:Infinity;
 }
 function acquire(kind,id,w,h){
+  if(GPU_WORLD)return null;
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
   const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
@@ -322,7 +323,7 @@ function maintainWorld(){
   }
 }
 function renderObjects(){
-  if(!run)return;
+  if(GPU_WORLD||!run)return;
   const m=metrics();
   for(const o of obstacles){
     const x=(o.x-run.scroll)*m.scale;
@@ -343,7 +344,7 @@ function jump(held=true){
   if(!run||state!=='running'||run.dead)return;
   if(run.y===0||run.coyote>0){
     run.slideHeld=false;run.slideTime=0;run.slideMin=0;run.slideBlocked=false;
-    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');return;
+    run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');dashGraphics.emit('takeoff',{x:runnerWorldX,y:groundWorldY+.08});return;
   }
   run.jumpBuffer=JUMP_BUFFER;run.jumpBufferHeld=held;
 }
@@ -359,7 +360,7 @@ function releaseJump(){
 function slide(on){
   if(!run||state!=='running'||run.dead)return;
   run.slideHeld=on;
-  if(on&&!run.slideTime&&run.y===0)voice.play('slide');
+  if(on&&!run.slideTime&&run.y===0){voice.play('slide');dashGraphics.emit('slide',{x:runnerWorldX-.3,y:groundWorldY+.08});}
   if(on&&run.y===0){run.slideMin=Math.max(run.slideMin,.24);run.slideTime=Math.max(run.slideTime,.24);}
 }
 function movePlayer(dt){
@@ -373,7 +374,7 @@ function movePlayer(dt){
   const gravity=run.jumpHeld&&run.jumpAge<HOLD_TIME&&run.vy>0?GRAVITY*.35:(run.vy<0?GRAVITY*1.14:GRAVITY);
   run.jumpAge+=dt;run.y+=run.vy*dt-gravity*dt*dt/2;run.vy-=gravity*dt;
   if(run.y<=0){
-    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');
+    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');dashGraphics.emit('land',{x:runnerWorldX,y:groundWorldY+.06});
     if(run.jumpBuffer>0)jump(run.jumpBufferHeld);
   }else run.grounded=false;
 }
@@ -384,13 +385,13 @@ function setState(next){
 function startRun(){
   if(!character||loading)return;
   clearInputs();voice.stopMusic();voice.startMusic();voice.play('click');
-  clearWorld();run=makeRun();seedWorld();setState('running');accumulator=0;
+  clearWorld();dashGraphics.reset();run=makeRun();seedWorld();setState('running');accumulator=0;
   $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;$('dash-tip').classList.add('show');
   setTimeout(()=>$('dash-tip')?.classList.remove('show'),4200);last=performance.now();
 }
 function finishRun(){
   if(!run||run.dead)return;
-  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.play(run.score>best?'record':'dead');best=Math.max(best,Math.floor(run.score));try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
+  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();const isRecord=run.score>best;voice.play(isRecord?'record':'dead');dashGraphics.emit(isRecord?'record':'death',{x:runnerWorldX,y:groundWorldY+.8,intensity:isRecord?1:.8});best=Math.max(best,Math.floor(run.score));try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
   hudText('dash-best',String(best).padStart(6,'0'));
   $('dash-result').textContent=`${Math.floor(run.score)} points · ${(run.distance/1000).toFixed(2)} km · ${run.bananaCount} bananas · stage ${run.stage}`;
   setState('over');
@@ -403,7 +404,7 @@ function updatePhysics(dt){
   if(state!=='running'||!run||run.dead)return;
   run.time+=dt;
   const stage=Math.floor((run.time+1e-7)/30)+1;
-  if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');}
+  if(stage!==run.stage){run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');dashGraphics.emit('stage',{x:0,y:groundWorldY+viewH*.3,intensity:.9});}
   run.speed=speedFor(run.stage);
   const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
   previousBox.x+=oldScroll;
@@ -436,7 +437,7 @@ function updatePhysics(dt){
     if(sweptContact(previousBox,p,pickup)!==Infinity){
       b.collected=true;voice.play(b.golden?'golden':'banana');run.bananaCount++;run.goldenBananas+=b.golden?1:0;
       run.flow=Math.min(100,run.flow+(b.golden?30:3));run.maxFlow=Math.max(run.maxFlow,run.flow);
-      run.bonus+=Math.round((b.golden?500:25)*multiplier(run.flow));b.el.classList.add('collected');
+      run.bonus+=Math.round((b.golden?500:25)*multiplier(run.flow));b.el?.classList.add('collected');dashGraphics.emit(b.golden?'goldenBanana':'banana',{x:runnerWorldX,y:groundWorldY+b.y*WORLD_UNIT,intensity:b.golden?1:.7});
     }
   }
   run.score=Math.floor(run.distance*10)+run.bonus;
@@ -462,8 +463,10 @@ function renderUI(dt){
   hudText('dash-stage-label',String(active.stage).padStart(2,'0')+' / '+biome[0]);
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
+  const graphicsSliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked);
+  dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
   if(character){
-    const jumping=!active.grounded,sliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked),animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
+    const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
     character.update(dt,{state:animState,speed:active.speed/265,jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
     character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
     const jumpWorld=active.y*WORLD_UNIT;
@@ -471,7 +474,7 @@ function renderUI(dt){
   }
   active.landed=false;
   const shadow=$('dash-shadow');
-  if(shadow){
+  if(shadow&&!GPU_WORLD){
     const jump=active.y*m.scale;
     shadow.style.left=Math.round(PLAYER_X*m.scale)+'px';
     shadow.style.width=Math.round(104*m.scale)+'px';
@@ -564,11 +567,11 @@ renderer.setAnimationLoop(now=>{
     let steps=0;
     while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
   }else accumulator=0;
-  renderUI(frameDt);renderer.render(scene,camera);
+  renderUI(frameDt);dashGraphics.render();
 });
 
 window.chimpionsLab=()=>({
   state,ready:!!character,selected:currentEntry?.id,score:Math.floor(run?.score||0),
   distance:run?.distance||0,stage:run?.stage||1,bananas:run?.bananaCount||0,best,
-  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,pool:{hazards:pools.hazard.length,bananas:pools.banana.length}
+  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats()
 });
