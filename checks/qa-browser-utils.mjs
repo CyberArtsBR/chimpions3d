@@ -15,7 +15,11 @@ export const VIEWPORTS=[
 export async function launchBrowser(name=process.env.CHIMP_BROWSER||'chromium'){
   const engines={chromium,firefox,webkit};
   assert(engines[name],`Unsupported browser: ${name}`);
-  const options=name==='chromium'?{args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}:{};
+  const options=name==='chromium'
+    ?{args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}
+    :name==='firefox'
+      ?{firefoxUserPrefs:{'webgl.force-enabled':true,'webgl.disabled':false}}
+      :{};
   return {name,browser:await engines[name].launch(options)};
 }
 
