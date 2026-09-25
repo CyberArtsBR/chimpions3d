@@ -49,6 +49,11 @@ jobs:
           node checks/dash-browser.mjs
           node checks/dash-mobile-browser.mjs
           node checks/dash-resources.mjs
+      - name: Audit current Dash production
+        continue-on-error: true
+        env:
+          CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+        run: node checks/dash-production-browser.mjs
       - name: Inspect source GLB
         run: |
           node --input-type=module <<'NODE'
