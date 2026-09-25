@@ -78,6 +78,16 @@ try{
   assert.equal(focusedLabel,fifthLabel,'Gamepad down must move one four-column desktop row');
   await page.locator('#confirm-chimpion').click();
   await page.waitForFunction(()=>window.chimpJump().mode==='starting');
+  const committedSeed=await page.evaluate(()=>window.chimpJump().runSeed);
+  await page.evaluate(()=>{const play=document.getElementById('play');play.click();play.click();play.click();});
+  await page.keyboard.press('Enter');
+  await page.evaluate(()=>{window.__chimpTestPad.buttons[0].pressed=true;});
+  await page.waitForTimeout(50);
+  await page.evaluate(()=>{window.__chimpTestPad.buttons[0].pressed=false;});
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'starting','Repeated Play/Enter/controller confirm must not create a second run');
+  assert.equal(await page.evaluate(()=>window.chimpJump().runSeed),committedSeed,'Rapid duplicate start activation must never replace the committed seed');
+  assert.equal(await page.evaluate(()=>window.chimpJump().time),0,'Duplicate start activation must not leak physics into the countdown');
   await page.evaluate(()=>window.chimpJumpTest.render());
   const countdownState=await page.evaluate(()=>window.chimpJump());
   assert.equal(countdownState.countdown,3,'Fresh run must open with a 3-to-0 countdown');
@@ -157,6 +167,23 @@ try{
   assert.equal(await page.evaluate(()=>window.chimpJump().time),pausedAt,'Pause must freeze game time');
   await screenshot('game-pause-desktop.png');
   await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForTimeout(1250);
+  await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused');
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Window blur must safely pause an active run');
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.waitForTimeout(1250);
+  await page.evaluate(()=>{
+    Object.defineProperty(document,'hidden',{configurable:true,value:true});
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused');
+  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','visibilitychange must safely pause a hidden active run');
+  await page.evaluate(()=>{delete document.hidden;});
+  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   // Long-session desktop pacing check using a deterministic safe bounce fixture.
   await page.evaluate(()=>{
