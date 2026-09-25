@@ -43,6 +43,16 @@ try{
   }
   report.assetFailures.glb='previous avatar preserved';
 
+  await page.unroute('**/*.glb');
+  await page.route('**/jungle-v2.webp',r=>r.abort('failed'));
+  await page.route('**/ground-green.png',r=>r.abort('failed'));
+  await page.route('**/chimpions-army.mp3',r=>r.abort('failed'));
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.chimpionsDash?.().ready,{timeout:90000});
+  await page.waitForFunction(()=>document.querySelector('.dash-start-hotspot'),{timeout:30000});
+  assert(await page.getByRole('button',{name:'Start Game'}).isVisible(),'background/audio failure must not block start');
+  report.assetFailures.backgroundAudio='Dash remained bootable with authored background/ground/music requests blocked';
+
   assert.deepEqual(pageErrors,[]);
   writeReport('dash-resources-report.json',report);
   console.log('PASS dash soak/resources: 40 lifecycle cycles, bounded DOM/scene/renderer pools, asset fallback');
