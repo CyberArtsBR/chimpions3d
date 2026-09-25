@@ -86,3 +86,164 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
     right:12px!important;bottom:max(66px,calc(env(safe-area-inset-bottom) + 56px))!important;
   }
 }
+
+
+/* Dash AAA presentation: artwork is decorative; interaction is real viewport UI. */
+body[data-lab-state="menu"].dash-start-screen #dash-stage:before{
+  background:#06110a url('/screens/chimp-dash-start-853ee5d1.png') center/cover no-repeat!important;
+}
+body[data-lab-state="menu"].dash-start-screen #dash-menu>.dash-entry-actions{
+  display:flex!important;
+  position:fixed!important;
+  z-index:95!important;
+  left:50%!important;
+  right:auto!important;
+  top:auto!important;
+  bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px))!important;
+  transform:translateX(-50%)!important;
+  width:min(720px,calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 32px))!important;
+  height:auto!important;
+  padding:14px!important;
+  margin:0!important;
+  gap:12px!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border:1px solid rgba(239,230,150,.32)!important;
+  border-radius:22px!important;
+  background:linear-gradient(180deg,rgba(7,28,23,.9),rgba(3,18,15,.96))!important;
+  box-shadow:0 16px 48px rgba(0,0,0,.52),inset 0 1px rgba(255,255,255,.08)!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+  pointer-events:auto!important;
+}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button{
+  position:static!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-width:min(260px,42vw)!important;
+  min-height:58px!important;
+  padding:12px 24px!important;
+  margin:0!important;
+  border:2px solid #e5ca68!important;
+  border-radius:15px!important;
+  opacity:1!important;
+  color:#10231b!important;
+  font:950 clamp(15px,1.4vw,21px)/1 ui-rounded,'Trebuchet MS',system-ui,sans-serif!important;
+  letter-spacing:.08em!important;
+  text-shadow:none!important;
+  cursor:pointer!important;
+  pointer-events:auto!important;
+  transform:none!important;
+  outline-offset:4px!important;
+}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>.dash-entry-start{
+  background:linear-gradient(180deg,#fff3a3,#e3c64d)!important;
+  box-shadow:inset 0 2px rgba(255,255,255,.65),0 5px 0 #886f22,0 11px 28px rgba(0,0,0,.34)!important;
+}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>.games-back{
+  background:linear-gradient(180deg,#315a43,#193c2d)!important;
+  border-color:#9fc384!important;
+  color:#f8f3cc!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.12),0 5px 0 #0b241a,0 11px 28px rgba(0,0,0,.34)!important;
+}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button:hover{filter:brightness(1.08)!important}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button:active{transform:translateY(3px)!important}
+body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button:focus-visible{
+  outline:4px solid #fff!important;
+  box-shadow:0 0 0 7px #183e30,0 10px 30px rgba(0,0,0,.48)!important;
+}
+body[data-lab-state="menu"].dash-start-screen .original-dash-start{display:none!important}
+
+/* Character picker: compact, keyboard/gamepad friendly and safe-area aware. */
+#dash-character-picker{
+  width:min(980px,calc(100vw - 32px))!important;
+  max-width:none!important;
+  max-height:min(860px,calc(100dvh - 24px))!important;
+  padding:0!important;
+  overflow:hidden!important;
+  border:1px solid rgba(214,232,178,.46)!important;
+  border-radius:24px!important;
+  color:#f8f5d8!important;
+  background:#0a241d!important;
+  box-shadow:0 26px 100px rgba(0,0,0,.72)!important;
+}
+#dash-character-picker::backdrop{background:rgba(2,13,10,.78)!important;backdrop-filter:blur(8px)!important}
+#dash-character-picker .picker-shell{
+  display:grid;grid-template-rows:auto auto auto minmax(160px,1fr) auto;gap:14px;
+  max-height:min(860px,calc(100dvh - 24px));
+  padding:clamp(14px,2.2vw,24px);
+  padding-top:max(clamp(14px,2.2vw,24px),env(safe-area-inset-top));
+  padding-right:max(clamp(14px,2.2vw,24px),env(safe-area-inset-right));
+  padding-bottom:max(clamp(14px,2.2vw,24px),env(safe-area-inset-bottom));
+  padding-left:max(clamp(14px,2.2vw,24px),env(safe-area-inset-left));
+}
+#dash-character-picker header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+#dash-character-picker .picker-kicker{display:block;color:#9cc9a8;font:800 10px/1.2 ui-monospace,monospace;letter-spacing:.18em}
+#dash-character-picker h2{margin:5px 0 0;font:950 clamp(23px,3vw,34px)/1 ui-rounded,'Trebuchet MS',system-ui,sans-serif}
+#dash-character-picker .picker-close{flex:0 0 46px;width:46px;height:46px;border:1px solid #a8c49a66;border-radius:13px;background:#14362c;color:#fff5cf;font-size:29px}
+#dash-character-picker button:focus-visible,#dash-character-picker input:focus-visible{outline:3px solid #ffe67a!important;outline-offset:3px!important}
+#dash-character-picker .picker-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:10px;align-items:end}
+#dash-character-picker .picker-search-wrap{color:#a6c4ad;font:800 10px/1.2 ui-monospace,monospace;letter-spacing:.12em}
+#dash-character-picker .picker-search{display:block;width:100%;margin-top:6px;padding:12px 14px;border:1px solid #71947a88;border-radius:11px;background:#061a15;color:#fff8da;font:inherit}
+#dash-character-picker .picker-toolbar button,#dash-character-picker footer button{
+  min-height:44px;padding:10px 14px;border:1px solid #7ca18488;border-radius:11px;background:#173e31;color:#f8f5d4;font-weight:900
+}
+#dash-character-picker .picker-current{
+  display:grid;grid-template-columns:90px minmax(0,1fr);gap:14px;align-items:center;
+  min-height:96px;padding:10px 14px;border:1px solid rgba(154,193,153,.25);border-radius:14px;background:#0d3026
+}
+#dash-character-picker .picker-preview-frame{width:78px;height:78px;display:grid;place-items:center;border-radius:12px;background:#061a14}
+#dash-character-picker .picker-current img{max-width:74px;max-height:74px;object-fit:contain}
+#dash-character-picker .picker-current small{display:block;color:#93bba0;font:800 9px/1.2 ui-monospace,monospace;letter-spacing:.13em}
+#dash-character-picker .picker-current strong{display:block;margin-top:3px;font-size:18px;color:#fff1a1}
+#dash-character-picker .picker-current p{margin:4px 0 0;color:#b8d1bd;font-size:12px}
+#dash-character-picker .picker-grid{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;overflow:auto;min-height:0;max-height:none;padding:4px
+}
+#dash-character-picker .picker-option{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  min-height:128px;padding:8px;border:1px solid #6e9a7a66;border-radius:13px;background:#12362b;color:#f4f4d4
+}
+#dash-character-picker .picker-option:hover{background:#194837}
+#dash-character-picker .picker-option[aria-pressed="true"]{border-color:#ffe277;background:#2f4e31;box-shadow:0 0 0 2px #ffe27733}
+#dash-character-picker .picker-option[aria-pressed="true"]::after{content:"SELECTED";position:absolute;right:7px;top:7px;padding:3px 5px;border-radius:6px;background:#ffe277;color:#183024;font:900 8px ui-monospace,monospace}
+#dash-character-picker .picker-option img{width:100%;height:84px;object-fit:contain}
+#dash-character-picker .picker-option strong{font-size:11px;text-align:center;overflow-wrap:anywhere}
+#dash-character-picker .picker-empty{grid-column:1/-1;text-align:center;color:#bdd0be;padding:34px 12px}
+#dash-character-picker footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#dash-character-picker .picker-pages{display:flex;align-items:center;gap:8px}
+#dash-character-picker .picker-page{min-width:58px;text-align:center;font:800 11px ui-monospace,monospace;color:#cbdcc7}
+#dash-character-picker .picker-play{min-width:210px!important;background:linear-gradient(#fff09b,#dfc44e)!important;border-color:#fff1a8!important;color:#173023!important;box-shadow:0 4px 0 #8f7627!important}
+#dash-character-picker button:disabled{opacity:.42;cursor:not-allowed}
+#dash-character-picker[aria-busy] .picker-grid{opacity:.72}
+
+@media(max-width:760px){
+  body[data-lab-state="menu"].dash-start-screen #dash-menu>.dash-entry-actions{
+    width:calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 20px)!important;
+    padding:10px!important;gap:9px!important;border-radius:17px!important
+  }
+  body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button{
+    min-width:0!important;flex:1 1 0!important;min-height:52px!important;padding:10px 12px!important;font-size:13px!important
+  }
+  #dash-character-picker{width:calc(100vw - 12px)!important;max-height:calc(100dvh - 12px)!important;border-radius:18px!important}
+  #dash-character-picker .picker-shell{gap:10px;max-height:calc(100dvh - 12px);padding:12px}
+  #dash-character-picker .picker-toolbar{grid-template-columns:1fr 1fr}
+  #dash-character-picker .picker-search-wrap{grid-column:1/-1}
+  #dash-character-picker .picker-current{grid-template-columns:66px 1fr;min-height:74px}
+  #dash-character-picker .picker-preview-frame{width:58px;height:58px}
+  #dash-character-picker .picker-current img{max-width:56px;max-height:56px}
+  #dash-character-picker .picker-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #dash-character-picker .picker-option{min-height:108px}
+  #dash-character-picker .picker-option img{height:68px}
+  #dash-character-picker footer{align-items:stretch;flex-direction:column}
+  #dash-character-picker .picker-pages{justify-content:center}
+  #dash-character-picker .picker-play{width:100%;min-width:0!important}
+}
+@media(max-height:520px) and (orientation:landscape){
+  body[data-lab-state="menu"].dash-start-screen #dash-menu>.dash-entry-actions{bottom:max(8px,env(safe-area-inset-bottom))!important;padding:7px!important}
+  body[data-lab-state="menu"].dash-start-screen .dash-entry-actions>button{min-height:44px!important}
+  #dash-character-picker .picker-shell{grid-template-rows:auto auto minmax(120px,1fr) auto}
+  #dash-character-picker .picker-current{display:none}
+  #dash-character-picker .picker-grid{grid-template-columns:repeat(5,minmax(110px,1fr))}
+}
