@@ -48,6 +48,7 @@ try{
     assert(pauseBox&&pauseBox.y>=-1&&pauseBox.y+pauseBox.height<=viewport.height+1,viewport.name+': pause UI exceeds viewport');
     item.errors=diag.errors;item.consoleErrors=diag.consoleErrors;item.sameOriginFailures=diag.sameOriginFailures;
     assert.deepEqual(diag.errors,[],viewport.name+': page errors');
+    assert.deepEqual(diag.consoleErrors,[],viewport.name+': console errors');
     assert.deepEqual(diag.sameOriginFailures,[],viewport.name+': same-origin failures');
     report.viewports.push(item);
     await page.close();
