@@ -200,6 +200,11 @@ function emitFlowTransition(before,reason){
 function handleTutorialEvent(type){
   if(!run?.tutorial?.enabled||run.tutorial.complete)return;
   const result=advanceDashTutorial(run.tutorial,{type});
+  if(result.retry){
+    run.tutorialPatternActive=false;
+    emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'retry',event:type,step:run.tutorial.index}));
+    return;
+  }
   if(!result.advanced)return;
   run.tutorialPatternActive=false;
   emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:result.complete?'complete':'advance',event:type,step:run.tutorial.index}));
