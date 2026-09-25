@@ -241,6 +241,7 @@ body.dash-reduced-motion #dash-feedback,
 body.dash-reduced-motion #dash-stage-flash,
 body.dash-reduced-motion #dash-tip,
 body.dash-reduced-motion .banana.collected{transition:none!important}
+body.dash-reduced-motion #dash-stage-flash{display:none!important}
 body.dash-reduced-motion #dash-far,
 body.dash-reduced-motion #dash-mid{background-position:center!important}
 
