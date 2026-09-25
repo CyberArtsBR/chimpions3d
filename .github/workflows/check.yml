@@ -61,6 +61,12 @@ jobs:
           node --check checks/cross-browser-smoke.mjs
           node --check checks/long-session-rendered.mjs
           node --check checks/production-browser.mjs
+          node --check checks/dash-production-browser.mjs
+          node --check checks/dash-physics.mjs
+          node --check checks/dash-patterns.mjs
+          node --check checks/dash-browser.mjs
+          node --check checks/dash-mobile-browser.mjs
+          node --check checks/dash-resources.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -103,6 +109,11 @@ jobs:
           done
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:standard
+          node checks/dash-physics.mjs
+          node checks/dash-patterns.mjs
+          node checks/dash-browser.mjs
+          node checks/dash-mobile-browser.mjs
+          node checks/dash-resources.mjs
       - name: Build network-failure QA bundle
         if: ${{ always() && !cancelled() }}
         run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
@@ -121,6 +132,12 @@ jobs:
           done
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:network
+      - name: Audit current Dash production
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        env:
+          CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
+        run: node checks/dash-production-browser.mjs
       - name: Generate acceptance matrix
         if: ${{ always() && !cancelled() }}
         run: node checks/acceptance-matrix.mjs
