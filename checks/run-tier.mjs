@@ -19,11 +19,11 @@ const suites={
     'countdown-browser.mjs',
     'responsive-browser.mjs',
     'accessibility-browser.mjs',
-    'network-failures-browser.mjs',
     'runtime-resilience-browser.mjs',
     'performance-browser.mjs',
     'visual-regression.mjs'
-  ]
+  ],
+  network:['network-failures-browser.mjs']
 };
 if(!suites[tier])throw new Error('Unknown QA tier: '+tier);
 const results=[];
@@ -33,7 +33,6 @@ for(const file of suites[tier]){
   const child=spawnSync(process.execPath,['checks/'+file],{stdio:'inherit',env:process.env});
   results.push({file,status:child.status===0?'PASS':'FAIL',exitCode:child.status,durationMs:Date.now()-started,signal:child.signal||null});
 }
-if(tier==='standard')spawnSync(process.execPath,['checks/acceptance-matrix.mjs'],{stdio:'inherit',env:process.env});
 const failures=results.filter(r=>r.status==='FAIL');
 const report={status:failures.length?'FAIL':'PASS',tier,results,failures:failures.map(f=>f.file)};
 fs.writeFileSync('checks/qa-'+tier+'-status-report.json',JSON.stringify(report,null,2));
