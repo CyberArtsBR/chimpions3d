@@ -19,15 +19,23 @@ try{
   assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'start must release hidden button focus');await shot(page,'dash-gameplay-desktop.png');
 
   for(const code of ['Space','KeyW','ArrowUp']){await page.keyboard.down(code);await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0,code+' must jump');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('key-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
-  for(const code of ['ArrowDown','KeyS','ShiftLeft']){await page.keyboard.down(code);await page.waitForTimeout(30);assert(await page.evaluate(()=>window.chimpionsDash().sliding),code+' must slide');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('slide-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
+  for(const code of ['ArrowDown','KeyS','ShiftLeft','ShiftRight']){await page.keyboard.down(code);await page.waitForTimeout(30);assert(await page.evaluate(()=>window.chimpionsDash().sliding),code+' must slide');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('slide-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
   report.inputs.keyboard='pass';
 
-  await page.mouse.move(500,500);await page.mouse.down({button:'left'});await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await page.mouse.up({button:'left'});
-  await page.evaluate(()=>window.chimpionsDashTest.reset('mouse-slide',0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());await page.mouse.down({button:'right'});await page.waitForTimeout(30);assert(await page.evaluate(()=>window.chimpionsDash().sliding));await page.mouse.up({button:'right'});report.inputs.mouse='pass';
+  await page.mouse.move(500,500);await page.mouse.down({button:'left'});await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await shot(page,'dash-jump-desktop.png');await page.mouse.up({button:'left'});
+  await page.evaluate(()=>window.chimpionsDashTest.reset('mouse-slide',0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());await page.mouse.down({button:'right'});await page.waitForTimeout(30);assert(await page.evaluate(()=>window.chimpionsDash().sliding));await shot(page,'dash-slide-desktop.png');await page.mouse.up({button:'right'});report.inputs.mouse='pass';
 
-  await page.evaluate(()=>window.chimpionsDashTest.reset('pad',0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
-  await page.evaluate(()=>window.__dashTestPad.buttons[0].pressed=true);await page.waitForTimeout(50);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await page.evaluate(()=>window.__dashTestPad.buttons[0].pressed=false);
-  await page.evaluate(()=>window.chimpionsDashTest.reset('pad-slide',0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());await page.evaluate(()=>window.__dashTestPad.axes[1]=.9);await page.waitForTimeout(50);assert(await page.evaluate(()=>window.chimpionsDash().sliding));await page.evaluate(()=>window.__dashTestPad.axes[1]=0);report.inputs.gamepad='pass';
+  const resetPad=async seed=>{await page.evaluate(s=>window.chimpionsDashTest.reset(s,0),seed);await page.evaluate(()=>window.chimpionsDashTest.clearWorld());};
+  const pulseButton=async(index,expect)=>{await page.evaluate(i=>window.__dashTestPad.buttons[i].pressed=true,index);await page.waitForTimeout(55);assert(await page.evaluate(expect),`gamepad button ${index}`);await page.evaluate(i=>window.__dashTestPad.buttons[i].pressed=false,index);await page.waitForTimeout(35);};
+  await resetPad('pad-a');await pulseButton(0,()=>window.chimpionsDash().vy>0);
+  await resetPad('pad-b');await pulseButton(1,()=>window.chimpionsDash().sliding);
+  await resetPad('pad-dpad-up');await pulseButton(12,()=>window.chimpionsDash().vy>0);
+  await resetPad('pad-dpad-down');await pulseButton(13,()=>window.chimpionsDash().sliding);
+  await resetPad('pad-axis-up');await page.evaluate(()=>window.__dashTestPad.axes[1]=-.9);await page.waitForTimeout(55);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0);await page.evaluate(()=>window.__dashTestPad.axes[1]=0);await page.waitForTimeout(35);
+  await resetPad('pad-axis-down');await page.evaluate(()=>window.__dashTestPad.axes[1]=.9);await page.waitForTimeout(55);assert(await page.evaluate(()=>window.chimpionsDash().sliding));await page.evaluate(()=>window.__dashTestPad.axes[1]=0);await page.waitForTimeout(35);
+  await resetPad('pad-start');await page.evaluate(()=>window.__dashTestPad.buttons[9].pressed=true);await page.waitForTimeout(55);await page.evaluate(()=>window.__dashTestPad.buttons[9].pressed=false);await page.waitForTimeout(35);assert.equal(await page.evaluate(()=>window.chimpionsDash().state),'paused','Start must pause');
+  await page.evaluate(()=>window.__dashTestPad.buttons[9].pressed=true);await page.waitForTimeout(55);await page.evaluate(()=>window.__dashTestPad.buttons[9].pressed=false);await page.waitForTimeout(35);assert.equal(await page.evaluate(()=>window.chimpionsDash().state),'running','Start must resume');
+  report.inputs.gamepad='A/B/D-pad/analog/Start pass';
 
   await page.keyboard.press('KeyP');await page.waitForFunction(()=>window.chimpionsDash().state==='paused');await shot(page,'dash-pause-desktop.png');await page.getByRole('button',{name:'RESUME'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'resume must release button focus');
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForFunction(()=>window.chimpionsDash().state==='paused');await page.getByRole('button',{name:'RESUME'}).click();
