@@ -3,24 +3,63 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      run_extended:
+        description: Run Firefox/WebKit extended suites
+        required: false
+        type: boolean
+        default: true
+      run_soak:
+        description: Run the real-rendered five-minute soak
+        required: false
+        type: boolean
+        default: false
+      production_url:
+        description: Optional deployed URL for the public production audit
+        required: false
+        type: string
+        default: https://chimp-jump.onrender.com
+      expected_commit:
+        description: Optional deployed commit SHA expected from version.json
+        required: false
+        type: string
+        default: ''
 permissions:
   contents: read
+concurrency:
+  group: chimp-jump-qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
+  fast:
+    name: FAST · build, source, deterministic gameplay, assets
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: node checks/physics.mjs
-      - run: node checks/assets.mjs
-      - run: node checks/jump-audit.mjs
-      - name: Check production audit syntax
+      - name: Build production bundle
+        run: npm run build
+      - name: Run fast deterministic gates
+        run: npm run qa:fast
+      - name: Syntax-check browser and production suites
         run: |
+          node --check checks/game-browser.mjs
+          node --check checks/collection-browser.mjs
+          node --check checks/countdown-browser.mjs
+          node --check checks/responsive-browser.mjs
+          node --check checks/accessibility-browser.mjs
+          node --check checks/network-failures-browser.mjs
+          node --check checks/runtime-resilience-browser.mjs
+          node --check checks/performance-browser.mjs
+          node --check checks/visual-regression.mjs
+          node --check checks/cross-browser-smoke.mjs
+          node --check checks/long-session-rendered.mjs
           node --check checks/production-browser.mjs
           node --check checks/dash-production-browser.mjs
           node --check checks/dash-physics.mjs
@@ -28,44 +67,200 @@ jobs:
           node --check checks/dash-browser.mjs
           node --check checks/dash-mobile-browser.mjs
           node --check checks/dash-resources.mjs
-      - name: Install desktop browser test runtime
-        run: |
-          npx playwright install --with-deps chromium
-      - name: Run desktop browser audit
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-fast-reports
+          if-no-files-found: ignore
+          path: |
+            checks/*-report.json
+
+  standard-browser:
+    name: STANDARD · Chromium E2E, responsive, a11y, network, soak
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: chimp-jump-fast-reports
+          path: checks
+      - name: Build dedicated QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run standard browser tier
+        id: standard
+        continue-on-error: true
+        shell: bash
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4173/?test=1 >/dev/null; then
-              break
-            fi
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
             sleep 1
           done
-          curl -fsS http://127.0.0.1:4173/?test=1 >/dev/null
-          node checks/game-browser.mjs
+          curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
+          npm run qa:standard
           node checks/dash-physics.mjs
           node checks/dash-patterns.mjs
           node checks/dash-browser.mjs
           node checks/dash-mobile-browser.mjs
           node checks/dash-resources.mjs
+      - name: Build network-failure QA bundle
+        if: ${{ always() && !cancelled() }}
+        run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
+      - name: Run targeted network-failure tier
+        id: network
+        if: ${{ always() && !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite-network.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
+          npm run qa:network
       - name: Audit current Dash production
+        if: ${{ always() && !cancelled() }}
         continue-on-error: true
         env:
           CHIMP_PRODUCTION_URL: https://chimp-jump.onrender.com
         run: node checks/dash-production-browser.mjs
-      - name: Inspect source GLB
+      - name: Generate acceptance matrix
+        if: ${{ always() && !cancelled() }}
+        run: node checks/acceptance-matrix.mjs
+      - name: Enforce standard release gate
+        if: ${{ always() && !cancelled() }}
+        shell: bash
         run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const b = fs.readFileSync('public/model/chimpion.glb');
-          const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString());
-          console.log(JSON.stringify({skins: json.skins, nodes: json.nodes.map(({name,children,translation,rotation}) => ({name,children,translation,rotation}))}, null, 2));
-          NODE
+          echo "standard outcome: ${{ steps.standard.outcome }}"
+          echo "network outcome: ${{ steps.network.outcome }}"
+          test "${{ steps.standard.outcome }}" = "success"
+          test "${{ steps.network.outcome }}" = "success"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: chimp-jump-reports
+          name: chimp-jump-standard-reports
+          if-no-files-found: ignore
           path: |
             checks/*.png
             checks/*-report.json
+            checks/*-manifest.json
+            checks/acceptance-matrix.*
+
+  extended:
+    name: EXTENDED · Firefox and WebKit smoke
+    needs: fast
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install browser runtimes
+        run: npx playwright install --with-deps firefox webkit
+      - name: Run extended suites
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          status=0
+          CHIMP_BROWSER=firefox npm run qa:cross-browser || status=1
+          CHIMP_BROWSER=webkit npm run qa:cross-browser || status=1
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-extended-reports
+          if-no-files-found: ignore
+          path: |
+            checks/*-report.json
+            checks/*.png
+
+  soak:
+    name: EXTENDED · real-rendered five-minute soak
+    needs: fast
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_soak == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run real-rendered soak
+        env:
+          CHIMP_REAL_SOAK_SECONDS: 300
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite-soak.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run qa:soak
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-soak-report
+          if-no-files-found: ignore
+          path: checks/long-session-rendered-report.json
+
+  production:
+    name: PRODUCTION · deployed public smoke
+    needs: fast
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.production_url != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Audit deployed public build
+        env:
+          CHIMP_PRODUCTION_URL: ${{ github.event.inputs.production_url }}
+          CHIMP_EXPECTED_COMMIT: ${{ github.event.inputs.expected_commit }}
+        run: npm run qa:production
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-production-reports
+          if-no-files-found: ignore
+          path: |
+            checks/production-*.png
+            checks/production-browser-report.json
