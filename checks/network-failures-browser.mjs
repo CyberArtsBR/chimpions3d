@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import {launchBrowser,BASE,attachPageDiagnostics,gotoJump,writeReport} from './qa-browser-utils.mjs';
 
 const {browser}=await launchBrowser('chromium');
-const includeSlow=process.env.CHIMP_INCLUDE_SLOW_NETWORK==='1';
+const includeSlow=process.env.CHIMP_INCLUDE_SLOW_NETWORK!=='0';
 const scenarios=[
   {name:'500',handler:route=>route.fulfill({status:500,contentType:'application/json',body:'{"error":"qa-500"}'})},
   {name:'404',handler:route=>route.fulfill({status:404,contentType:'application/json',body:'{"error":"qa-404"}'})},
   {name:'abort',handler:route=>route.abort('connectionfailed')},
 ];
 if(includeSlow)scenarios.push({
-  name:'late-response',
+  name:'slow-late-response',
   handler:async route=>{await new Promise(r=>setTimeout(r,4000));await route.fulfill({status:200,contentType:'application/json',body:'{"id":"late","seed":7}'});}
 });
 
@@ -26,7 +26,7 @@ try{
     const started=Date.now();
     await page.locator('#confirm-chimpion').click();
     await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:1500});
-    if(scenario.name==='late-response'){
+    if(scenario.name==='slow-late-response'){
       // This is the release invariant: the visible countdown must not wait for a slow leaderboard ticket.
       await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,{timeout:1200});
     }else{
