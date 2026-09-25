@@ -13,7 +13,7 @@ try{
   await page.getByRole('button',{name:'Start Game'}).click();
   assert(await page.getByRole('dialog').isVisible());
   await shot(page,'production-dash-picker-desktop.png');
-  await page.getByRole('button',{name:/Play with selected Chimpion/}).click();
+  await page.locator('.picker-play').click();
   await page.waitForFunction(()=>window.chimpionsDash().state==='running',{timeout:90000});
   await page.keyboard.down('Space');await page.waitForTimeout(60);
   assert((await page.evaluate(()=>window.chimpionsDash().vy))>0,'production keyboard jump must work immediately after picker');
