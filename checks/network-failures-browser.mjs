@@ -4,6 +4,7 @@ import {launchBrowser,attachPageDiagnostics,gotoJump,writeReport} from './qa-bro
 const {browser}=await launchBrowser('chromium');
 const includeSlow=process.env.CHIMP_INCLUDE_SLOW_NETWORK!=='0';
 const scenarios=[
+  {name:'success',handler:route=>route.fulfill({status:200,contentType:'application/json',body:'{"id":"qa-run","seed":1234}'})},
   {name:'500',handler:route=>route.fulfill({status:500,contentType:'application/json',body:'{"error":"qa-500"}'})},
   {name:'404',handler:route=>route.fulfill({status:404,contentType:'application/json',body:'{"error":"qa-404"}'})},
   {name:'abort',handler:route=>route.abort('connectionfailed')},
@@ -33,6 +34,10 @@ try{
       await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,null,{timeout:budget});
       item.latencyMs=Date.now()-started;
       assert(runRequests>0,scenario.name+': QA build did not contact configured leaderboard endpoint');
+      if(scenario.name==='success'){
+        await page.waitForFunction(()=>window.chimpJump().runSeed===1234,{timeout:1000});
+        item.authoritativeSeedAdopted=true;
+      }
       if(scenario.name==='slow-late-response'){
         const seedBefore=await page.evaluate(()=>window.chimpJump().runSeed);
         await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
