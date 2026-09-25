@@ -32,7 +32,7 @@ export function attachPageDiagnostics(page){
 }
 
 export async function waitForVisualReadiness(page,{timeout=45000}={}){
-  await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().platformReady&&window.chimpJump().backgroundReady&&document.body?.dataset?.mode==='menu',null,{timeout});
+  await page.waitForFunction(()=>{const s=window.chimpJump?.();return !!s?.ready&&document.body?.dataset?.mode==='menu'&&(s.quality==='high'?(s.platformReady&&s.backgroundReady):s.treeVisible);},null,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
     const images=[...document.images].filter(img=>!img.hidden);
