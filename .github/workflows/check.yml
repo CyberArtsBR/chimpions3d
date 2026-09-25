@@ -1,7 +1,7 @@
 name: Chimp Jump build and checks
 on:
   push:
-    branches: [main, 'test/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -10,11 +10,21 @@ on:
         required: false
         type: boolean
         default: true
+      run_soak:
+        description: Run the real-rendered five-minute soak
+        required: false
+        type: boolean
+        default: false
       production_url:
         description: Optional deployed URL for the public production audit
         required: false
         type: string
         default: https://chimp-jump.onrender.com
+      expected_commit:
+        description: Optional deployed commit SHA expected from version.json
+        required: false
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -49,6 +59,7 @@ jobs:
           node --check checks/performance-browser.mjs
           node --check checks/visual-regression.mjs
           node --check checks/cross-browser-smoke.mjs
+          node --check checks/long-session-rendered.mjs
           node --check checks/production-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -135,7 +146,7 @@ jobs:
   extended:
     name: EXTENDED · Firefox and WebKit smoke
     needs: fast
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true' }}
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -170,6 +181,43 @@ jobs:
             checks/*-report.json
             checks/*.png
 
+  soak:
+    name: EXTENDED · real-rendered five-minute soak
+    needs: fast
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_soak == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run real-rendered soak
+        env:
+          CHIMP_REAL_SOAK_SECONDS: 300
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-vite-soak.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run qa:soak
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-soak-report
+          if-no-files-found: ignore
+          path: checks/long-session-rendered-report.json
+
   production:
     name: PRODUCTION · deployed public smoke
     needs: fast
@@ -187,7 +235,8 @@ jobs:
       - name: Audit deployed public build
         env:
           CHIMP_PRODUCTION_URL: ${{ github.event.inputs.production_url }}
-        run: node checks/production-browser.mjs
+          CHIMP_EXPECTED_COMMIT: ${{ github.event.inputs.expected_commit }}
+        run: npm run qa:production
       - uses: actions/upload-artifact@v4
         if: always()
         with:
