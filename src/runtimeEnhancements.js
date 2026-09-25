@@ -1,3 +1,4 @@
+import {inputManager} from './InputManager.js';
 const isVisible=el=>{
  if(!el||el.disabled||el.hidden)return false;
  const style=getComputedStyle(el);return style.display!=='none'&&style.visibility!=='hidden'&&style.opacity!=='0'&&el.getClientRects().length>0;
@@ -49,25 +50,11 @@ function activateFocused(){
  }
 }
 
-let previousX=0,previousY=0,previousA=false,previousB=false;
-setInterval(()=>{
- const mode=document.body?.dataset?.mode||'';
- const pads=[...(navigator.getGamepads?.()||[])].filter(p=>p?.connected);
- if(!pads.length){previousX=previousY=0;previousA=previousB=false;return;}
- const p=pads.find(p=>Math.abs(p.axes?.[0]||0)>.35||Math.abs(p.axes?.[1]||0)>.35||p.buttons?.some(b=>b.pressed))||pads[0];
- const x=Number(p.buttons?.[15]?.pressed)-Number(p.buttons?.[14]?.pressed)||(Math.abs(p.axes?.[0]||0)>.45?Math.sign(p.axes[0]):0);
- const y=Number(p.buttons?.[13]?.pressed)-Number(p.buttons?.[12]?.pressed)||(Math.abs(p.axes?.[1]||0)>.45?Math.sign(p.axes[1]):0);
- const a=!!p.buttons?.[0]?.pressed,b=!!p.buttons?.[1]?.pressed;
- const dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
- if(navigating){
-  if(x&&x!==previousX){if(dialog?.id==='collection-dialog')moveCollection(x,0);else if(dialog)moveDialog(dialog,x);else moveMenu(x);}
-  if(y&&y!==previousY){if(dialog?.id==='collection-dialog')moveCollection(0,y);else if(dialog)moveDialog(dialog,y);else moveMenu(y);}
-  if(a&&!previousA)activateFocused();
-  if(b&&!previousB){if(dialog?.id==='collection-dialog')document.querySelector('#close-collection')?.click();else if(dialog?.id==='record-book')dialog.querySelector('header button')?.click();}
- }
- previousX=x;previousY=y;previousA=a;previousB=b;
-},80);
-
-// Gameplay mouse steering is intentionally owned by game.js.
-// Keeping a single input owner prevents synthetic key-up events from cancelling a
-// physical Arrow/A/D key that the player is still holding.
+inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed})=>{
+ const mode=document.body?.dataset?.mode||'',dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
+ if(!navigating)return;
+ if(menuX){if(dialog?.id==='collection-dialog')moveCollection(menuX,0);else if(dialog)moveDialog(dialog,menuX);else moveMenu(menuX);}
+ if(menuY){if(dialog?.id==='collection-dialog')moveCollection(0,menuY);else if(dialog)moveDialog(dialog,menuY);else moveMenu(menuY);}
+ if(confirmPressed)activateFocused();
+ if(cancelPressed){if(dialog?.id==='collection-dialog')document.querySelector('#close-collection')?.click();else if(dialog?.id==='record-book')dialog.querySelector('header button')?.click();}
+});
