@@ -13,7 +13,18 @@ try{
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();await shot('character-picker');
   await page.locator('#confirm-chimpion').click();await page.waitForFunction(()=>window.chimpJump().mode==='starting');await page.evaluate(()=>window.chimpJumpTest.render());await shot('countdown');
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing');await shot('gameplay');
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();
+    g.x=0;g.vx=0;g.y=0;g.vy=12.6;g.camera=5;g.height=0;g.hazards=[];g.nextJetAt=Infinity;g.nextEventAt=Infinity;
+    g.platforms=[
+      {id:7900,x:-2.4,baseX:-2.4,y:0,width:2.2,type:'solid',coin:false,broken:false},
+      {id:7901,x:0,baseX:0,y:3.8,width:1.8,type:'moving',coin:true,broken:false,moveRange:1,moveSpeed:.7,phase:.2},
+      {id:7902,x:2.5,baseX:2.5,y:7.6,width:1.7,type:'spring',coin:true,broken:false}
+    ];
+    window.chimpJumpTest.render();
+  });
+  await shot('gameplay');
 
   await page.evaluate(()=>{
     const g=window.chimpJumpTest.game();
@@ -22,6 +33,14 @@ try{
     g.hazards=[{id:8999,type:'thorn-pod',x:3.8,baseX:3.8,y:g.y+2.2,radius:.42,range:0,speed:0,phase:0}];
   });
   await shot('mechanics-solid-moving-cracked-spring-leaf-vanish-swing-thorn');
+
+  await page.evaluate(()=>{
+    const g=window.chimpJumpTest.game();
+    g.jetpack={x:g.x+1.4,y:g.y+2.4};
+    g.jetRemaining=6;
+  });
+  await shot('jetpack');
+  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.jetpack=null;g.jetRemaining=0;});
 
   const biomes=[['jungle-morning',0],['emerald-mist',30],['golden-canopy',60],['moonlit-grove',90]];
   for(const [name,time] of biomes){await page.evaluate(t=>{const g=window.chimpJumpTest.game();g.time=t;},time);await shot('biome-'+name);}
