@@ -4,7 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
-import {DASH_PHYSICS,gravityForDashJump,releaseDashJump} from './dash/dashPhysics.js';
+import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
 import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
 import {hashDashSeed,nextDashRandom,chooseDashWeighted} from './dash/dashSeed.js';
@@ -225,23 +225,7 @@ function overheadBlocksStand(){
   return obstacles.some(o=>!o.hit&&['overhead','flex'].includes(o.family)&&obstacleBoxes(o).some(b=>hit(stand,b)));
 }
 
-// Clip four linear overlap inequalities to find the first swept contact.
-// Both box heights can change as the player enters/exits a crouch.
-function sweptContact(a0,a1,b){
- let enter=0,exit=1;
- const constraints=[
-  [a0.x+a0.w-b.x,a1.x+a1.w-b.x],
-  [b.x+b.w-a0.x,b.x+b.w-a1.x],
-  [a0.y+a0.h-b.y,a1.y+a1.h-b.y],
-  [b.y+b.h-a0.y,b.y+b.h-a1.y]
- ];
- for(const [from,to] of constraints){
-  if(from<=0&&to<=0)return Infinity;
-  if(from<=0)enter=Math.max(enter,-from/(to-from));
-  else if(to<=0)exit=Math.min(exit,from/(from-to));
- }
- return enter<exit?enter:Infinity;
-}
+const sweptContact=sweptDashContact;
 function acquire(kind,id,w,h){
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
