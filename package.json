@@ -10,7 +10,9 @@
     "qa:fast": "node checks/run-tier.mjs fast",
     "qa:standard": "node checks/run-tier.mjs standard",
     "qa:cross-browser": "node checks/cross-browser-smoke.mjs",
-    "qa:network": "node checks/run-tier.mjs network"
+    "qa:network": "node checks/run-tier.mjs network",
+    "qa:soak": "node checks/long-session-rendered.mjs",
+    "qa:production": "node checks/production-browser.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
