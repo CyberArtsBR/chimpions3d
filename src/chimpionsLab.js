@@ -223,7 +223,17 @@ let suppressLongFramePause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 const performanceController=createDashPerformanceController({renderer,scene,keyLight:key,getRuntimeStats:()=>({hazards:obstacles.length,bananas:bananas.length,poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},domGameplayNodes:objectLayer.childElementCount})});
 window.chimpionsDashPerformance={setQuality:q=>performanceController.setQuality(q),diagnostics:()=>performanceController.diagnostics()};
-window.addEventListener('chimpions-dash-quality-change',event=>{const tier=event.detail?.tier;if(tier&&dashGraphics.qualityName!==tier)dashGraphics.setQuality(tier);});
+window.addEventListener('chimpions-dash-quality-change',event=>{
+  const detail=event.detail||{},tier=detail.tier;
+  if(tier&&dashGraphics.qualityName!==tier)dashGraphics.setQuality(tier);
+  if(Number.isFinite(detail.dpr))renderer.setPixelRatio(detail.dpr);
+  if(Number.isFinite(detail.shadowMap)&&key?.shadow){
+    key.castShadow=detail.shadowMap>0;
+    if(key.shadow.mapSize.width!==detail.shadowMap||key.shadow.mapSize.height!==detail.shadowMap){
+      key.shadow.map?.dispose?.();key.shadow.map=null;key.shadow.mapSize.set(detail.shadowMap,detail.shadowMap);
+    }
+  }
+});
 let feedbackTimer=0,activeInputDevice=matchMedia('(pointer:coarse)').matches?'touch':'keyboard';
 function setInputDevice(device){
   if(!['keyboard','mouse','touch','gamepad'].includes(device)||activeInputDevice===device)return;
