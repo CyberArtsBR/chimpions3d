@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import {openBrowserPage,waitForDash,assertNoOverflow,writeReport,shot} from './dash-test-utils.mjs';
 
 const {browser,page,pageErrors,consoleErrors}=await openBrowserPage({viewport:{width:1920,height:1080},gamepad:true});
-const report={scope:'dash-browser',viewports:{},inputs:{},picker:{},quality:{}};
+const report={scope:'dash-browser',viewports:{},inputs:{},picker:{},quality:{},pause:{}};
+async function recoverScreenshotPause(label){
+  const state=await page.evaluate(()=>window.chimpionsDash().state);
+  if(state==='paused'){
+    report.pause.largeFrameProtection=(report.pause.largeFrameProtection||[]).concat(label);
+    await page.evaluate(()=>window.chimpionsDashTest.resume());
+    await page.waitForFunction(()=>window.chimpionsDash().state==='running');
+  }
+}
 try{
   const boot=await waitForDash(page);assert.equal(boot.rosterCount,10);assert(boot.ready);assert.equal(new URL(page.url()).searchParams.get('dash'),'1');
   assert(await page.getByRole('button',{name:'Start Game'}).isVisible());assert(await page.getByRole('button',{name:'Back to the game selection'}).isVisible());
@@ -16,7 +24,7 @@ try{
   const options=page.locator('.picker-option');assert.equal(await options.count(),10);await options.nth(1).click();assert((await page.locator('.picker-current p').innerText()).length>0);
   const beforeRandom=await page.locator('.picker-current p').innerText();await page.getByRole('button',{name:'Random Chimpion'}).click();const afterRandom=await page.locator('.picker-current p').innerText();report.picker={beforeRandom,afterRandom,count:await options.count()};
   await page.locator('.picker-play').click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');await page.evaluate(()=>window.chimpionsDashTest.clearWorld());
-  assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'start must release hidden button focus');await shot(page,'dash-gameplay-desktop.png');
+  assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'start must release hidden button focus');await shot(page,'dash-gameplay-desktop.png');await recoverScreenshotPause('gameplay screenshot');
 
   for(const code of ['Space','KeyW','ArrowUp']){await page.keyboard.down(code);await page.waitForTimeout(30);assert((await page.evaluate(()=>window.chimpionsDash().vy))>0,code+' must jump');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('key-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
   for(const code of ['ArrowDown','KeyS','ShiftLeft','ShiftRight']){await page.keyboard.down(code);await page.waitForTimeout(30);assert(await page.evaluate(()=>window.chimpionsDash().sliding),code+' must slide');await page.keyboard.up(code);await page.evaluate(()=>window.chimpionsDashTest.reset('slide-'+Math.random(),0));await page.evaluate(()=>window.chimpionsDashTest.clearWorld());}
