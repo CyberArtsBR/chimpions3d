@@ -511,7 +511,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 
 function touchHold(id,start,end){
   const el=$(id);
-  el.onpointerdown=e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);start();};
+  el.onpointerdown=e=>{e.preventDefault();try{el.setPointerCapture?.(e.pointerId)}catch{}start();};
   el.onpointerup=el.onpointercancel=el.onlostpointercapture=e=>{e?.preventDefault?.();end();};
 }
 touchHold('touch-jump',()=>setInput('jump','touch',true),()=>setInput('jump','touch',false));
