@@ -9,11 +9,12 @@ const audio=fs.readFileSync('src/dashAudio.js','utf8');
 
 assert(!menu.includes('beginWhenReady'),'Dash picker must not poll for avatar readiness');
 assert(!menu.includes('setTimeout(beginWhenReady'),'Dash picker must not poll a disabled start button');
-assert(menu.includes("className='dash-entry-start'"),'Dash START must be a real HTML button');
-assert(menu.includes("start.textContent='START DASH'"),'Dash START must have visible text');
-assert(finalCss.includes('.dash-entry-actions>.dash-entry-start'),'Dash START must have explicit visible CSS');
-assert(finalCss.includes('opacity:1!important'),'Dash entry controls must be visible');
-assert(menu.includes("api.selectAvatar(selected.id,{timeoutMs:15000})"),'Picker must await explicit avatar readiness with timeout');
+assert(menu.includes("document.querySelector('#dash-start')"),'Dash START must reuse the real runtime button');
+assert(menu.includes("start.classList.add('screen-primary')"),'Dash START must become the painted-art hotspot');
+assert(menu.includes("const back=backButton(menu,'dash-back')"),'Dash Back hotspot must remain a real HTML button');
+assert(!menu.includes("className='dash-entry-start'"),'Duplicate visible Dash entry buttons must not be recreated');
+assert(finalCss.includes('#dash-menu>.screen-primary'),'Dash START hotspot must have explicit artwork-aligned CSS');
+assert(finalCss.includes('#dash-menu>.dash-entry-actions{display:none!important}'),'Legacy duplicate entry controls must stay hidden');
 assert(dash.includes('Chimpion load timed out'),'Runtime must enforce avatar load timeout');
 assert(dash.includes('cancelAvatarLoad'),'Runtime must expose avatar load cancellation');
 for(const bus of ['master','music','sfx','ui','ambience'])assert(audio.includes(`'${bus}'`),`Missing ${bus} audio bus`);
