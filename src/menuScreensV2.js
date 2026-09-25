@@ -210,7 +210,7 @@ export function setupDashMenu(){
     }
   };
 
-  let lastPadButtons='',lastAxis=0,lastPadMove=0;
+  let lastPadState={},lastPadSignature='',lastAxis=0,lastPadMove=0;
   function pickerGamepadFrame(now){
     if(dialog.open){
       const pad=[...(navigator.getGamepads?.()||[])].find(p=>p?.connected);
@@ -218,15 +218,15 @@ export function setupDashMenu(){
         const signature=[0,1,9,12,13,14,15].map(i=>pad.buttons?.[i]?.pressed?'1':'0').join('');
         const axis=pad.axes?.[1]||0;
         const focusables=[...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled)')];
-        if((signature!==lastPadButtons||Math.abs(axis-lastAxis)>.35))dashApi()?.setInputDevice?.('gamepad');
-        const pressed=i=>!!pad.buttons?.[i]?.pressed&&!lastPadButtons[i];
+        if((signature!==lastPadSignature||Math.abs(axis-lastAxis)>.35))dashApi()?.setInputDevice?.('gamepad');
+        const pressed=i=>!!pad.buttons?.[i]?.pressed&&!lastPadState[i];
         if(pressed(1)){dialog.close()}
         if(pressed(0)){document.activeElement?.click?.()}
         const canMove=now-lastPadMove>150;
         const prev=focusables.indexOf(document.activeElement);
         if(canMove&&(pad.buttons?.[13]?.pressed||axis>.65)){focusables[Math.min(focusables.length-1,Math.max(0,prev)+1)]?.focus();lastPadMove=now}
         if(canMove&&(pad.buttons?.[12]?.pressed||axis<-.65)){focusables[Math.max(0,prev-1)]?.focus();lastPadMove=now}
-        lastPadButtons=signature;lastAxis=axis;
+        lastPadState=Object.fromEntries([0,1,9,12,13,14,15].map(i=>[i,!!pad.buttons?.[i]?.pressed]));lastPadSignature=signature;lastAxis=axis;
       }
     }
     requestAnimationFrame(pickerGamepadFrame);
