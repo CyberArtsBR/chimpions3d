@@ -33,6 +33,7 @@ try{
     await page.waitForFunction(()=>window.chimpJump?.().mode==='starting');
     await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
     await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+    await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
     item.playing=await assertNoHorizontalOverflow(page,viewport.name+' playing');
     assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),viewport.name+': pause action hidden');
     if(viewport.width<=768){
