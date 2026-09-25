@@ -40,7 +40,7 @@
 
 /* Dash entry art: keep the image sharp/full screen. START is a transparent hotspot;
    the lower plaque is replaced by a matching high-quality Back button. */
-body[data-lab-state="menu"].dash-start-screen #dash-stage:before{content:'';position:fixed;inset:0;z-index:80;background:#06110a url('/screens/chimp-dash-start.png') center/cover no-repeat!important;filter:none!important}
+body[data-lab-state="menu"].dash-start-screen #dash-stage:before{content:'';position:fixed;inset:0;z-index:80;background:#06110a url('/screens/chimp-dash-start-853ee5d1.png') center/cover no-repeat!important;filter:none!important}
 body[data-lab-state="menu"].dash-start-screen #dash-menu{
   position:fixed!important;z-index:81!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;
   width:var(--menu-art-w)!important;height:var(--menu-art-h)!important;max-width:none!important;max-height:none!important;
@@ -78,7 +78,7 @@ body[data-lab-state="menu"].dash-start-screen .games-back:hover{filter:brightnes
 #dash-character-picker footer{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px}.picker-page{min-width:70px;text-align:center;color:#d9e4c5;font-weight:800}.picker-prev:disabled,.picker-next:disabled{opacity:.4;cursor:default}
 
 /* Card Arena: the artwork already contains both buttons, so HTML controls are only hotspots. */
-.arena-gate-screen{margin:0;overflow:hidden;background:#06110a}.arena-gate{position:fixed;inset:0;overflow:hidden;background:#06110a}.arena-art{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--menu-art-w);height:var(--menu-art-h);background:url('/screens/card-arena-start.png') center/100% 100% no-repeat}
+.arena-gate-screen{margin:0;overflow:hidden;background:#06110a}.arena-gate{position:fixed;inset:0;overflow:hidden;background:#06110a}.arena-art{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:var(--menu-art-w);height:var(--menu-art-h);background:url('/screens/card-arena-start-0920443d.png') center/100% 100% no-repeat}
 .arena-actions{position:absolute;inset:0}.arena-actions button{position:absolute;padding:0;margin:0;border:0;background:transparent;color:transparent;font-size:0;opacity:0;cursor:pointer}
 #enter-arena{left:38.1%;top:77.0%;width:23.9%;height:7.4%}#arena-back{left:37.4%;top:85.3%;width:25.6%;height:7.6%}
 .arena-actions button:focus-visible{opacity:.12;outline:4px solid #fff2a6;outline-offset:2px;border-radius:18px}

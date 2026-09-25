@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite",
     "build": "node scripts/prepare-willie.mjs && node scripts/avatars.mjs && vite build && node scripts/build-version.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:assets": "node checks/assets.mjs",
+    "audit:assets": "node checks/assets.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
