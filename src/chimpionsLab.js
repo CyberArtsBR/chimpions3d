@@ -769,15 +769,57 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
   $('lab-avatar').value=entry.id;return loadAvatar(entry);
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
+window.chimpionsDashPresentationApi={
+  audioGesture:()=>voice.unlock(),
+  playUi:kind=>voice.play(kind||'click'),
+  setInputDevice,
+  openSettings:()=>$('dash-settings')?.showModal(),
+  cancelAvatarLoad,
+  selectAvatar:async(id,options={})=>{
+    const entry=catalog.find(e=>String(e.id)===String(id));
+    if(!entry)throw new Error('Chimpion is not in the approved roster');
+    $('lab-avatar').value=entry.id;
+    return loadAvatar(entry,options);
+  },
+  startRun
+};
 window.chimpionsDash=()=>({
   state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,
   seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,
   sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,
   speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,
   bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,
-  nearMisses:run?.nearMisses||0,tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null
+  nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,settings:{...dashSettings},tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null,
+  graphics:dashGraphics.stats()
 });
-if(new URLSearchParams(location.search).has('test'))window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput};
+if(new URLSearchParams(location.search).has('test')){
+  const snapshot=()=>{
+    let sceneObjects=0;scene.traverse(()=>sceneObjects++);
+    return{
+      ...window.chimpionsDash(),
+      run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score}:null,
+      inputs:{jump:[...heldJump],slide:[...heldSlide]},
+      obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||o.difficulty||0,boxes:o.boxes})),
+      bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),
+      pools:{hazards:pools.hazard.length,bananas:pools.banana.length},
+      renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},
+      resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},
+      standBlocked:run?overheadBlocksStand():false
+    };
+  };
+  const reset=(seed='dash-regression',time=0)=>{
+    clearInputs();voice.stopMusic();voice.stopAmbience();clearWorld();dashGraphics.reset();
+    run=makeRun({seed:hashSeed(seed),tutorial:false});run.time=Math.max(0,Number(time)||0);run.stage=dashStageForTime(run.time);run.speed=dashSpeedForTime(run.time);
+    seedWorld();setState('running');accumulator=0;last=performance.now();renderUI(0);dashGraphics.render();return snapshot();
+  };
+  const step=(steps=1)=>{const count=Math.max(0,Math.min(20000,Math.floor(Number(steps)||0)));for(let i=0;i<count&&state==='running';i++)updatePhysics(STEP);renderUI(0);dashGraphics.render();return snapshot();};
+  const clearWorldForTest=()=>{clearWorld();dashGraphics.reset();spawnCursor=(run?.scroll||0)+metrics().vw+360;return snapshot();};
+  const spawnTestObstacle=(id,offset=220)=>{const type=TYPES.find(t=>t.id===id);if(!type)throw new Error('Unknown Dash obstacle: '+id);const o=spawnObstacle(type,(run?.scroll||0)+PLAYER_X+Number(offset||0));o.patternId='test-fixture';return snapshot();};
+  const spawnTestBanana=(offset=180,y=55,golden=false)=>{spawnBanana((run?.scroll||0)+PLAYER_X+Number(offset||0),Number(y||0),!!golden);return snapshot();};
+  const advanceWorld=(distance=800)=>{if(!run)return snapshot();run.scroll+=Math.max(0,Number(distance)||0);run.distance=run.scroll/100;maintainWorld();renderUI(0);return snapshot();};
+  window.chimpionsDashTest={startRun,finishRun,pause,resume,quit,setInput,reset,step,snapshot,clearWorld:clearWorldForTest,spawnObstacle:spawnTestObstacle,spawnBanana:spawnTestBanana,advanceWorld,pollGamepad,hashSeed,speedFor:dashSpeedForTime,safeGap,catalog:()=>({constants:DASH_PHYSICS,types:TYPES,version:DASH_RULES_VERSION})};
+}
+addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose?.();},{once:true});
 
 setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
