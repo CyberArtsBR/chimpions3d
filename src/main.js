@@ -32,7 +32,6 @@ if(params.has('lab')){
   Promise.all([
     import('./runtimeEnhancements.js'),
     import('./visualCompletion.js'),
-    import('./mobileVisualBudget.js'),
     import('./noBiomeBands.js')
   ]).then(async()=>{
     const [{setupBiomePolish},{setupMenuExtras}]=await Promise.all([
