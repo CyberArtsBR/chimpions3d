@@ -147,7 +147,10 @@ for(let seed=0;seed<2000;seed++){
 const budget=new Game(77);budget.nextY=10000;budget.platforms=[{id:0,x:0,baseX:0,y:0,width:3,type:'solid',coin:false,route:'safe',required:true,broken:false,phase:0,moveSpeed:1,moveRange:0,vanishAt:null}];
 budget.hazards=[];budget.jetRemaining=4;budget.nextEventAt=budget.time;let budgetEvents=[];budget.updateCanopyEvent(budgetEvents);assert(!budget.event,'Canopy event must not start during jetpack');
 budget.jetRemaining=0;budget.jetpack={x:0,y:0,expires:100,route:'reward'};budget.nextEventAt=budget.time;budgetEvents=[];budget.updateCanopyEvent(budgetEvents);assert(!budget.event,'Canopy event must not start while jetpack pickup is active');
-budget.jetpack=null;budget.specialBlockedUntil=0;budgetEvents=[];budget.updateCanopyEvent(budgetEvents);assert(budget.event&&budgetEvents.some(e=>e.type==='event-start'));
+budget.jetpack=null;budget.specialBlockedUntil=0;
+budget.hazards=[{id:99,type:'thorn-pod',x:4,baseX:4,y:budget.y+2,baseY:budget.y+2,radius:.42,range:0,speed:0,phase:0,createdAt:0,safeX:0,safeWidth:3,route:'optional'}];
+budgetEvents=[];budget.updateCanopyEvent(budgetEvents);assert(!budget.event,'Canopy event must defer under immediate hazard pressure');
+budget.hazards=[];budgetEvents=[];budget.updateCanopyEvent(budgetEvents);assert(budget.event&&budgetEvents.some(e=>e.type==='event-start'));
 budget.nextJetAt=budget.time;const beforeJet=budget.jetpack;budget.step(0);assert.equal(budget.jetpack,beforeJet,'Jetpack must not spawn on top of an active canopy event');
 
 const replaySeed=123456789,replayA=new Game(replaySeed),replayB=new Game(replaySeed);
