@@ -46,7 +46,7 @@ const selectionActions=document.createElement('div');selectionActions.className=
 selectionActions.innerHTML='<button id="random-chimpion">↻ Random</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Ready for the canopy</small></div><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
 collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
-collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();$('choose').focus();});
+collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();const choose=$('choose'),play=$('play');(choose?.getClientRects().length?choose:play)?.focus();});
 const scene=new THREE.Scene();
 const camera=new THREE.OrthographicCamera(-5,5,14,-2,0.1,60);camera.position.set(0,0,20);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
