@@ -203,7 +203,7 @@ export class Game {
    const safeBanana=this.random()<(step.phase===ENCOUNTER_PHASES.REWARD ? .76 : .48);
    if(!this.add(x,y,width,'solid',safeBanana,'safe',{
     encounterId:step.encounterId,encounterType:step.encounterType,encounterPhase:step.phase,encounterStep:step.encounterStep,
-    required:true,recovery
+    required:true,recovery,extendedRecovery:!!step.extendedRecovery
    }))break;
    const safePlatform=this.platforms.at(-1);
    this.nextX=x;this.nextY=y;this.nextWidth=safePlatform.width;
