@@ -1,29 +1,47 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
 
-function walk(dir){
-  const out=[];
-  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
-    const full=path.join(dir,entry.name);
-    if(entry.isDirectory())out.push(...walk(full));else out.push(full.replaceAll('\\','/'));
-  }
-  return out;
+const manifestPath='public/asset-manifest.json';
+assert(fs.existsSync(manifestPath),'Missing public/asset-manifest.json. Run the build/asset manifest step first.');
+const manifest=JSON.parse(fs.readFileSync(manifestPath,'utf8'));
+
+const MiB=1048576;
+const limits=Object.freeze({
+  initialShell:0.50*MiB,
+  menuArt:0.35*MiB,
+  defaultCharacter:15.0*MiB,
+  environment:9.0*MiB,
+  music:4.5*MiB,
+  optionalCharacters:30.0*MiB,
+  largestSingleAsset:15.0*MiB
+});
+
+const categories={};
+for(const [name,limit] of Object.entries(limits)){
+  const bytes=name==='largestSingleAsset'
+    ? Number(manifest.largestSingleAsset?.bytes||0)
+    : Number(manifest.categories?.[name]?.bytes||0);
+  categories[name]={
+    bytes,
+    miB:Number((bytes/MiB).toFixed(2)),
+    limitBytes:limit,
+    limitMiB:Number((limit/MiB).toFixed(2)),
+    utilization:Number((bytes/limit).toFixed(3)),
+    files:name==='largestSingleAsset'
+      ? [manifest.largestSingleAsset?.path].filter(Boolean)
+      : manifest.categories?.[name]?.files||[]
+  };
+  assert(bytes<=limit,`${name} payload ${(bytes/MiB).toFixed(2)} MiB exceeds mandatory ${(limit/MiB).toFixed(2)} MiB budget`);
 }
-const files=walk('public').map(p=>({path:p,bytes:fs.statSync(p).size,ext:path.extname(p).toLowerCase()}));
-const characters=files.filter(f=>f.path.startsWith('public/model/characters/')&&f.ext==='.glb');
-const glbs=files.filter(f=>f.ext==='.glb').sort((a,b)=>b.bytes-a.bytes);
-const images=files.filter(f=>/\.(png|jpe?g|webp|avif|gif)$/i.test(f.path)).sort((a,b)=>b.bytes-a.bytes);
-const totalBytes=files.reduce((n,f)=>n+f.bytes,0),characterBytes=characters.reduce((n,f)=>n+f.bytes,0);
+
 const report={
   status:'PASS',
-  totalPublicBytes:totalBytes,totalPublicMiB:Number((totalBytes/1048576).toFixed(2)),
-  characterBytes,characterMiB:Number((characterBytes/1048576).toFixed(2)),
-  characterCount:characters.length,
-  largestGlb:glbs[0]||null,largestImage:images[0]||null,
-  top20:[...files].sort((a,b)=>b.bytes-a.bytes).slice(0,20)
+  manifestVersion:manifest.version,
+  manifestHash:manifest.contentHash,
+  categories,
+  largestSingleAsset:manifest.largestSingleAsset,
+  note:'Budgets model network-relevant controlled categories; total public/ size is intentionally not used as the release gate because lazy assets are not all fetched initially.'
 };
-const maxMiB=Number(process.env.CHIMP_ASSET_BUDGET_MIB||0);
-if(maxMiB)assert(totalBytes<=maxMiB*1048576,`Public payload ${report.totalPublicMiB} MiB exceeds ${maxMiB} MiB budget`);
+
 fs.writeFileSync('checks/asset-budget-report.json',JSON.stringify(report,null,2));
 console.log('ASSET_BUDGET:'+JSON.stringify(report));
