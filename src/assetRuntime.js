@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+const prefetched=new Set();
+
 const telemetry={
   requests:0,
   completed:0,
@@ -80,7 +82,8 @@ export function createTrackedLoadingManager(kind='dependency'){
 export function prefetchVisualAsset(url){
   if(typeof document==='undefined'||!url)return null;
   const key=String(url);
-  if(document.head.querySelector(`link[data-chimp-prefetch="${CSS?.escape?.(key)||key}"]`))return null;
+  if(prefetched.has(key))return null;
+  prefetched.add(key);
   const link=document.createElement('link');
   link.rel='prefetch';
   link.as=/\.(?:glb|gltf)(?:\?|$)/i.test(key)?'fetch':'image';
