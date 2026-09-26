@@ -3,7 +3,7 @@ import {JUMP} from './physics.js';
 import {validateGLB} from './upload.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CharacterAnimator} from './character/CharacterAnimator.js';
-import {mapHumanoidRig, prepareAnimationRig} from './character/rigUtils.js';
+import {mapHumanoidRig, mapSecondaryMotionBones, prepareAnimationRig} from './character/rigUtils.js';
 
 const MODEL_YAW = 0; // Set Math.PI only for a deliberately reversed authored model.
 
@@ -13,7 +13,10 @@ export const CHARACTER_ANIMATION_STAGES = Object.freeze([
   'IDLE','TAKEOFF','ASCEND','APEX','DESCEND','LAND',
   'SPRING','HAZARD','JETPACK','DYING','RESULT',
 ]);
-const TEST_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('test');
+const TEST_MODE = typeof location !== 'undefined'
+  && new URLSearchParams(location.search).has('test')
+  && (import.meta.env.DEV || import.meta.env.VITE_CHIMP_QA_HOOKS === '1')
+  && ['localhost','127.0.0.1'].includes(location.hostname);
 let testHarnessOwner = null;
 
 // Public compatibility contract for audit tooling and later game.js integration.
@@ -91,6 +94,7 @@ function installTestHarness(controller, animator) {
   globalThis.__chimpCharacterAnimationTest = {
     exercise: () => animator.debugExercise(),
     diagnostics: () => animator.getDiagnostics(),
+    events: () => animator.peekEvents(),
     state: () => animator.state,
   };
 }
@@ -126,10 +130,12 @@ export async function loadCharacter(url, overrides = {}) {
 
     const {rig, bones, report} = mapHumanoidRig(model, overrides);
     const rigEntries = prepareAnimationRig(model, rig);
+    const secondaryEntries = mapSecondaryMotionBones(model, rigEntries);
     const animator = new CharacterAnimator({
       visual,
       model,
       rigEntries,
+      secondaryEntries,
       bones,
       launchVelocity:JUMP,
     });
@@ -167,6 +173,7 @@ export async function loadCharacter(url, overrides = {}) {
       model,
       boneCount:bones.length,
       mappedBoneCount:rigEntries.length,
+      secondaryBoneCount:secondaryEntries.length,
       triangles:stats.triangles,
       rigReport:report,
 
@@ -218,6 +225,14 @@ export async function loadCharacter(url, overrides = {}) {
 
       getAnimationDiagnostics() {
         return animator.getDiagnostics();
+      },
+
+      consumeAnimationEvents() {
+        return animator.consumeEvents();
+      },
+
+      peekAnimationEvents() {
+        return animator.peekEvents();
       },
     };
 
