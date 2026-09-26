@@ -383,7 +383,8 @@ export class CharacterAnimator {
       this._set(side + 'Foot', -0.44 * compression + 0.10 * extension, 0, 0);
     }
 
-    this.targetOffset = -0.145 * compression + 0.045 * extension;
+    // Keep the normalized floor anchored; leg compression provides the contact squash.
+    this.targetOffset = 0.045 * extension;
     this.targetScaleXZ = 1 + 0.030 * compression - 0.010 * extension;
     this.targetScaleY = 1 - 0.050 * compression + 0.028 * extension;
   }
@@ -499,7 +500,8 @@ export class CharacterAnimator {
       this._set(side + 'Foot', -0.36 * compression + 0.08 * recoverPhase, 0, 0);
     }
 
-    this.targetOffset = -0.155 * compression - 0.035 * hardDelay;
+    // The model floor is normalized to y=0, so translating downward would sink feet through the platform.
+    this.targetOffset = 0;
     this.targetScaleXZ = 1 + 0.035 * compression;
     this.targetScaleY = 1 - 0.060 * compression;
   }
@@ -530,7 +532,8 @@ export class CharacterAnimator {
       this._set(side + 'Foot', -0.48 * compression + 0.12 * release, 0, 0);
     }
 
-    this.targetOffset = -0.19 * compression + 0.060 * release * strength;
+    // Spring compression stays foot-anchored; only the release adds visual lift.
+    this.targetOffset = 0.060 * release * strength;
     this.targetScaleXZ = 1 + 0.045 * compression - 0.018 * release;
     this.targetScaleY = 1 - 0.075 * compression + 0.038 * release;
   }
