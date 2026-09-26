@@ -110,7 +110,7 @@ const controlledNames=[
 const controlled=[...new Set(controlledNames)].filter(name=>byRel.has(name)).map(name=>entry(byRel.get(name)));
 
 const characters=controlled.filter(item=>item.path.startsWith('model/characters/'));
-const defaultCharacter=characters[0]||null;
+const defaultCharacter=[...characters].sort((a,b)=>b.bytes-a.bytes)[0]||null; // worst-case playable initial selection
 const optionalCharacters=characters.filter(item=>item!==defaultCharacter);
 const sum=items=>items.reduce((total,item)=>total+(item?.bytes||0),0);
 
