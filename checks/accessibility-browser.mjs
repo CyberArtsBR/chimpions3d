@@ -35,25 +35,31 @@ try{
   const guide=page.locator('#jump-guide-dialog[open]');
   assert(await guide.isVisible(),'Field Guide dialog must be visible');
   assert((await guide.getAttribute('aria-label'))||(await guide.getAttribute('aria-labelledby')),'Field Guide dialog must be labeled');
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+
+  await page.getByRole('button',{name:'Options',exact:true}).click();
+  const settings=page.locator('#jump-settings-dialog[open]');
+  assert(await settings.isVisible(),'Options dialog must be visible');
+  assert((await settings.getAttribute('aria-label'))||(await settings.getAttribute('aria-labelledby')),'Options dialog must be labeled');
   const reduced=page.getByLabel('Reduced Motion');
   const highVisibility=page.getByLabel('High Visibility');
   await reduced.check();
   assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
   await highVisibility.check();
   assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
-  report.checks.reducedMotion=true;report.checks.highVisibility=true;
+  report.checks.reducedMotion=true;report.checks.highVisibility=true;report.checks.optionsDialog=true;
   await reduced.uncheck();await highVisibility.uncheck();
-  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+  await page.getByRole('button',{name:'Close Options',exact:true}).click();
 
-  const choose=page.getByRole('button',{name:'Choose chimp',exact:true});
-  await choose.click();
+  const play=page.getByRole('button',{name:'LET’S JUMP',exact:true});
+  await play.click();
   const picker=page.locator('#collection-dialog[open]');
   assert((await picker.getAttribute('aria-label'))||(await picker.getAttribute('aria-labelledby')),'Character picker dialog must be labeled');
   await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
   assert(await page.evaluate(()=>document.getElementById('collection-dialog')?.contains(document.activeElement)),'Modal focus must enter picker');
   await page.keyboard.press('Escape');
   await picker.waitFor({state:'hidden'});
-  assert.equal(await page.evaluate(()=>document.activeElement?.id),'choose','Closing picker must restore focus to Choose chimp');
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'play','Closing picker must restore focus to the visible title action');
   report.checks.modalFocus=true;
 
   const primaryTargets=await page.locator('button:visible').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {id:n.id,width:r.width,height:r.height};}));
