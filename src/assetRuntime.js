@@ -48,33 +48,34 @@ export async function fetchAssetBuffer(url,{signal,kind='asset'}={}){
 }
 
 export async function trackAssetDecode(kind,url,work){
-  const started=now();
+  const started=now();let status='ok';
   try{return await work();}
+  catch(error){status='error';throw error;}
   finally{
     const durationMs=Math.max(0,now()-started);
     telemetry.totalDecodeMs+=durationMs;
     telemetry.maxDecodeMs=Math.max(telemetry.maxDecodeMs,durationMs);
-    pushRecent({kind:`${kind}:decode`,url:String(url),status:'ok',durationMs:Number(durationMs.toFixed(1)),bytes:0});
+    pushRecent({kind:`${kind}:decode`,url:String(url),status,durationMs:Number(durationMs.toFixed(1)),bytes:0});
   }
 }
 
 export function createTrackedLoadingManager(kind='dependency'){
   const manager=new THREE.LoadingManager();
-  const starts=new Map();
-  manager.onStart=url=>{starts.set(url,now());};
+  const starts=new Map(),failed=new Set();
+  manager.onStart=url=>{
+    if(starts.has(url))return;
+    starts.set(url,now());telemetry.requests++;telemetry.active++;
+  };
+  manager.onError=url=>{failed.add(url);};
   manager.onProgress=url=>{
     const started=starts.get(url);
-    if(started!==undefined){
-      const durationMs=Math.max(0,now()-started);
-      pushRecent({kind,url:String(url),status:'ok',durationMs:Number(durationMs.toFixed(1)),bytes:0});
-      starts.delete(url);
-    }
-  };
-  manager.onError=url=>{
-    const started=starts.get(url)??now();
-    const durationMs=Math.max(0,now()-started);
-    pushRecent({kind,url:String(url),status:'error',durationMs:Number(durationMs.toFixed(1)),bytes:0});
-    starts.delete(url);
+    if(started===undefined)return;
+    const durationMs=Math.max(0,now()-started),status=failed.has(url)?'error':'ok';
+    telemetry.active=Math.max(0,telemetry.active-1);
+    if(status==='ok')telemetry.completed++;else telemetry.failed++;
+    telemetry.totalLoadMs+=durationMs;telemetry.maxLoadMs=Math.max(telemetry.maxLoadMs,durationMs);
+    pushRecent({kind,url:String(url),status,durationMs:Number(durationMs.toFixed(1)),bytes:0});
+    starts.delete(url);failed.delete(url);
   };
   return manager;
 }
