@@ -1,0 +1,254 @@
+/* CHIMP JUMP — AAA presentation v2.
+   The approved illustrated title artwork is intentionally not restyled here. */
+:root{
+  --jump-ink:#071c17;
+  --jump-emerald:#113c31;
+  --jump-emerald-2:#0a2b24;
+  --jump-wood:#68401f;
+  --jump-wood-dark:#321b0e;
+  --jump-gold:#ffe18b;
+  --jump-cream:#fff4d6;
+  --jump-line:#d9c78566;
+}
+
+/* ---------- Active-run HUD: compact, safe-area aware, no playfield panels ---------- */
+body[data-mode=playing] #hud,
+body[data-mode=starting] #hud{
+  top:max(10px,env(safe-area-inset-top));
+  width:min(calc(100vw - 18px),680px);
+  gap:7px;align-items:stretch;justify-content:center;
+}
+body[data-mode=playing] #hud>.stat,
+body[data-mode=starting] #hud>.stat,
+body[data-mode=playing] #hud .right>.stat,
+body[data-mode=starting] #hud .right>.stat{
+  min-width:92px;padding:7px 11px;border:1px solid var(--jump-line);border-radius:11px;
+  background:linear-gradient(180deg,#153f34e8,#092b25e8);
+  box-shadow:inset 0 1px #fff2bf12,0 4px 14px #02171355;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+body[data-mode=playing] #hud>.stat,
+body[data-mode=starting] #hud>.stat{flex:0 1 122px}
+body[data-mode=playing] #hud .right,
+body[data-mode=starting] #hud .right{display:flex;gap:7px;align-items:stretch}
+body[data-mode=playing] #hud small,
+body[data-mode=starting] #hud small{color:#c6d9c5;font-size:8px;letter-spacing:.16em;line-height:1}
+body[data-mode=playing] #hud strong,
+body[data-mode=starting] #hud strong{display:inline-block;color:#fff4d5;font-size:21px;line-height:1.1;font-variant-numeric:tabular-nums}
+body[data-mode=playing] #hud em,
+body[data-mode=starting] #hud em{color:#bfd0c1;font-size:11px}
+body[data-mode=playing] #hud .coins strong,
+body[data-mode=starting] #hud .coins strong{color:#ffe189}
+body[data-mode=playing] #pause,
+body[data-mode=playing] #mute,
+body[data-mode=starting] #mute{
+  width:42px;height:42px;min-width:42px;padding:0;border-radius:11px;
+  border:1px solid var(--jump-line);background:linear-gradient(#173f35eb,#0a2c25ed);
+  color:#fff4d5;box-shadow:inset 0 1px #fff3bf16,0 4px 14px #02171355;
+}
+body[data-mode=playing] #pause:hover,
+body[data-mode=playing] #mute:hover{filter:brightness(1.12)}
+body[data-mode=playing] .stat-pulse,
+body[data-mode=starting] .stat-pulse{animation:jump-stat-pulse .34s cubic-bezier(.2,.8,.25,1)}
+@keyframes jump-stat-pulse{0%{transform:scale(.93)}55%{transform:scale(1.055);box-shadow:0 0 0 3px #ffe18b38,0 7px 22px #02171388}100%{transform:scale(1)}}
+
+/* Temporary state belongs under the HUD, then leaves. */
+#canopy-event{
+  top:max(67px,calc(env(safe-area-inset-top) + 58px))!important;left:50%!important;transform:translateX(-50%)!important;
+  max-width:min(76vw,330px)!important;padding:7px 13px!important;
+  border:1px solid #f2ce7299!important;border-radius:999px!important;
+  background:linear-gradient(180deg,#6f4823ed,#3d2716ed)!important;
+  color:#fff1b9!important;box-shadow:0 5px 18px #1d0f0780!important;
+  letter-spacing:.13em!important;text-align:center!important;
+}
+#pace{
+  top:max(98px,calc(env(safe-area-inset-top) + 89px))!important;
+  padding:7px 13px;border:1px solid #a8d7bf66;border-radius:999px;
+  background:#0b3029df;color:#d9fff0!important;box-shadow:0 5px 18px #02171366;
+  z-index:19;
+}
+#toast{
+  bottom:max(92px,calc(env(safe-area-inset-bottom) + 76px));padding:9px 15px;
+  border-radius:999px;background:#0e322bdc;color:#fff4d5;
+  font-weight:850;letter-spacing:.02em;
+}
+#toast[data-kind=warning]::before{content:"! ";font-weight:950}
+#toast[data-kind=success]::before{content:"✓ ";font-weight:950}
+
+/* ---------- Countdown and mode transitions ---------- */
+@keyframes jump-panel-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+#collection-dialog[open],#jump-guide-dialog[open],#jump-settings-dialog[open],#results-dialog[open],#record-book[open]{
+  animation:jump-panel-in .16s ease-out both
+}
+body[data-mode=paused] #overlay .card{animation:jump-panel-in .14s ease-out both}
+
+#countdown{
+  min-width:1.25em;text-align:center;color:#fff2b2;
+  text-shadow:0 4px 0 #2d1a0b,0 10px 30px #000a;
+}
+body[data-mode=starting] #hud{opacity:.84}
+body[data-mode=paused] #overlay{background:radial-gradient(circle at 50% 38%,#183a302e,#041713b8 68%)}
+body[data-mode=paused] #overlay .card{
+  width:min(440px,calc(100vw - 24px));padding:28px;border:1px solid #d8c17b7a;border-radius:24px;
+  background:
+    linear-gradient(90deg,#ffffff08 0 1px,transparent 1px 100%),
+    radial-gradient(circle at 20% 0,#7fa46128,transparent 35%),
+    linear-gradient(155deg,#244d3c,#0b2924 68%);
+  color:var(--jump-cream);box-shadow:inset 0 1px #fff2bd22,0 24px 80px #000a;
+}
+body[data-mode=paused] #overlay .eyebrow{color:#d2d9ac}
+body[data-mode=paused] #overlay h1{margin:13px 0 10px;color:#fff3d1;text-shadow:0 3px 0 #261509}
+body[data-mode=paused] #overlay h1 span{color:var(--jump-gold)}
+body[data-mode=paused] #overlay .card>p{margin:8px auto 12px;color:#d5dfca}
+body[data-mode=paused] #jump-pause-actions{gap:9px;margin-top:15px}
+body[data-mode=paused] #jump-pause-actions button{
+  min-height:48px;border:1px solid #b5c78b77;border-radius:11px;background:linear-gradient(#315542,#1b3c31);
+  color:#fff2d0;box-shadow:inset 0 1px #fff3c018,0 3px 0 #09221b;font-weight:900
+}
+body[data-mode=paused] #jump-pause-actions .primary{
+  background:linear-gradient(#ffed9c,#e1c557);color:#213a27;border-color:#fff0a6;box-shadow:0 4px 0 #826f2b
+}
+body[data-mode=paused] #jump-pause-actions button:active{transform:translateY(2px)}
+body[data-mode=paused] #jump-pause-actions small{color:#b9c9b8}
+
+/* ---------- Results: primary run story first, optional network/score detail second ---------- */
+#results-dialog{
+  width:min(560px,calc(100vw - 24px))!important;max-height:min(92dvh,880px)!important;padding:24px!important;
+  border:1px solid #d8c17d!important;border-radius:24px!important;
+  background:
+    radial-gradient(circle at 50% -5%,#758e4d35,transparent 34%),
+    linear-gradient(155deg,#244b39,#0b2925 66%,#071e1b)!important;
+  color:var(--jump-cream)!important;box-shadow:inset 0 1px #fff3ca24,0 30px 100px #000c!important;
+}
+#results-dialog::backdrop{background:#041512cf!important;backdrop-filter:blur(5px)}
+#results-dialog .eyebrow{color:#ced9ac;letter-spacing:.14em}
+#results-dialog h2{margin:5px 0 0!important;font-size:clamp(27px,5vw,38px)!important}
+#results-dialog .result-kicker{margin:3px 0 13px!important;color:#afc7b7!important}
+.result-hero{
+  padding:13px 12px 14px;border:1px solid #d9c37955;border-radius:16px;
+  background:linear-gradient(180deg,#7d55233a,#0a292326);box-shadow:inset 0 1px #fff4bd16;
+}
+.result-hero>small{display:block;color:#d6d9ad;font-size:9px;letter-spacing:.18em;font-weight:900}
+.result-hero>#result-height{
+  display:block;margin-top:2px;color:#fff1b6;font-size:clamp(38px,9vw,56px);line-height:1;font-weight:950;
+  letter-spacing:-.045em;font-variant-numeric:tabular-nums
+}
+#result-record{margin:8px auto 0!important}
+.result-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:7px!important;margin:11px 0!important}
+.result-stat{padding:10px 6px!important;border-color:#c9d6a52b!important;background:#fff7dc08!important}
+.result-stat small{min-height:2.2em;color:#b9ccb9!important;font-size:8px!important;line-height:1.1}
+.result-stat strong{font-size:17px!important}
+.result-goals{
+  margin:7px 0!important;padding:7px 10px;border-left:3px solid #ffe18b;background:#ffe18b0c;color:#fff1bb!important;
+  font-size:11px!important;line-height:1.35!important;text-align:left
+}
+.result-route{
+  display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 10px!important;color:#b9cbbb!important;
+  font-size:9px!important;letter-spacing:.12em!important
+}
+.result-route code{padding:4px 7px;border:1px solid #a9bf9e38;border-radius:6px;background:#051b17;color:#e4edd8;font-size:10px;letter-spacing:.04em}
+.result-details{
+  margin:7px 0;border:1px solid #b9c79830;border-radius:11px;background:#061f1b77;text-align:left;overflow:hidden
+}
+.result-details>summary{
+  min-height:40px;display:flex;align-items:center;padding:9px 12px;color:#dce7cb;font-size:11px;font-weight:900;letter-spacing:.08em;
+  cursor:pointer;list-style:none
+}
+.result-details>summary::-webkit-details-marker{display:none}
+.result-details>summary::after{content:"＋";margin-left:auto;color:#ffe18b}
+.result-details[open]>summary::after{content:"−"}
+.result-details[open]{padding-bottom:7px}
+#score-formula{margin:4px 12px 8px!important;font-size:10px!important}
+#results-dialog .score-conversion{margin:8px 12px!important;gap:15px!important}
+#results-dialog .score-conversion strong{font-size:24px!important}
+#ranking-status{min-height:0!important;margin:8px 0!important;font-size:11px}
+#result-top{margin:0;padding:0 12px 4px!important;max-height:165px;overflow:auto}
+#result-top li{padding:7px 0!important}
+#results-dialog .result-actions{
+  position:sticky!important;bottom:-24px!important;grid-template-columns:1fr 1fr!important;gap:8px!important;
+  margin:12px -4px -24px!important;padding:12px 4px 20px!important;
+  background:linear-gradient(transparent 0,#0b2925 20%,#0b2925 100%)!important
+}
+#results-dialog .result-actions #try-again{
+  grid-column:1/-1;min-height:52px;font-size:18px!important;
+  background:linear-gradient(#ffed9d,#e1c557);color:#203923;box-shadow:0 4px 0 #806e2a
+}
+#results-dialog .result-actions>button:not(.primary){min-height:42px;background:#24473a!important}
+#results-dialog button:focus-visible,#results-dialog summary:focus-visible{
+  outline:3px solid #fff0a0!important;outline-offset:3px!important
+}
+
+/* ---------- High visibility keeps meaning in labels/icons, not color alone ---------- */
+body[data-high-visibility=true] #hud .stat,
+body[data-high-visibility=true] #pause,
+body[data-high-visibility=true] #mute{border:2px solid #fff3b4!important;background:#061b18f7!important}
+body[data-high-visibility=true] #canopy-event,
+body[data-high-visibility=true] #pace,
+body[data-high-visibility=true] #toast{border:2px solid #fff3b4!important;background:#071d19f7!important;color:#fff!important}
+body[data-high-visibility=true] #results-dialog,
+body[data-high-visibility=true][data-mode=paused] #overlay .card{border:2px solid #fff3b4!important;background:#061b18!important}
+body[data-high-visibility=true] .result-stat,
+body[data-high-visibility=true] .result-details{border-color:#fff3b477!important}
+
+/* Controller focus must be visible even where mouse focus remains visually quiet. */
+body[data-input-mode=controller].jump-start-screen[data-mode=menu] #overlay #play:focus{
+  opacity:.16!important;outline:5px solid #fff6b7!important;outline-offset:3px!important
+}
+body[data-input-mode=controller] #jump-pause-actions button:focus,
+body[data-input-mode=controller] #results-dialog button:focus,
+body[data-input-mode=controller] #results-dialog summary:focus,
+body[data-input-mode=controller] #collection-dialog button:focus,
+body[data-input-mode=controller] #jump-guide-dialog button:focus,
+body[data-input-mode=controller] #jump-settings-dialog button:focus{
+  outline:4px solid #fff2a3!important;outline-offset:4px!important
+}
+
+/* ---------- Responsive evidence target: 390x844 through 1920x1080 ---------- */
+@media(max-width:700px){
+  body[data-mode=playing] #hud,body[data-mode=starting] #hud{width:calc(100vw - 12px);gap:4px}
+  body[data-mode=playing] #hud>.stat,body[data-mode=starting] #hud>.stat,
+  body[data-mode=playing] #hud .right>.stat,body[data-mode=starting] #hud .right>.stat{
+    min-width:0;padding:6px 7px;border-radius:9px
+  }
+  body[data-mode=playing] #hud>.stat,body[data-mode=starting] #hud>.stat{flex:1 1 0}
+  body[data-mode=playing] #hud strong,body[data-mode=starting] #hud strong{font-size:18px}
+  body[data-mode=playing] #hud small,body[data-mode=starting] #hud small{font-size:6.5px;letter-spacing:.1em}
+  body[data-mode=playing] #pause,body[data-mode=playing] #mute,
+  body[data-mode=starting] #mute{width:40px;height:40px;min-width:40px}
+  #canopy-event{top:max(58px,calc(env(safe-area-inset-top) + 50px))!important;font-size:8px!important}
+  #pace{top:max(88px,calc(env(safe-area-inset-top) + 80px))!important;font-size:8px!important}
+  #toast{bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px));max-width:82vw;font-size:10px}
+  #results-dialog{padding:17px!important}
+  .result-stats{grid-template-columns:1fr 1fr!important}
+  .result-stat small{min-height:1.1em}
+  #results-dialog .result-actions{bottom:-17px!important;margin-bottom:-17px!important;padding-bottom:14px!important}
+}
+@media(max-width:430px){
+  body[data-mode=playing] #hud .right,body[data-mode=starting] #hud .right{gap:3px}
+  body[data-mode=playing] #hud em,body[data-mode=starting] #hud em{display:none}
+  #results-dialog .result-actions{grid-template-columns:1fr!important}
+  #results-dialog .result-actions #try-again{grid-column:auto}
+  body[data-mode=paused] #overlay .card{padding:20px}
+}
+@media(max-height:600px) and (orientation:landscape){
+  #results-dialog{max-height:96dvh!important;padding:15px!important}
+  .result-hero{padding:8px}.result-hero>#result-height{font-size:34px}
+  .result-stats{margin:7px 0!important}.result-stat{padding:7px 5px!important}
+  #results-dialog .result-actions{position:static!important;margin:8px 0 0!important;padding:0!important;background:none!important}
+}
+
+/* Reduced motion removes nonessential presentation movement but leaves text/state changes. */
+body[data-reduced-motion=true] .stat-pulse,
+body[data-reduced-motion=true] #collection-dialog,
+body[data-reduced-motion=true] #jump-guide-dialog,
+body[data-reduced-motion=true] #jump-settings-dialog,
+body[data-reduced-motion=true] #results-dialog,
+body[data-reduced-motion=true] #record-book,
+body[data-reduced-motion=true][data-mode=paused] #overlay .card{animation:none!important}
+body[data-reduced-motion=true] #results-dialog,
+body[data-reduced-motion=true] #results-dialog *,
+body[data-reduced-motion=true][data-mode=paused] #overlay .card{scroll-behavior:auto!important;transition:none!important}
+@media(prefers-reduced-motion:reduce){
+  .stat-pulse,#collection-dialog,#jump-guide-dialog,#jump-settings-dialog,#results-dialog,#record-book,body[data-mode=paused] #overlay .card{animation:none!important}
+  #results-dialog,#results-dialog *,body[data-mode=paused] #overlay .card{scroll-behavior:auto!important;transition:none!important}
+}
