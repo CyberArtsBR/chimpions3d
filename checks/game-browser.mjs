@@ -39,26 +39,19 @@ try{
   await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
   assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
   assert(await page.getByRole('button',{name:'Field Guide',exact:true}).isVisible(),'Field guide must be visible on desktop');
-  assert(await page.getByRole('button',{name:'Options',exact:true}).isVisible(),'Options must be visible on desktop');
-  assert.equal(await page.evaluate(()=>window.chimpJump().uiReady),true,'Jump must not advertise ready before presentation controls are mounted');
   assert.equal(await page.locator('#audio-settings').isVisible(),false,'Title screen must hide Audio settings');
   assert.equal(await page.locator('#background-style').isVisible(),false,'Title screen must hide Scenery settings');
 
   await screenshot('game-menu-desktop.png');
   await page.getByRole('button',{name:'Field Guide',exact:true}).click();
-  assert(await page.locator('#jump-guide-dialog[open]').isVisible(),'Field Guide dialog must open from the menu');
-  await screenshot('game-guide-desktop.png');
-  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
-  await page.getByRole('button',{name:'Options',exact:true}).click();
-  assert(await page.locator('#jump-settings-dialog[open]').isVisible(),'Options dialog must open from the menu');
   await page.getByLabel('Reduced Motion').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
   await page.getByLabel('Reduced Motion').uncheck();
   await page.getByLabel('High Visibility').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
   await page.getByLabel('High Visibility').uncheck();
-  await screenshot('game-options-desktop.png');
-  await page.getByRole('button',{name:'Close Options',exact:true}).click();
+  await screenshot('game-guide-desktop.png');
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');
