@@ -9,6 +9,7 @@ const suites={
     'determinism-regression.mjs',
     'assets.mjs',
     'asset-budget.mjs',
+    'mobile-visual-budget.mjs',
     'upload-validation.mjs',
     'jump-audit.mjs',
     'production-hook-safety.mjs'
