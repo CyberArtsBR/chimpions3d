@@ -30,6 +30,11 @@ try{
     await page.getByRole('button',{name:'Resume',exact:true}).click();
     await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:5000});
   }
+  // Freeze the QA render loop before exercising the pause control. Software WebKit can
+  // stall a Cinematic Max frame long enough to trigger the intentional >750ms safety
+  // auto-pause between the visibility assertion and Playwright's click action.
+  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:3000});
   assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),name+': gameplay pause action hidden');
   await page.getByRole('button',{name:'Pause game'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused',null,{timeout:3000});
