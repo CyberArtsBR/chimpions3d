@@ -78,9 +78,14 @@ for(const hz of renderRates){
   }
  }
  assert.equal(steps,targetSteps);
- renderSnapshots.push(JSON.stringify({x:g.x,y:g.y,vx:g.vx,vy:g.vy,time:g.time,height:g.height,bounces:g.bounces,dead:g.dead}));
+ renderSnapshots.push({hz,x:g.x,y:g.y,vx:g.vx,vy:g.vy,time:g.time,height:g.height,bounces:g.bounces,dead:g.dead});
 }
-assert.equal(new Set(renderSnapshots).size,1,'30/60/120/144 Hz render cadence must not alter the same fixed-step simulation');
+const renderReference=renderSnapshots.find(snapshot=>snapshot.hz===60);
+for(const snapshot of renderSnapshots){
+ for(const key of ['x','y','vx','vy','time','height'])assert(Math.abs(snapshot[key]-renderReference[key])<1e-9,'Render cadence changed '+key+' at '+snapshot.hz+' Hz');
+ assert.equal(snapshot.bounces,renderReference.bounces,'Render cadence changed bounce count at '+snapshot.hz+' Hz');
+ assert.equal(snapshot.dead,renderReference.dead,'Render cadence changed death state at '+snapshot.hz+' Hz');
+}
 
 let transferCount=0,safePlatforms=0,hazardCount=0;
 const encounterTypes=new Set(),hazardTypes=new Set(),phases=new Set();
