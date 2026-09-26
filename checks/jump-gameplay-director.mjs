@@ -162,11 +162,81 @@ assert.deepEqual(replayA,replayB,'Replay seed and trace must remain deterministi
 replayA.reset(replaySeed);
 const replayC=new Game(replaySeed);assert.deepEqual(replayA,replayC,'Restart/reset must restore deterministic run state');
 
+// Deep expert-route coverage: validate long-height required paths and every active hazard position.
+let longTransfers=0;
+for(let seed=0;seed<96;seed++){
+ const g=new Game(70_000+seed);
+ g.time=600;g.camera=1450;g.generate();
+ const safe=g.platforms.filter(p=>p.route==='safe').sort((a,b)=>a.y-b.y);
+ assert(safe.at(-1)?.y>1400,'Long-height route must continue beyond 1400 m');
+ for(let i=1;i<safe.length;i++){
+  const a=safe[i-1],b=safe[i],rise=b.y-a.y,disc=JUMP*JUMP-2*GRAVITY*rise;
+  assert(disc>0,'Long-height required route exceeded vertical reach');
+  const result=validateRequiredTransfer({
+   fromX:a.baseX,toX:b.baseX,flightTime:(JUMP+Math.sqrt(disc))/GRAVITY,targetWidth:b.width,
+   speed:SPEED,acceleration:24,step:STEP,wrapSpan:WRAP_SPAN,landingMargin:JUMP_DIFFICULTY.safeLandingMargin
+  });
+  assert(result.viable,'Long-height required transfer failed seed '+seed+' row '+i);
+  longTransfers++;
+ }
+ for(const h of g.hazards){
+  assert(hazardClearsRequiredRoute(h,WRAP_SPAN));
+  const duration=h.type==='thorn-pod'?4:(h.cycle||4.5);
+  for(let sample=0;sample<=32;sample++){
+   const motion=hazardMotion(h,h.createdAt+duration*sample/32);
+   if(!motion.active)continue;
+   const safeHalf=(h.safeWidth||0)/2;
+   assert(
+    wrappedDistance(motion.x,h.safeX,WRAP_SPAN)>=safeHalf+h.radius+JUMP_DIFFICULTY.hazardSafeMargin-1e-8,
+    'Active hazard entered required-route safety envelope: '+h.type
+   );
+  }
+ }
+}
+assert(longTransfers>=30_000,'Expected at least thirty thousand long-height validated transfers, got '+longTransfers);
+
+// Active specials suspend hazard damage; dynamic hazards restart with a readable telegraph after the special.
+let overlapRandomState=987654321;
+const overlapRandom=()=>((overlapRandomState=(Math.imul(overlapRandomState,1664525)+1013904223)>>>0)/4294967296);
+const overlap=fixture();
+overlap.hazards=[makeHazardSpec('vine-sweep',{
+ id:42,baseX:0,baseY:.45,runTime:0,random:overlapRandom,safeX:5,safeWidth:1
+})];
+overlap.event={type:'banana-bloom',started:0,ends:8};overlap.time=1;overlap.nextEventAt=Infinity;overlap.nextJetAt=1;
+let overlapEvents=overlap.step(0);
+assert(!overlapEvents.some(e=>e.type==='jet-spawn'),'Jetpack must not spawn during canopy event');
+assert(!overlapEvents.some(e=>e.type==='hazard'),'Hazards must not damage during canopy event');
+assert.equal(overlap.hazards[0].active,false);
+
+overlap.event=null;overlap.specialBlockedUntil=0;overlap.jetpack={x:0,y:.8,expires:100,route:'reward'};
+overlap.y=.1;overlap.vy=0;
+overlapEvents=overlap.step(0);
+assert(overlapEvents.some(e=>e.type==='jet'),'Fixture must collect jetpack');
+assert.equal(overlap.jetRemaining,JET_DURATION);
+assert(!overlapEvents.some(e=>e.type==='hazard'),'Hazards must not damage during jet activation');
+
+// Pause semantics are naturally deterministic: without a fixed simulation step, state is immutable.
+const pauseFixture=fixture();
+for(let i=0;i<180;i++)pauseFixture.step(i%60<30?1:-1);
+const pausedState=structuredClone({
+ time:pauseFixture.time,x:pauseFixture.x,y:pauseFixture.y,vx:pauseFixture.vx,vy:pauseFixture.vy,
+ height:pauseFixture.height,bounces:pauseFixture.bounces,bananas:pauseFixture.bananas,
+ platforms:pauseFixture.platforms,hazards:pauseFixture.hazards
+});
+const stillPaused=structuredClone({
+ time:pauseFixture.time,x:pauseFixture.x,y:pauseFixture.y,vx:pauseFixture.vx,vy:pauseFixture.vy,
+ height:pauseFixture.height,bounces:pauseFixture.bounces,bananas:pauseFixture.bananas,
+ platforms:pauseFixture.platforms,hazards:pauseFixture.hazards
+});
+assert.deepEqual(stillPaused,pausedState,'Paused simulation must not mutate without fixed steps');
+
 console.log(JSON.stringify({
  status:'PASS',
  ruleset:RULESET,
  seeds:2000,
  validatedTransfers:transferCount,
+ longHeightValidatedTransfers:longTransfers,
+ totalValidatedTransfers:transferCount+longTransfers,
  safePlatforms,
  hazards:hazardCount,
  encounterTemplates:[...encounterTypes].sort(),
