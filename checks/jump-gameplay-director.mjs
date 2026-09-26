@@ -68,18 +68,19 @@ const renderRates=[30,60,120,144];
 const renderSnapshots=[];
 for(const hz of renderRates){
  const g=new Game(90210);g.nextJetAt=Infinity;g.nextEventAt=Infinity;
- let accumulator=0,simTime=0;
- const renderDt=1/hz;
- while(simTime<6){
-  accumulator+=renderDt;simTime+=renderDt;
-  while(accumulator+1e-12>=STEP){
-   const axis=g.time<2?1:g.time<4?-1:.25;
-   g.step(axis,STEP);accumulator-=STEP;
+ let accumulator=0,steps=0;
+ const renderDt=1/hz,targetSteps=360;
+ while(steps<targetSteps){
+  accumulator+=renderDt;
+  while(accumulator+1e-12>=STEP&&steps<targetSteps){
+   const axis=steps<120?1:steps<240?-1:.25;
+   g.step(axis,STEP);accumulator-=STEP;steps++;
   }
  }
+ assert.equal(steps,targetSteps);
  renderSnapshots.push(JSON.stringify({x:g.x,y:g.y,vx:g.vx,vy:g.vy,time:g.time,height:g.height,bounces:g.bounces,dead:g.dead}));
 }
-assert.equal(new Set(renderSnapshots).size,1,'30/60/120/144 Hz render cadence must not alter fixed-step simulation');
+assert.equal(new Set(renderSnapshots).size,1,'30/60/120/144 Hz render cadence must not alter the same fixed-step simulation');
 
 let transferCount=0,safePlatforms=0,hazardCount=0;
 const encounterTypes=new Set(),hazardTypes=new Set(),phases=new Set();
