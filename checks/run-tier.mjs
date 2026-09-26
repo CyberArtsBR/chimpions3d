@@ -6,6 +6,7 @@ const suites={
   fast:[
     'qa-self-audit.mjs',
     'core-regression.mjs',
+    'jump-gameplay-director.mjs',
     'determinism-regression.mjs',
     'assets.mjs',
     'asset-budget.mjs',
