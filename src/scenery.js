@@ -376,6 +376,7 @@ export function createScenery(scene,renderer){
    const pulse=reducedMotion?1:1+Math.sin(time*3.4+h.phase)*.035;group.scale.setScalar(pulse);
    if(telegraph){
     telegraph.visible=!!h.telegraphing;
+    telegraph.position.y=h.type==='falling-fruit'?(h.baseY-h.y):0;
     telegraph.material.opacity=h.telegraphing ? .62 : 0;
     if(h.telegraphing&&!reducedMotion){const cuePulse=1+Math.sin(time*8)*.16;telegraph.scale.setScalar(cuePulse);}
    }
