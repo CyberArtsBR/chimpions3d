@@ -3,7 +3,7 @@ import './jumpPresentationV2.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
-const MENU_ART_URL='/ui/start-screen.webp';
+const MENU_ART_URL='/screens/chimp-jump-start.png';
 const loadJSON=(key,fallback)=>{try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{return {...fallback}}};
 const loadGoals=()=>{try{const value=JSON.parse(localStorage.getItem(GOALS_KEY)||'[]');return Array.isArray(value)?value:[]}catch{return []}};
 const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
@@ -147,7 +147,8 @@ export function setupJumpExperience(){
     }catch{}
     try{await document.fonts?.ready;}catch{}
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const controlsReady=!!document.getElementById('play')&&!!document.querySelector('#overlay .card')&&!!document.getElementById('avatar-status');
+    const controlsReady=[document.getElementById('play'),document.querySelector('#overlay .card'),document.getElementById('avatar-status'),guideButton,optionsButton,dialog,settings].every(Boolean)
+      &&[guideButton,optionsButton].every(control=>control.isConnected&&control.getClientRects().length>0&&getComputedStyle(control).pointerEvents!=='none');
     document.body.dataset.uiReady=controlsReady?'true':'degraded';
     document.body.dataset.menuReady=artworkReady&&controlsReady?'true':'degraded';
     loader.hidden=true;
@@ -244,7 +245,7 @@ export function setupJumpExperience(){
     if(keys[event.key]){event.preventDefault();event.stopImmediatePropagation();focusGrid(collection,keys[event.key]);}
   },true);
 
-  window.chimpJumpUX=Object.freeze({handleAction:handleNormalizedAction,get preferences(){return {...prefs}}});
+  window.chimpJumpUX=Object.freeze({handleAction:handleNormalizedAction,get ready(){return document.body.dataset.uiReady==='true';},get preferences(){return {...prefs}}});
 
   applyPrefs();renderGoals();syncStatus();syncReadyLoader();void setReadiness();
 }
