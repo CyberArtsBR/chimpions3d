@@ -177,6 +177,11 @@ try{
   report.samples.afterMenus=await sample();
   assertResourceGrowth(beforeMenus,report.samples.afterMenus,budgets.functionalCI.transitionGrowth,'menu cycles');
 
+  await page.evaluate(()=>window.chimpJumpTest.startRun());
+  await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));
+  if(await page.evaluate(()=>window.chimpJump().mode==='starting'))await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+
   // 25 complete restarts remain the primary resource lifetime regression.
   const beforeRestarts=await sample();
   for(let i=0;i<25;i++){
