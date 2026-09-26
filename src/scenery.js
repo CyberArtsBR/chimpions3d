@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
+import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
 
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function canvasTexture(w,h,draw){
@@ -132,6 +133,8 @@ export function createScenery(scene,renderer){
 
  // Keep the wrap boundary invisible: no decorative vines hanging from the screen edges.
  let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null;
+ let activeVisualProfile={profile:'balanced',highScenery:false},visualConstraints={constrained:false};
+ const desktopDetailAllowed=()=>allowsDesktopDetail(activeVisualProfile,visualConstraints);
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
  function instances(geometry,material,parent,count,place){
   const batch=new THREE.InstancedMesh(geometry,material,count);parent.add(batch);
@@ -187,7 +190,7 @@ export function createScenery(scene,renderer){
   const authored=group.getObjectByName('authored-branch'),procedural=group.getObjectByName('procedural-branch');
   if(authored)authored.visible=highQuality;
   if(procedural)procedural.visible=!highQuality||!authored;
-  group.traverse(o=>{if(o.userData.desktopDetail)o.visible=highQuality;});
+  applyVisualDetailBudget(group,activeVisualProfile,visualConstraints);
   attachPlatform(group);armBranchPooling(group);return group;
  }
 
@@ -263,7 +266,7 @@ export function createScenery(scene,renderer){
   }else{const wood=mesh(logGeo,branchBark,fallback,0,-.24);wood.rotation.z=Math.PI/2;wood.scale.set(.82+variant*.09,p.width,.82+(3-variant)*.055);wood.castShadow=wood.receiveShadow=true;}
   for(const side of [-1,1]){const cut=mesh(capGeo,end,fallback,side*p.width/2,-.24,0);cut.rotation.y=side*Math.PI/2;const twig=mesh(logGeo,branchBark,fallback,side*(p.width*(.30+variant*.018)),-.36,-.04);twig.scale.set(.34+variant*.035,.44+variant*.05,.34);twig.rotation.z=side*(.88+variant*.12);}
   for(const side of ((p.type==='cracked'||p.fragile)?[-1,1]:[0])){const top=mesh(mossGeo,branchMoss,fallback,side*p.width*.26,-.085);top.scale.set(p.width/(side?4:2),.075+variant*.006,.28+variant*.025);top.receiveShadow=true;}
-  const detail=new THREE.Group();fallback.add(detail);detail.visible=highQuality;detail.userData.desktopDetail=true;
+  const detail=new THREE.Group();fallback.add(detail);detail.visible=desktopDetailAllowed();detail.userData.desktopDetail=true;
   instances(knotGeo,dark,detail,5,(i,o)=>{o.position.set((i/4-.5)*p.width*.85,-.27,.205);o.scale.set(.6+i%2*.25,.5,1);});
   instances(mossGeo,branchMoss,detail,9,(i,o)=>{o.position.set((i/8-.5)*p.width*.9,-.04,-.04+Math.sin(i*4)*.12);o.scale.set(.13,.04,.15);});
   instances(leafGeo,leaf,detail,7,(i,o)=>{o.position.set((i/6-.5)*p.width*.85,-.31,.05);o.scale.set(.11,.22,1);o.rotation.z=(i%2?1:-1)*.6;});
@@ -271,7 +274,7 @@ export function createScenery(scene,renderer){
 
   // High-detail contour work for procedural/special branches. It stays below the
   // landing plane, so silhouettes gain taper, knots and moss without changing physics.
-  const organic=new THREE.Group();organic.name='organic-platform-detail';organic.userData.desktopDetail=true;organic.visible=highQuality;fallback.add(organic);
+  const organic=new THREE.Group();organic.name='organic-platform-detail';organic.userData.desktopDetail=true;organic.visible=desktopDetailAllowed();fallback.add(organic);
   for(const [side,index] of [[-1,0],[1,1]]){
    const spur=mesh(logGeo,branchBark,organic,side*p.width*(.38+variant*.012),-.3,-.06+index*.03);
    spur.scale.set(.13+variant*.012,.42+variant*.045,.13);spur.rotation.z=side*(.9+variant*.055);spur.rotation.x=side*.09;spur.castShadow=spur.receiveShadow=true;
@@ -389,7 +392,18 @@ export function createScenery(scene,renderer){
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
   reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;invalidateStaticFrame();},
-  setQuality(high){highQuality=high;loadPlatform();loadTree();scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});refreshBackground();invalidateStaticFrame();},
+  setQuality(profile,options={}){
+   activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
+   visualConstraints={constrained:!!options.constrained};
+   highQuality=!!activeVisualProfile.highScenery&&!visualConstraints.constrained;
+   loadPlatform();loadTree();
+   scene.traverse(o=>{
+    if(o.name==='authored-branch')o.visible=highQuality;
+    if(o.name==='procedural-branch')o.visible=!highQuality||!o.parent.getObjectByName('authored-branch');
+   });
+   applyVisualDetailBudget(scene,activeVisualProfile,visualConstraints);
+   refreshBackground();invalidateStaticFrame();
+  },
   invalidateRender(){invalidateStaticFrame();}
  };
 }
