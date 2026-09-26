@@ -21,6 +21,7 @@ const ARM_REST_ANGLE = THREE.MathUtils.degToRad(22);
 const WORLD_X = new THREE.Vector3(1,0,0);
 const WORLD_Y = new THREE.Vector3(0,1,0);
 const WORLD_Z = new THREE.Vector3(0,0,1);
+const SECONDARY_TOKENS = Object.freeze(['ear','tail','hat','cap','bandana','ponytail','accessory','strap']);
 
 const ALIASES = Object.freeze({
   hips: ['hips','hip','pelvis'],
@@ -154,6 +155,11 @@ function worldDirection(fromBone, toBone, output, fromPosition, toPosition) {
 }
 
 export function prepareAnimationRig(model, rig) {
+  const authoredBases = new Map();
+  model.traverse(object => {
+    if (object.isBone) authoredBases.set(object, object.quaternion.clone().normalize());
+  });
+
   const direction = new THREE.Vector3();
   const fromPosition = new THREE.Vector3();
   const toPosition = new THREE.Vector3();
@@ -162,53 +168,85 @@ export function prepareAnimationRig(model, rig) {
   const boneWorld = new THREE.Quaternion();
   const correction = new THREE.Quaternion();
 
-  for (const side of ['left','right']) {
-    const arm = rig[side + 'UpperArm'];
-    const forearm = rig[side + 'Forearm'];
-    model.updateWorldMatrix(true, true);
-    worldDirection(arm, forearm, direction, fromPosition, toPosition);
-    if (direction.lengthSq() < 0.5) {
-      throw new Error('Arm has zero length; cannot safely prepare animation rig.');
+  try {
+    for (const side of ['left','right']) {
+      const arm = rig[side + 'UpperArm'];
+      const forearm = rig[side + 'Forearm'];
+      model.updateWorldMatrix(true, true);
+      worldDirection(arm, forearm, direction, fromPosition, toPosition);
+      if (direction.lengthSq() < 0.5) {
+        throw new Error('Arm has zero length; cannot safely prepare animation rig.');
+      }
+      desired.set(
+        (side === 'left' ? 1 : -1) * Math.sin(ARM_REST_ANGLE),
+        -Math.cos(ARM_REST_ANGLE),
+        0.04,
+      ).normalize();
+      arm.parent.getWorldQuaternion(parentWorld);
+      arm.getWorldQuaternion(boneWorld);
+      correction.setFromUnitVectors(direction, desired);
+      arm.quaternion.copy(parentWorld.invert().multiply(correction).multiply(boneWorld)).normalize();
     }
-    desired.set(
-      (side === 'left' ? 1 : -1) * Math.sin(ARM_REST_ANGLE),
-      -Math.cos(ARM_REST_ANGLE),
-      0.04,
-    ).normalize();
-    arm.parent.getWorldQuaternion(parentWorld);
-    arm.getWorldQuaternion(boneWorld);
-    correction.setFromUnitVectors(direction, desired);
-    arm.quaternion.copy(parentWorld.invert().multiply(correction).multiply(boneWorld)).normalize();
+
+    model.updateWorldMatrix(true, true);
+
+    const entries = [];
+    for (const key of BONE_KEYS) {
+      const bone = rig[key];
+      if (!bone) continue;
+      const worldInverse = bone.getWorldQuaternion(new THREE.Quaternion()).invert();
+      entries.push({
+        key,
+        bone,
+        base: bone.quaternion.clone().normalize(),
+        authoredBase: authoredBases.get(bone)?.clone() || bone.quaternion.clone().normalize(),
+        axes: [
+          WORLD_X.clone().applyQuaternion(worldInverse).normalize(),
+          WORLD_Y.clone().applyQuaternion(worldInverse).normalize(),
+          WORLD_Z.clone().applyQuaternion(worldInverse).normalize(),
+        ],
+      });
+    }
+
+    for (const side of ['left','right']) {
+      model.updateWorldMatrix(true, true);
+      worldDirection(rig[side + 'UpperArm'], rig[side + 'Forearm'], direction, fromPosition, toPosition);
+      if (direction.y > -0.6) {
+        throw new Error('Idle arm validation failed. Character stays hidden; review bone mapping.');
+      }
+    }
+
+    return entries;
+  } finally {
+    for (const [bone, authoredBase] of authoredBases) {
+      bone.quaternion.copy(authoredBase).normalize();
+    }
+    model.updateWorldMatrix(true, true);
   }
+}
 
-  model.updateWorldMatrix(true, true);
+export function mapSecondaryMotionBones(root, rigEntries = [], maxBones = 12) {
+  const excluded = new Set(rigEntries.map(entry => entry.bone));
+  const selected = [];
 
-  const entries = [];
-  for (const key of BONE_KEYS) {
-    const bone = rig[key];
-    if (!bone) continue;
-    const worldInverse = bone.getWorldQuaternion(new THREE.Quaternion()).invert();
-    entries.push({
-      key,
-      bone,
-      base: bone.quaternion.clone().normalize(),
-      axes: [
-        WORLD_X.clone().applyQuaternion(worldInverse).normalize(),
-        WORLD_Y.clone().applyQuaternion(worldInverse).normalize(),
-        WORLD_Z.clone().applyQuaternion(worldInverse).normalize(),
-      ],
+  root.traverse(object => {
+    if (!object.isBone || excluded.has(object) || selected.length >= maxBones) return;
+    const words = String(object.name || '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    if (!SECONDARY_TOKENS.some(token => words.some(word => word === token || word.startsWith(token)))) return;
+    if (selected.some(entry => isDescendant(object, entry.bone))) return;
+
+    selected.push({
+      bone: object,
+      base: object.quaternion.clone().normalize(),
+      phase: selected.length % 2 === 0 ? 1 : -1,
     });
-  }
+  });
 
-  for (const side of ['left','right']) {
-    model.updateWorldMatrix(true, true);
-    worldDirection(rig[side + 'UpperArm'], rig[side + 'Forearm'], direction, fromPosition, toPosition);
-    if (direction.y > -0.6) {
-      throw new Error('Idle arm validation failed. Character stays hidden; review bone mapping.');
-    }
-  }
-
-  return entries;
+  return selected;
 }
 
 export function validateFiniteSkeleton(bones) {

@@ -6,6 +6,10 @@ const BONE_INDEX = Object.freeze(Object.fromEntries(BONE_KEYS.map((key, index) =
 const EMPTY_INPUT = Object.freeze({});
 const PI = Math.PI;
 const SIDES = Object.freeze(['left','right']);
+const LAND_CONTACT_SECONDS = 0.085;
+const EVENT_QUEUE_LIMIT = 32;
+const LOCAL_X = new THREE.Vector3(1,0,0);
+const LOCAL_Z = new THREE.Vector3(0,0,1);
 
 const ROTATION_LIMIT = Object.freeze({
   hips:0.60, spine:0.68, chest:0.72, neck:0.52, head:0.58,
@@ -44,10 +48,11 @@ function resultKind(value) {
 }
 
 export class CharacterAnimator {
-  constructor({visual, model, rigEntries, bones, launchVelocity = 12}) {
+  constructor({visual, model, rigEntries, secondaryEntries = [], bones, launchVelocity = 12}) {
     this.visual = visual;
     this.model = model;
     this.rigEntries = rigEntries;
+    this.secondaryEntries = secondaryEntries;
     this.bones = bones;
     this.launchVelocity = Math.max(1, finite(launchVelocity, 12));
 
@@ -65,6 +70,11 @@ export class CharacterAnimator {
     this.secondaryLag = 0;
     this.previousVelocityY = 0;
     this.velocityInitialized = false;
+    this.previousVelocityX = 0;
+    this.reversalAge = 999;
+    this.reversalDirection = 1;
+    this.reversalStrength = 0;
+    this.reversalLatch = 0;
 
     this.hazardAge = 999;
     this.hazardDirection = 1;
@@ -88,6 +98,7 @@ export class CharacterAnimator {
 
     this.jetpackBlend = 0;
     this.jetpackStrength = 0;
+    this.jetSignal = false;
     this.dyingAge = 0;
     this.resultAge = 0;
     this.result = '';
@@ -97,6 +108,7 @@ export class CharacterAnimator {
     this.targetScaleY = 1;
     this.targetLeanZ = 0;
     this.targetPitchX = 0;
+    this.events = [];
 
     this.resetImmediate();
   }
@@ -119,10 +131,29 @@ export class CharacterAnimator {
     this.pose[index + 2] += z;
   }
 
+  _emit(type, detail = {}) {
+    this.events.push({type, state:this.state, ...detail});
+    if (this.events.length > EVENT_QUEUE_LIMIT) this.events.splice(0, this.events.length - EVENT_QUEUE_LIMIT);
+  }
+
+  peekEvents() {
+    return this.events.map(event => ({...event}));
+  }
+
+  consumeEvents() {
+    const events = this.peekEvents();
+    this.events.length = 0;
+    return events;
+  }
+
   _changeState(next) {
     if (next === this.state) return;
+    const previous = this.state;
     this.state = next;
     this.stateAge = 0;
+    if (next === ANIMATION_STATES.TAKEOFF) this._emit('takeoff', {from:previous});
+    else if (next === ANIMATION_STATES.APEX) this._emit('apex', {from:previous});
+    else if (next === ANIMATION_STATES.DYING) this._emit('death', {from:previous});
   }
 
   _captureEvents(dt, input, velocityX) {
@@ -147,6 +178,7 @@ export class CharacterAnimator {
     if (spring > 0.001 && this.springSignal <= 0.001) {
       this.springAge = 0;
       this.springStrength = clamp01(finite(input.springStrength, spring)) || spring;
+      this._emit('spring-contact', {strength:this.springStrength});
     }
     this.springSignal = spring;
     this.springAge += dt;
@@ -158,9 +190,29 @@ export class CharacterAnimator {
       this.landingQuality = String(input.landingQuality || 'CLEAN').toUpperCase();
       this.landingDirection = velocityX < -0.08 ? -1 : velocityX > 0.08 ? 1 : this.landingDirection;
       this.landingPlatformType = String(input.platformType || '').toLowerCase();
+      this._emit('foot-contact', {
+        strength:this.landingImpact,
+        quality:this.landingQuality,
+        platformType:this.landingPlatformType,
+      });
     }
     this.landingSignal = landing;
     this.landingAge += dt;
+  }
+
+  _captureDirection(dt, velocityX, intentX) {
+    const intentDirection = Math.abs(intentX) > 0.15 ? Math.sign(intentX) : 0;
+    const velocityDirection = Math.abs(velocityX) > 0.35 ? Math.sign(velocityX) : 0;
+    if (intentDirection && velocityDirection && intentDirection !== velocityDirection && this.reversalLatch !== intentDirection) {
+      this.reversalAge = 0;
+      this.reversalDirection = intentDirection;
+      this.reversalStrength = Math.max(0.35, clamp01(Math.abs(velocityX) / 6));
+      this.reversalLatch = intentDirection;
+    } else if (intentDirection && velocityDirection === intentDirection) {
+      this.reversalLatch = 0;
+    }
+    this.reversalAge += dt;
+    this.previousVelocityX = velocityX;
   }
 
   _selectState(input, velocityY, landingAnticipation, platformType) {
@@ -171,8 +223,8 @@ export class CharacterAnimator {
     if (this.springAge < 0.44 || (platformType === 'spring' && landingAnticipation > 0.34)) {
       return ANIMATION_STATES.SPRING;
     }
-    const profile = landingProfile(this.landingQuality);
-    if (this.landingAge < profile.recovery + 0.18) return ANIMATION_STATES.LAND;
+    const contactWindow = this.landingQuality === 'HARD' ? 0.09 : LAND_CONTACT_SECONDS;
+    if (this.landingAge < contactWindow) return ANIMATION_STATES.LAND;
     if (input.active === false) return ANIMATION_STATES.IDLE;
 
     const bounceAge = Math.max(0, finite(input.bounceAge, 1));
@@ -191,12 +243,19 @@ export class CharacterAnimator {
     const velocityY = finite(input.velocityY, 0);
     const velocityX = finite(input.velocityX, 0);
     const platformVelocityX = finite(input.platformVelocityX, 0);
+    const intentX = clamp(finite(input.intentX, velocityX), -1, 1);
     const landingAnticipation = clamp01(finite(input.landingAnticipation, 0));
     const platformType = String(input.platformType || '').toLowerCase();
     const reducedMotion = !!input.reducedMotion;
     const reduction = reducedMotion ? 0.42 : 1;
 
     this._captureEvents(dt, input, velocityX);
+    this._captureDirection(dt, velocityX, intentX);
+
+    const nextJetSignal = !!input.jetpackActive;
+    if (nextJetSignal && !this.jetSignal) this._emit('jet-start', {strength:clamp01(finite(input.jetpackStrength, 1))});
+    else if (!nextJetSignal && this.jetSignal) this._emit('jet-end');
+    this.jetSignal = nextJetSignal;
 
     const jetTarget = input.jetpackActive ? clamp01(finite(input.jetpackStrength, 1)) : 0;
     this.jetpackBlend = damp(this.jetpackBlend, jetTarget, input.jetpackActive ? 12 : 7, dt);
@@ -262,9 +321,11 @@ export class CharacterAnimator {
 
     this._applyPlatformReaction(time, platformType || this.landingPlatformType, landingAnticipation, velocityX, platformVelocityX, reduction);
     this._applyHorizontalBalance(velocityX, reduction);
+    this._applyDirectionReversal(reduction);
     this._applyWrapReaction(reduction);
     this._applySecondaryMotion(velocityY, reducedMotion, dt);
     this._applyPose(dt, reducedMotion);
+    this._applySecondaryAccessories(dt, reducedMotion, velocityX);
 
     return this.state;
   }
@@ -632,6 +693,20 @@ export class CharacterAnimator {
     }
   }
 
+  _applyDirectionReversal(reduction) {
+    if (this.reversalAge >= 0.28) return;
+    const pulse = Math.sin(PI * clamp01(this.reversalAge / 0.28)) *
+      this.reversalDirection * this.reversalStrength * reduction;
+    this._add('hips', 0.025 * Math.abs(pulse), 0.035 * pulse, -0.10 * pulse);
+    this._add('spine', 0.018 * Math.abs(pulse), -0.055 * pulse, -0.14 * pulse);
+    this._add('chest', -0.012 * Math.abs(pulse), 0.075 * pulse, 0.09 * pulse);
+    this._add('neck', 0, -0.060 * pulse, 0.035 * pulse);
+    this._add('head', 0, -0.095 * pulse, 0.055 * pulse);
+    this._add('leftUpperArm', -0.11 * pulse, 0, 0.045 * pulse);
+    this._add('rightUpperArm', 0.11 * pulse, 0, 0.045 * pulse);
+    this.targetLeanZ += -0.055 * pulse;
+  }
+
   _applyWrapReaction(reduction) {
     if (this.wrapAge >= 0.34) return;
     const pulse = Math.sin(PI * clamp01(this.wrapAge / 0.34)) * this.wrapDirection * reduction;
@@ -675,9 +750,10 @@ export class CharacterAnimator {
     for (const entry of this.rigEntries) {
       const index = this._slot(entry.key);
       const limit = ROTATION_LIMIT[entry.key] || 1.2;
-      let x = clamp(finite(this.pose[index]), -limit, limit);
-      let y = clamp(finite(this.pose[index + 1]), -limit, limit);
-      let z = clamp(finite(this.pose[index + 2]), -limit, limit);
+      const motionScale = reducedMotion ? 0.58 : 1;
+      let x = clamp(finite(this.pose[index]) * motionScale, -limit, limit);
+      let y = clamp(finite(this.pose[index + 1]) * motionScale, -limit, limit);
+      let z = clamp(finite(this.pose[index + 2]) * motionScale, -limit, limit);
 
       this.targetQuaternion.copy(entry.base);
       if (x) this.targetQuaternion.multiply(this.deltaQuaternion.setFromAxisAngle(entry.axes[0], x));
@@ -687,11 +763,15 @@ export class CharacterAnimator {
       entry.bone.quaternion.slerp(this.targetQuaternion, alpha).normalize();
     }
 
-    this.bodyOffset = damp(this.bodyOffset, this.targetOffset, response, dt);
-    this.scaleXZ = damp(this.scaleXZ, this.targetScaleXZ, response, dt);
-    this.scaleY = damp(this.scaleY, this.targetScaleY, response, dt);
-    this.visualLeanZ = damp(this.visualLeanZ, this.targetLeanZ, reducedMotion ? 12 : 9, dt);
-    this.visualPitchX = damp(this.visualPitchX, this.targetPitchX, reducedMotion ? 12 : 9, dt);
+    const rootMotionScale = reducedMotion ? 0.30 : 1;
+    const offsetTarget = this.targetOffset * rootMotionScale;
+    const scaleXZTarget = 1 + (this.targetScaleXZ - 1) * rootMotionScale;
+    const scaleYTarget = 1 + (this.targetScaleY - 1) * rootMotionScale;
+    this.bodyOffset = damp(this.bodyOffset, offsetTarget, response, dt);
+    this.scaleXZ = damp(this.scaleXZ, scaleXZTarget, response, dt);
+    this.scaleY = damp(this.scaleY, scaleYTarget, response, dt);
+    this.visualLeanZ = damp(this.visualLeanZ, this.targetLeanZ * rootMotionScale, reducedMotion ? 12 : 9, dt);
+    this.visualPitchX = damp(this.visualPitchX, this.targetPitchX * rootMotionScale, reducedMotion ? 12 : 9, dt);
 
     this.visual.position.x = 0;
     this.visual.position.y = finite(this.bodyOffset);
@@ -705,9 +785,34 @@ export class CharacterAnimator {
     this.visual.rotation.z = clamp(finite(this.visualLeanZ), -0.20, 0.20);
   }
 
+  _applySecondaryAccessories(dt, reducedMotion, velocityX) {
+    if (!this.secondaryEntries.length) return;
+    const response = reducedMotion ? 15 : 9;
+    const alpha = 1 - Math.exp(-response * dt);
+    const motionScale = reducedMotion ? 0.18 : 1;
+    const verticalLag = clamp(this.secondaryLag * 0.95 * motionScale, -0.12, 0.12);
+    const lateralLag = clamp(velocityX / 8, -1, 1) * 0.045 * motionScale;
+    const reversal = this.reversalAge < 0.28
+      ? Math.sin(PI * clamp01(this.reversalAge / 0.28)) * this.reversalDirection * 0.035 * motionScale
+      : 0;
+
+    for (const entry of this.secondaryEntries) {
+      this.targetQuaternion.copy(entry.base);
+      this.targetQuaternion.multiply(this.deltaQuaternion.setFromAxisAngle(
+        LOCAL_X, -verticalLag * entry.phase,
+      ));
+      this.targetQuaternion.multiply(this.deltaQuaternion.setFromAxisAngle(
+        LOCAL_Z, (lateralLag + reversal) * entry.phase,
+      ));
+      this.targetQuaternion.normalize();
+      entry.bone.quaternion.slerp(this.targetQuaternion, alpha).normalize();
+    }
+  }
+
   resetImmediate() {
     this.pose.fill(0);
     for (const entry of this.rigEntries) entry.bone.quaternion.copy(entry.base).normalize();
+    for (const entry of this.secondaryEntries) entry.bone.quaternion.copy(entry.base).normalize();
 
     this.state = ANIMATION_STATES.IDLE;
     this.stateAge = 0;
@@ -719,6 +824,11 @@ export class CharacterAnimator {
     this.secondaryLag = 0;
     this.previousVelocityY = 0;
     this.velocityInitialized = false;
+    this.previousVelocityX = 0;
+    this.reversalAge = 999;
+    this.reversalDirection = 1;
+    this.reversalStrength = 0;
+    this.reversalLatch = 0;
 
     this.hazardAge = 999;
     this.hazardStrength = 0;
@@ -733,6 +843,7 @@ export class CharacterAnimator {
     this.landingSignal = 0;
     this.jetpackBlend = 0;
     this.jetpackStrength = 0;
+    this.jetSignal = false;
     this.dyingAge = 0;
     this.resultAge = 0;
     this.result = '';
@@ -742,6 +853,7 @@ export class CharacterAnimator {
     this.targetScaleY = 1;
     this.targetLeanZ = 0;
     this.targetPitchX = 0;
+    this.events.length = 0;
 
     this.visual.position.set(0,0,0);
     this.visual.scale.set(1,1,1);
@@ -763,6 +875,9 @@ export class CharacterAnimator {
       visualFinite,
       visible:this.model.visible,
       visualScale:[this.visual.scale.x,this.visual.scale.y,this.visual.scale.z],
+      secondaryBoneCount:this.secondaryEntries.length,
+      pendingEventTypes:this.events.map(event => event.type),
+      authoredRestSnapshots:this.rigEntries.filter(entry => entry.authoredBase).length,
     };
   }
 
@@ -771,44 +886,59 @@ export class CharacterAnimator {
     let time = 0;
     let maxQuaternionNormError = 0;
     let maxVisualScaleDeviation = 0;
+    let maxReducedRootScaleDeviation = 0;
     let maxBoneScaleDelta = 0;
+    let maxSecondaryAngularOffset = 0;
+    let maxHeadStep = 0;
     const failures = [];
     const states = [];
-
+    const bounceCycles = 120;
     const baseScales = this.bones.map(bone => bone.scale.clone());
+    const headEntry = this.rigEntries.find(entry => entry.key === 'head');
+    let previousHead = headEntry ? headEntry.bone.quaternion.clone() : null;
 
-    const check = label => {
+    const check = (label, reducedMotion = false) => {
       const diagnostics = this.getDiagnostics();
       if (!diagnostics.skeleton.ok) failures.push(label + ': ' + diagnostics.skeleton.reason + ' (' + diagnostics.skeleton.bone + ')');
       if (!diagnostics.visualFinite) failures.push(label + ': non-finite visual transform');
       if (!diagnostics.visible) failures.push(label + ': model became invisible');
       maxQuaternionNormError = Math.max(maxQuaternionNormError, diagnostics.skeleton.maxQuaternionNormError || 0);
-      maxVisualScaleDeviation = Math.max(
-        maxVisualScaleDeviation,
+      const scaleDeviation = Math.max(
         Math.abs(this.visual.scale.x - 1),
         Math.abs(this.visual.scale.y - 1),
         Math.abs(this.visual.scale.z - 1),
       );
+      maxVisualScaleDeviation = Math.max(maxVisualScaleDeviation, scaleDeviation);
+      if (reducedMotion) maxReducedRootScaleDeviation = Math.max(maxReducedRootScaleDeviation, scaleDeviation);
       for (let index = 0; index < this.bones.length; index++) {
         maxBoneScaleDelta = Math.max(maxBoneScaleDelta, this.bones[index].scale.distanceTo(baseScales[index]));
       }
+      for (const entry of this.secondaryEntries) {
+        maxSecondaryAngularOffset = Math.max(maxSecondaryAngularOffset, entry.bone.quaternion.angleTo(entry.base));
+      }
+      if (headEntry && previousHead) {
+        maxHeadStep = Math.max(maxHeadStep, previousHead.angleTo(headEntry.bone.quaternion));
+        previousHead.copy(headEntry.bone.quaternion);
+      }
     };
+
+    const inputTemplate = () => ({
+      active:true, velocityY:0, velocityX:0, intentX:0, bounceAge:1,
+      landingAnticipation:0, landingImpact:0, platformType:'', platformVelocityX:0,
+      springActive:false, springStrength:1, hazardHit:false, hazardDirection:1,
+      jetpackActive:false, jetpackStrength:1, wrapEvent:null,
+      dying:false, reducedMotion:false, landingQuality:'CLEAN', result:'', resultType:'',
+    });
 
     const run = (label, expected, frames, configure) => {
       const seen = new Set();
       for (let frame = 0; frame < frames; frame++) {
-        const input = {
-          active:true, velocityY:0, velocityX:0, bounceAge:1,
-          landingAnticipation:0, landingImpact:0, platformType:'', platformVelocityX:0,
-          springActive:false, springStrength:1, hazardHit:false, hazardDirection:1,
-          jetpackActive:false, jetpackStrength:1, wrapEvent:null,
-          dying:false, reducedMotion:false, landingQuality:'CLEAN', result:'', resultType:'',
-        };
+        const input = inputTemplate();
         configure(input, frame, frames);
         this.update(dt, time, input);
         time += dt;
         seen.add(this.state);
-        check(label);
+        check(label, input.reducedMotion);
       }
       const observed = [...seen];
       states.push({label, expected, observed});
@@ -816,6 +946,8 @@ export class CharacterAnimator {
     };
 
     this.resetImmediate();
+    if (headEntry) previousHead.copy(headEntry.bone.quaternion);
+
     run('IDLE', ANIMATION_STATES.IDLE, 45, input => { input.active = false; });
     run('TAKEOFF', ANIMATION_STATES.TAKEOFF, 9, (input, frame) => {
       input.velocityY = 12 - frame * 0.15;
@@ -834,15 +966,16 @@ export class CharacterAnimator {
       input.bounceAge = 0.9;
       input.landingAnticipation = frame / frames * 0.75;
     });
-    run('LAND', ANIMATION_STATES.LAND, 30, (input, frame) => {
-      input.active = false;
-      input.velocityY = 0;
+    run('LAND', ANIMATION_STATES.LAND, 18, (input, frame) => {
+      input.velocityY = frame < 6 ? 12 : 9;
+      input.bounceAge = frame * dt;
       input.landingImpact = frame === 0 ? 0.72 : 0;
       input.landingQuality = 'CLEAN';
       input.platformType = 'leaf';
     });
-    run('HARD LAND', ANIMATION_STATES.LAND, 42, (input, frame) => {
-      input.active = false;
+    run('HARD LAND', ANIMATION_STATES.LAND, 20, (input, frame) => {
+      input.velocityY = frame < 7 ? 12 : 8;
+      input.bounceAge = frame * dt;
       input.landingImpact = frame === 0 ? 1 : 0;
       input.landingQuality = 'HARD';
       input.platformType = 'moving';
@@ -853,6 +986,12 @@ export class CharacterAnimator {
       input.platformType = 'spring';
       input.landingAnticipation = frame < 10 ? 0.92 : 0;
       input.springActive = frame === 10;
+    });
+    run('REVERSAL', ANIMATION_STATES.ASCEND, 24, (input, frame) => {
+      input.velocityY = 6;
+      input.velocityX = frame < 12 ? 4.5 : -4.5;
+      input.intentX = frame < 12 ? -1 : 1;
+      input.bounceAge = 0.32;
     });
     run('HAZARD', ANIMATION_STATES.HAZARD, 28, (input, frame) => {
       input.velocityY = -4;
@@ -873,27 +1012,95 @@ export class CharacterAnimator {
       input.velocityX = -2.5;
     });
 
+    const eventTypes = [...new Set(this.peekEvents().map(event => event.type))];
+    for (const type of ['foot-contact','takeoff','apex','spring-contact','jet-start','jet-end','death']) {
+      if (!eventTypes.includes(type)) failures.push('animation event contract missing ' + type);
+    }
+
     this.resetImmediate();
+    if (headEntry) previousHead.copy(headEntry.bone.quaternion);
+    for (let cycle = 0; cycle < bounceCycles; cycle++) {
+      for (let frame = 0; frame < 48; frame++) {
+        const input = inputTemplate();
+        input.intentX = cycle % 2 === 0 ? 1 : -1;
+        input.velocityX = input.intentX * (2.8 + (cycle % 5) * 0.25);
+        if (frame < 8) {
+          input.velocityY = 12 - frame * 0.42;
+          input.bounceAge = frame * dt;
+        } else if (frame < 22) {
+          input.velocityY = 8 - (frame - 8) * 0.42;
+          input.bounceAge = frame * dt;
+        } else if (frame < 30) {
+          input.velocityY = 1 - (frame - 22) * 0.28;
+          input.bounceAge = frame * dt;
+        } else if (frame < 47) {
+          input.velocityY = -2 - (frame - 30) * 0.50;
+          input.bounceAge = frame * dt;
+          input.landingAnticipation = (frame - 30) / 17;
+        } else {
+          input.velocityY = 12;
+          input.bounceAge = 0;
+          input.landingImpact = 0.78;
+          input.landingQuality = cycle % 9 === 0 ? 'HARD' : 'CLEAN';
+          input.platformType = cycle % 11 === 0 ? 'spring' : cycle % 3 === 0 ? 'leaf' : 'moving';
+          input.springActive = input.platformType === 'spring';
+        }
+        this.update(dt, time, input);
+        time += dt;
+        check('SOAK-' + cycle);
+      }
+    }
+
+    run('REDUCED MOTION', ANIMATION_STATES.LAND, 24, (input, frame) => {
+      input.reducedMotion = true;
+      input.velocityY = frame < 6 ? 12 : 8;
+      input.velocityX = frame < 12 ? 5 : -5;
+      input.intentX = frame < 12 ? -1 : 1;
+      input.bounceAge = frame * dt;
+      input.landingImpact = frame === 0 ? 0.85 : 0;
+      input.landingQuality = 'EDGE';
+      input.platformType = 'moving';
+    });
+
+    this.resetImmediate();
+    if (headEntry) previousHead.copy(headEntry.bone.quaternion);
     let maxResetAngularError = 0;
     for (const entry of this.rigEntries) {
       maxResetAngularError = Math.max(maxResetAngularError, entry.bone.quaternion.angleTo(entry.base));
+    }
+    let maxSecondaryResetError = 0;
+    for (const entry of this.secondaryEntries) {
+      maxSecondaryResetError = Math.max(maxSecondaryResetError, entry.bone.quaternion.angleTo(entry.base));
     }
     check('RESET');
 
     if (maxQuaternionNormError > 1e-4) failures.push('quaternion normalization drift exceeds 1e-4');
     if (maxVisualScaleDeviation > 0.20) failures.push('visual squash/stretch exceeded safety envelope');
+    if (maxReducedRootScaleDeviation > 0.075) failures.push('reduced-motion root squash/stretch exceeded 7.5%');
     if (maxBoneScaleDelta > 1e-7) failures.push('animation modified authored bone scale');
-    if (maxResetAngularError > 1e-6) failures.push('pose did not reset to basis transforms');
+    if (maxResetAngularError > 1e-6) failures.push('pose did not reset to animation basis transforms');
+    if (maxSecondaryResetError > 1e-6) failures.push('secondary bones did not reset to captured rest transforms');
+    if (maxSecondaryAngularOffset > 0.24) failures.push('secondary accessory motion exceeded angular safety envelope');
+    if (maxHeadStep > 0.50) failures.push('head angular step exceeded continuity limit');
 
     return {
       ok:failures.length === 0,
       states,
       failures,
+      eventTypes,
+      bounceCycles,
+      landContactSeconds:LAND_CONTACT_SECONDS,
       maxQuaternionNormError,
       maxVisualScaleDeviation,
+      maxReducedRootScaleDeviation,
       maxBoneScaleDelta,
       maxResetAngularError,
+      maxSecondaryResetError,
+      maxSecondaryAngularOffset,
+      maxHeadStep,
       boneCount:this.bones.length,
+      secondaryBoneCount:this.secondaryEntries.length,
+      authoredRestSnapshots:this.rigEntries.filter(entry => entry.authoredBase).length,
     };
   }
 }

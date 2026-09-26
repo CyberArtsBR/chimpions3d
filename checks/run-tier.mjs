@@ -10,11 +10,14 @@ const suites={
     'assets.mjs',
     'asset-budget.mjs',
     'upload-validation.mjs',
+    'character-rig.mjs',
     'jump-audit.mjs',
     'production-hook-safety.mjs'
   ],
   standard:[
     'game-browser.mjs',
+    'avatar-browser.mjs',
+    'character-gameplay-browser.mjs',
     'collection-browser.mjs',
     'countdown-browser.mjs',
     'responsive-browser.mjs',
