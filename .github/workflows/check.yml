@@ -57,6 +57,7 @@ jobs:
           node --check checks/countdown-browser.mjs
           node --check checks/responsive-browser.mjs
           node --check checks/accessibility-browser.mjs
+          node --check checks/audio-browser.mjs
           node --check checks/network-failures-browser.mjs
           node --check checks/runtime-resilience-browser.mjs
           node --check checks/performance-browser.mjs
