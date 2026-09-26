@@ -125,7 +125,6 @@ const categories={
 
 const manifest={
   version:1,
-  generatedAt:new Date().toISOString(),
   contentHash:crypto.createHash('sha256').update(controlled.map(item=>item.sha256).join('')).digest('hex'),
   categories:Object.fromEntries(Object.entries(categories).map(([name,items])=>[name,{bytes:sum(items),files:items.map(item=>item.path)}])),
   largestSingleAsset:[...controlled].sort((a,b)=>b.bytes-a.bytes)[0]||null,
