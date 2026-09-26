@@ -44,6 +44,10 @@ try{
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   await page.evaluate(()=>{window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
+  if(await page.evaluate(()=>window.chimpJump().mode==='paused')){
+    await page.evaluate(()=>window.chimpJumpTest.startRun());
+    await page.waitForFunction(()=>window.chimpJump().mode==='playing');
+  }
   await page.keyboard.down('ArrowRight');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
   await page.keyboard.up('ArrowRight');
