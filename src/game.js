@@ -95,7 +95,19 @@ const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,
 const FACE_ANGLE=Math.PI/4;
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FACE_ANGLE;
 let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set(),nearMisses=0,encountersCompleted=0,riskLandings=0;
-let renderThemeIndex=0,renderNight=0,renderLanding=0;
+let renderThemeIndex=0,renderNight=0,renderLanding=0,animationIntentX=0;
+const animationSignals={
+ landingImpact:0,landingQuality:'CLEAN',platformType:'',springActive:false,springStrength:1,
+ hazardHit:false,hazardDirection:1,wrapEvent:null
+};
+function clearAnimationPulses(){
+ animationSignals.landingImpact=0;animationSignals.springActive=false;
+ animationSignals.hazardHit=false;animationSignals.wrapEvent=null;
+}
+function resetAnimationSignals(){
+ clearAnimationPulses();animationSignals.landingQuality='CLEAN';animationSignals.platformType='';
+ animationSignals.springStrength=1;animationSignals.hazardDirection=1;animationIntentX=0;
+}
 const hudCache=new Map();function hudText(id,value){value=String(value);if(hudCache.get(id)!==value){$(id).textContent=value;hudCache.set(id,value);}}
 const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
@@ -172,7 +184,7 @@ function start(requestedSeed=null){
   if(session.practice)toast('Practice trail · same route, no online submission');
   else if(!session.online)toast('Playing offline · online records unavailable');
   for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();for(const m of hazardMeshes.values())removeHazard(m);hazardMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;
-  runSeed=session.seed;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
+  runSeed=session.seed;game.reset(runSeed);resetAnimationSignals();avatar.resetAnimation();avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
   music.muted=muted;music.play().catch(()=>{});inputManager.clearGameplay();acc=0;previous=performance.now();syncUI();return;
  }
  music.muted=muted;music.play().catch(()=>{});beginPlaying();
@@ -261,8 +273,9 @@ function drawWorld(dt=0){
  scenery.update(game.camera,visualTime,dt,palette,night,idx,game.time<30?1:blend);$('world').classList.toggle('night',night>.5);$('world').style.setProperty('--night-strength',night);sun.color.set(from.light).lerp(other.set(current.light),blend);
 }
 function tick(dt,control=input()){
- if(mode!=='playing')return;control=inputTrace.append(control);
+ if(mode!=='playing')return;control=inputTrace.append(control);animationIntentX=control;
  const reducedMotion=document.body.dataset.reducedMotion==='true';
+ const preStepVy=game.vy,preStepVx=game.vx;
  if(control)targetYaw=control>0?FACE_ANGLE:-FACE_ANGLE;const distance=targetYaw-yaw;if(reducedMotion)yaw=targetYaw;else yaw+=Math.sign(distance)*Math.min(Math.abs(distance),Math.PI/0.28*dt);
  const events=game.step(control,dt);
  for(const e of events){
@@ -274,19 +287,25 @@ function tick(dt,control=input()){
    deathPoint={x:game.x,visualY:game.y,velocity:Math.min(-.1,game.vy*paceAt(game.time))};
    runSession.finish();runSession.prepare();
    inputManager.clearGameplay();avatar.root.visible=true;syncUI();
-  }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
+  }else if(e.type==='wrap'){animationSignals.wrapEvent=e.side==='left'?-1:1;sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
   else if(e.type==='coin'){sound('coin');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
   else if(e.type==='jet'){sound('jet');toast('JETPACK · '+Math.ceil(e.duration||game.jetRemaining)+' seconds!');}
   else if(e.type==='jet-spawn')toast(e.route==='reward'?'JETPACK · REWARD ROUTE':'Jetpack nearby! Find it in the canopy');
   else if(e.type==='hazard-telegraph'){sound('event');const hazardCopy={'swinging-pod':'SWINGING POD · WATCH THE ARC','vine-sweep':'VINE SWEEP · READ THE OPENING','falling-fruit':'FALLING FRUIT · MOVE ON THE SHAKE'}[e.hazardType];if(hazardCopy)toast(hazardCopy);}
   else if(e.type==='hazard-active'){}
   else if(e.type==='near-miss'){nearMisses++;if(nearMisses===1||nearMisses%5===0)toast('NEAR MISS · '+nearMisses);}
-  else if(e.type==='hazard'){sound('hazard');landingImpulse=reducedMotion?0:.04;const hazardName={'thorn-pod':'THORN POD','swinging-pod':'SWINGING POD','vine-sweep':'VINE SWEEP','falling-fruit':'FALLING FRUIT'}[e.hazardType]||'HAZARD';toast(hazardName+' · KNOCKBACK');}
+  else if(e.type==='hazard'){animationSignals.hazardHit=true;animationSignals.hazardDirection=Math.sign(game.vx-preStepVx)||1;sound('hazard');landingImpulse=reducedMotion?0:.04;const hazardName={'thorn-pod':'THORN POD','swinging-pod':'SWINGING POD','vine-sweep':'VINE SWEEP','falling-fruit':'FALLING FRUIT'}[e.hazardType]||'HAZARD';toast(hazardName+' · KNOCKBACK');}
   else if(e.type==='vanish'){sound('vanish');}
   else if(e.type==='milestone'){sound('milestone');toast(e.meters+' M · CANOPY MILESTONE');}
   else if(e.type==='event-start'){sound('event');const copy=e.eventType==='banana-bloom'?'BANANA BLOOM · BONUS FRUIT':e.eventType==='spring-fever'?'SPRING FEVER · BOOSTED MUSHROOMS':'CANOPY EVENT';toast(copy);}
   else if(e.type==='event-end'){toast('CANOPY EVENT COMPLETE');}
   else if(e.type==='bounce'){
+   const impact=Math.max(.45,Math.min(1,Math.max(0,-preStepVy)/12));
+   animationSignals.landingImpact=impact;
+   animationSignals.landingQuality=impact>.88?'HARD':impact>.70?'EDGE':'CLEAN';
+   animationSignals.platformType=e.platformType||'';
+   animationSignals.springActive=!!e.spring;
+   animationSignals.springStrength=e.spring?(game.event?.type==='spring-fever'?1:.92):1;
    const branchSound=e.spring?'spring':e.fragile?'fragile':e.platformType==='leaf'?'leaf':e.platformType==='swing'?'swing':e.platformType==='vanish'?'vanish':'bounce';sound(branchSound);
    if(!['spring','cracked','vanish'].includes(e.platformType)&&!cleanPlatformIds.has(e.platformId)){cleanPlatformIds.add(e.platformId);cleanLandings++;}
    if(e.route==='reward'||e.route==='risk')riskLandings++;
@@ -313,10 +332,30 @@ function renderFrame(now){if(document.hidden){previous=now;return;}if(!['startin
   avatar.root.position.set(game.x,mode==='dying'?deathPoint.visualY:game.y,0);avatar.root.rotation.y=yaw;avatar.root.rotation.z=0;
   heroLight.position.set(game.x+2.4,avatar.root.position.y+4.5,7);heroFill.position.set(game.x-3,avatar.root.position.y+2,5);heroTarget.position.set(game.x,avatar.root.position.y+1,0);
   renderLanding=0;
-  if(mode==='playing'){
-   let landing=0;if(game.vy<0){for(const p of game.platforms)if(!p.broken&&p.y<=game.y&&Math.abs(p.x-game.x)<p.width/2+.4){const time=(game.y-p.y)/Math.max(1,-game.vy);landing=Math.max(landing,1-time/.18);}}
+  if(mode==='playing'||mode==='dying'){
+   let landing=0,landingPlatformType=animationSignals.platformType;
+   if(mode==='playing'&&game.vy<0){
+    let nearestTime=Infinity;
+    for(const p of game.platforms)if(!p.broken&&p.y<=game.y&&Math.abs(p.x-game.x)<p.width/2+.4){
+     const time=(game.y-p.y)/Math.max(1,-game.vy);
+     landing=Math.max(landing,1-time/.18);
+     if(time<nearestTime){nearestTime=time;landingPlatformType=p.type||landingPlatformType;}
+    }
+   }
    renderLanding=landing;
-   avatar.update(dt,visualTime,game.vy,game.bounceAge,true,{landing,vx:game.vx});
+   avatar.updateAnimation(dt,visualTime,{
+    active:mode==='playing',velocityY:mode==='dying'?(deathPoint?.velocity??game.vy):game.vy,
+    velocityX:game.vx,intentX:animationIntentX,bounceAge:game.bounceAge,
+    landingAnticipation:landing,landingImpact:animationSignals.landingImpact,
+    landingQuality:animationSignals.landingQuality,platformType:landingPlatformType,
+    springActive:animationSignals.springActive,springStrength:animationSignals.springStrength,
+    hazardHit:animationSignals.hazardHit,hazardDirection:animationSignals.hazardDirection,
+    wrapEvent:animationSignals.wrapEvent,jetpackActive:mode==='playing'&&game.jetRemaining>0,
+    jetpackStrength:game.jetRemaining>0?1:0,dying:mode==='dying',
+    reducedMotion:document.body.dataset.reducedMotion==='true'
+   });
+   for(const event of avatar.consumeAnimationEvents())window.dispatchEvent(new CustomEvent('chimp-character-animation',{detail:event}));
+   clearAnimationPulses();
   }
   if(mode==='dying'&&!splashed){
    avatar.root.updateWorldMatrix(true,true);deathBounds.setFromObject(avatar.root,true);const bottom=camera.position.y+camera.bottom/camera.zoom;
@@ -339,10 +378,10 @@ function renderFrame(now){if(document.hidden){previous=now;return;}if(!['startin
  renderPipeline.render(dt);
 }
 renderer.setAnimationLoop(renderFrame);
-const runtimeSnapshot=()=>({ready:ready&&document.body.dataset.uiReady==='true',characterReady:ready,uiReady:document.body.dataset.uiReady==='true',menuReady:document.body.dataset.menuReady==='true',mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,treeClimbOffset:scenery.treeClimbOffset,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,controller:inputManager.snapshot(),diagnosticsVersion:1});
+const runtimeSnapshot=()=>({ready:ready&&document.body.dataset.uiReady==='true',characterReady:ready,uiReady:document.body.dataset.uiReady==='true',menuReady:document.body.dataset.menuReady==='true',animationState:avatar?.animationState||null,secondaryBones:avatar?.secondaryBoneCount||0,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,treeClimbOffset:scenery.treeClimbOffset,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,controller:inputManager.snapshot(),diagnosticsVersion:1});
 const diagnostics=installDiagnostics(window,runtimeSnapshot);
 Object.defineProperty(window,'chimpJump',{value:()=>diagnostics.snapshot(),writable:false,configurable:false});
 const testApiEnabled=(import.meta.env.DEV||import.meta.env.VITE_CHIMP_QA_HOOKS==='1')&&['localhost','127.0.0.1'].includes(location.hostname);
 if(testApiEnabled&&new URLSearchParams(location.search).has('test')){
- window.chimpJumpTest={advanceCountdown:seconds=>{if(mode!=='starting')return;countdownTime=Math.max(0,countdownTime-Math.max(0,Number(seconds)||0));if(countdownTime<=0){beginPlaying();return;}countdown.textContent=countdownTime<=.75?'GO':String(Math.max(1,Math.ceil(countdownTime/.75)-1));},finishCountdown:()=>{if(mode==='starting')beginPlaying();},settleIntro:()=>{introTime=1.35;},stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
+ window.chimpJumpTest={advanceCountdown:seconds=>{if(mode!=='starting')return;countdownTime=Math.max(0,countdownTime-Math.max(0,Number(seconds)||0));if(countdownTime<=0){beginPlaying();return;}countdown.textContent=countdownTime<=.75?'GO':String(Math.max(1,Math.ceil(countdownTime/.75)-1));},finishCountdown:()=>{if(mode==='starting')beginPlaying();},settleIntro:()=>{introTime=1.35;},stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},renderStep:(seconds=STEP)=>{const now=performance.now();previous=now-Math.max(.001,Number(seconds)||STEP)*1000;renderFrame(now);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
 }
