@@ -38,7 +38,12 @@ try{
       await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
     }
     await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+    if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+      await page.locator('#jump-resume').click();
+      await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+    }
     item.playing=await assertNoHorizontalOverflow(page,viewport.name+' playing');
+    assert.equal(await page.evaluate(()=>window.chimpJump?.().mode),'playing',viewport.name+': gameplay must be active before HUD measurement');
     assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),viewport.name+': pause action hidden');
     if(viewport.width<=768){
       const touch=page.locator('#touch');
