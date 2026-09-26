@@ -76,9 +76,15 @@ try{
   await page.waitForFunction(()=>document.activeElement?.id==='try-again',{timeout:3000});
   await padEdge({axisY:1});
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'replay-trail','Game-over controller Down must move exactly one result action');
+  await padEdge({axisY:-1});
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'try-again','Game-over controller Up must return one result action');
+  await padEdge({button:0});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:10000});
   report.checks.controllerGameOverMenu=true;
 
-  await page.evaluate(()=>{document.querySelector('#results-dialog')?.close();window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
+  await page.evaluate(()=>{window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
   await page.keyboard.down('ArrowRight');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
   await page.keyboard.up('ArrowRight');
