@@ -96,7 +96,7 @@ for(let i=0;i<fruitVertices.count;i++){
  fruitVertices.setXYZ(i,center.x+(fruitVertices.getX(i)-center.x)*taper,center.y+(fruitVertices.getY(i)-center.y)*taper,center.z+(fruitVertices.getZ(i)-center.z)*taper);
 }
 bananaGeo.computeVertexNormals();
-const tipGeo=new THREE.SphereGeometry(.06,7,5),knotGeo=new THREE.TorusGeometry(.09,.027,6,16),thornGeo=new THREE.ConeGeometry(.15,.58,7);
+const tipGeo=new THREE.SphereGeometry(.06,7,5),knotGeo=new THREE.TorusGeometry(.09,.027,6,16),thornGeo=new THREE.ConeGeometry(.15,.58,7),hazardCueGeo=new THREE.RingGeometry(.46,.58,24);
 const arrowShape=new THREE.Shape();arrowShape.moveTo(-.7,-.25);arrowShape.lineTo(.05,-.25);arrowShape.lineTo(.05,-.65);arrowShape.lineTo(.85,0);arrowShape.lineTo(.05,.65);arrowShape.lineTo(.05,.25);arrowShape.lineTo(-.7,.25);arrowShape.closePath();
 const arrowGeo=new THREE.ExtrudeGeometry(arrowShape,{depth:.12,bevelEnabled:true,bevelSize:.04,bevelThickness:.04,bevelSegments:1,steps:1}),dummy=new THREE.Object3D();
 
@@ -318,12 +318,32 @@ export function createScenery(scene,renderer){
  }
 
  function hazard(h){
-  const group=new THREE.Group();group.userData.hazardId=h.id;
-  for(let i=0;i<7;i++){
-   const spike=mesh(thornGeo,thorn,group,(i-3)*.105,-.02+Math.abs(i-3)*.025,.08+(i%2)*.05);
-   spike.rotation.z=(i-3)*.12;spike.scale.set(.8+Math.abs(i-3)*.05,1+Math.abs(i-3)*.06,.8);
+  const group=new THREE.Group();group.userData.hazardId=h.id;group.userData.hazardType=h.type;
+  const cueMaterial=new THREE.MeshBasicMaterial({color:0xffd36a,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  const cue=mesh(hazardCueGeo,cueMaterial,group,0,0,.28);cue.visible=false;group.userData.telegraph=cue;
+  if(h.type==='falling-fruit'){
+   const fruit=mesh(mossGeo,gold,group,0,0,.08);fruit.scale.set(.43,.46,.43);
+   const crown=mesh(leafGeo,leafBright,group,.12,.34,.1);crown.scale.set(.16,.16,.16);crown.rotation.z=-.65;
+   group.userData.body=fruit;
+  }else if(h.type==='vine-sweep'){
+   const sweep=mesh(logGeo,vineGlow,group,0,0,.04);sweep.rotation.z=Math.PI/2;sweep.scale.set(.13,1.35,.13);group.userData.body=sweep;
+   for(let i=-2;i<=2;i++){
+    const spike=mesh(thornGeo,thorn,group,i*.28,.12*(i%2),.1);spike.rotation.z=i%2?Math.PI:-.15;spike.scale.set(.55,.7,.55);
+   }
+  }else if(h.type==='swinging-pod'){
+   const cord=mesh(logGeo,vineGlow,group,0,.72,.02);cord.scale.set(.08,.7,.08);
+   const core=mesh(mossGeo,thorn,group,0,0,.06);core.scale.set(.42,.42,.36);group.userData.body=core;
+   for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2,spike=mesh(thornGeo,thorn,group,Math.cos(a)*.34,Math.sin(a)*.34,.09);
+    spike.rotation.z=-a+Math.PI/2;spike.scale.set(.55,.72,.55);
+   }
+  }else{
+   for(let i=0;i<7;i++){
+    const spike=mesh(thornGeo,thorn,group,(i-3)*.105,-.02+Math.abs(i-3)*.025,.08+(i%2)*.05);
+    spike.rotation.z=(i-3)*.12;spike.scale.set(.8+Math.abs(i-3)*.05,1+Math.abs(i-3)*.06,.8);
+   }
+   const core=mesh(mossGeo,vineGlow,group,0,-.2,.04);core.scale.set(.48,.18,.32);group.userData.body=core;
   }
-  const core=mesh(mossGeo,vineGlow,group,0,-.2,.04);core.scale.set(.48,.18,.32);
   return group;
  }
 
@@ -348,9 +368,17 @@ export function createScenery(scene,renderer){
    const swingRig=group.userData.swingRig;if(swingRig&&!reducedMotion)swingRig.rotation.z=-group.rotation.z*.7;
   },
   animateHazard(group,h,time){
-   const reducedMotion=document.body?.dataset?.reducedMotion==='true';
-   group.position.set(h.x,h.y,0);group.rotation.z=reducedMotion?0:Math.sin(time*2.1+h.phase)*.08;
-   group.scale.setScalar(reducedMotion?1:1+Math.sin(time*3.4+h.phase)*.035);
+   const reducedMotion=document.body?.dataset?.reducedMotion==='true',telegraph=group.userData.telegraph;
+   group.position.set(h.x,h.y,0);
+   if(h.type==='swinging-pod')group.rotation.z=reducedMotion?0:Math.sin(time*1.2+h.phase)*.12;
+   else if(h.type==='vine-sweep')group.rotation.z=reducedMotion?0:Math.sin(time*5+h.phase)*.025;
+   else group.rotation.z=reducedMotion?0:Math.sin(time*2.1+h.phase)*.08;
+   const pulse=reducedMotion?1:1+Math.sin(time*3.4+h.phase)*.035;group.scale.setScalar(pulse);
+   if(telegraph){
+    telegraph.visible=!!h.telegraphing;
+    telegraph.material.opacity=h.telegraphing ? .62 : 0;
+    if(h.telegraphing&&!reducedMotion){const cuePulse=1+Math.sin(time*8)*.16;telegraph.scale.setScalar(cuePulse);}
+   }
   },
   setPixelMode(enabled){background.visible=!enabled;refreshBackground();},
   get platformReady(){return !!platformTemplate;},
