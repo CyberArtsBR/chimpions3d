@@ -1,18 +1,25 @@
-import * as THREE from 'three';
+// Explicit visual-detail policy for Chimp Jump.
+// This module deliberately does not patch Three.js prototypes. Callers opt in by
+// applying the policy to the scene/group they own.
 
-// visualCompletion marks non-essential branch accents with desktopDetail.
-// Branches are created after the initial quality pass, so enforce the mobile budget
-// at insertion time as well. Core branch/collision visuals are never hidden here.
-const constrained=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
-const priorAdd=THREE.Object3D.prototype.add;
-if(!THREE.Object3D.prototype.__chimpMobileAccentBudget){
- THREE.Object3D.prototype.add=function(...objects){
-  const result=priorAdd.apply(this,objects);
-  if(constrained())for(const object of objects){
-   if(!object?.userData?.platformWidth)continue;
-   object.traverse(node=>{if(node.userData?.desktopDetail)node.visible=false;});
-  }
-  return result;
- };
- THREE.Object3D.prototype.__chimpMobileAccentBudget=true;
+export function isConstrainedVisualDevice(){
+  if(typeof matchMedia!=='function')return (globalThis.innerWidth||9999)<=600;
+  return matchMedia('(pointer: coarse)').matches||(globalThis.innerWidth||9999)<=600;
+}
+
+export function allowsDesktopDetail(profile,{constrained=isConstrainedVisualDevice()}={}){
+  if(constrained)return false;
+  const name=typeof profile==='string'?profile:profile?.profile;
+  return name==='high'||name==='ultra'||name==='cinematic-max';
+}
+
+export function applyVisualDetailBudget(root,profile,options={}){
+  const allow=allowsDesktopDetail(profile,options);
+  let shown=0,hidden=0;
+  root?.traverse?.(node=>{
+    if(!node?.userData?.desktopDetail)return;
+    node.visible=allow;
+    if(allow)shown++;else hidden++;
+  });
+  return {allowDesktopDetail:allow,shown,hidden};
 }
