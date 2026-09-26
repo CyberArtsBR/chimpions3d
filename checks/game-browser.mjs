@@ -44,14 +44,17 @@ try{
 
   await screenshot('game-menu-desktop.png');
   await page.getByRole('button',{name:'Field Guide',exact:true}).click();
+  await screenshot('game-guide-desktop.png');
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+  await page.getByRole('button',{name:'Options',exact:true}).click();
   await page.getByLabel('Reduced Motion').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
   await page.getByLabel('Reduced Motion').uncheck();
   await page.getByLabel('High Visibility').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
   await page.getByLabel('High Visibility').uncheck();
-  await screenshot('game-guide-desktop.png');
-  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+  await screenshot('game-options-desktop.png');
+  await page.getByRole('button',{name:'Close Options',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');

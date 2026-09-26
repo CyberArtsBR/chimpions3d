@@ -1,4 +1,5 @@
 import './jumpExperience.css';
+import './jumpPresentationV2.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
@@ -193,8 +194,9 @@ export function setupJumpExperience(){
     stats.newBest=Number(stats.meters)>rememberedBest;
     rememberedBest=Math.max(rememberedBest,Number(stats.meters)||0);
     const result=evaluateJumpGoals(stats,unlocked);unlocked=result.unlocked;save(GOALS_KEY,unlocked);renderGoals();
-    if(result.newlyUnlocked.length){
-      const names=result.newlyUnlocked.map(id=>JUMP_GOALS.find(goal=>goal.id===id)?.title).filter(Boolean);
+    const names=result.newlyUnlocked.map(id=>JUMP_GOALS.find(goal=>goal.id===id)?.title).filter(Boolean);
+    stats.goals={completed:unlocked.length,total:JUMP_GOALS.length,newlyUnlocked:names};
+    if(names.length){
       goalToast.textContent='Goal complete · '+names.join(' + ');goalToast.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>goalToast.hidden=true,3200);
     }
   });

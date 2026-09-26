@@ -19,6 +19,7 @@ const suites={
     'countdown-browser.mjs',
     'responsive-browser.mjs',
     'accessibility-browser.mjs',
+    'audio-browser.mjs',
     'runtime-resilience-browser.mjs',
     'performance-browser.mjs',
     'visual-regression.mjs'

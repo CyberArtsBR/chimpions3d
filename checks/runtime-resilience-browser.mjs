@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {launchBrowser,attachPageDiagnostics,gotoJump,startSelectedRun,writeReport} from './qa-browser-utils.mjs';
+import {launchBrowser,attachPageDiagnostics,gotoJump,writeReport} from './qa-browser-utils.mjs';
 
 const {browser}=await launchBrowser('chromium');
 const page=await browser.newPage({viewport:{width:1280,height:800}});
@@ -10,38 +10,49 @@ await page.addInitScript(()=>{
   window.__qaPad=pad;
 });
 const report={status:'PASS',suite:'runtime-resilience',checks:{}};
-try{
-  const padEdge=async({button=null,axisX=null,axisY=null}={})=>{
-    await page.evaluate(({button,axisX,axisY})=>{
-      if(button!==null)window.__qaPad.buttons[button].pressed=true;
-      if(axisX!==null)window.__qaPad.axes[0]=axisX;
-      if(axisY!==null)window.__qaPad.axes[1]=axisY;
-    },{button,axisX,axisY});
-    await page.waitForTimeout(60);
-    await page.evaluate(({button,axisX,axisY})=>{
-      if(button!==null)window.__qaPad.buttons[button].pressed=false;
-      if(axisX!==null)window.__qaPad.axes[0]=0;
-      if(axisY!==null)window.__qaPad.axes[1]=0;
-    },{button,axisX,axisY});
-    await page.waitForTimeout(60);
-  };
 
+async function padEdge({button=null,axisX=null,axisY=null}={}){
+  await page.evaluate(({button,axisX,axisY})=>{
+    if(button!==null)window.__qaPad.buttons[button].pressed=true;
+    if(axisX!==null)window.__qaPad.axes[0]=axisX;
+    if(axisY!==null)window.__qaPad.axes[1]=axisY;
+  },{button,axisX,axisY});
+  await page.waitForTimeout(70);
+  await page.evaluate(({button,axisX,axisY})=>{
+    if(button!==null)window.__qaPad.buttons[button].pressed=false;
+    if(axisX!==null)window.__qaPad.axes[0]=0;
+    if(axisY!==null)window.__qaPad.axes[1]=0;
+  },{button,axisX,axisY});
+  await page.waitForTimeout(70);
+}
+
+try{
   await gotoJump(page,{test:true});
   await page.waitForFunction(()=>document.activeElement?.id==='play');
   report.checks.controllerStartFocused=true;
+
   await padEdge({button:0});
   await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
   const avatarButtons=page.locator('#collection-dialog .avatar-option:not(:disabled)');
   assert(await avatarButtons.count()>2,'Controller picker test needs at least three selectable avatars');
   await avatarButtons.nth(2).focus();
   await padEdge({axisX:-1});
-  assert.equal(await page.evaluate(()=>document.activeElement?.classList.contains('avatar-option')?[...document.querySelectorAll('#collection-dialog .avatar-option:not(:disabled)')].indexOf(document.activeElement):-1),1,'One left controller edge must move exactly one avatar');
+  assert.equal(
+    await page.evaluate(()=>document.activeElement?.classList.contains('avatar-option')?[...document.querySelectorAll('#collection-dialog .avatar-option:not(:disabled)')].indexOf(document.activeElement):-1),
+    1,
+    'One left controller edge must move exactly one avatar'
+  );
   report.checks.controllerPickerSingleStep=true;
-  await page.locator('#collection-dialog #confirm-chimpion').focus();
+
+  await page.locator('#confirm-chimpion').focus();
   await padEdge({button:0});
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:10000});
+  await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode),{timeout:10000});
+  if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+    await page.locator('#jump-resume').click();
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+  }
 
   await padEdge({button:9});
   await page.waitForFunction(()=>window.chimpJump().mode==='paused',{timeout:5000});
@@ -81,7 +92,11 @@ try{
   await padEdge({button:0});
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:10000});
+  await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode),{timeout:10000});
+  if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+    await page.locator('#jump-resume').click();
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+  }
   report.checks.controllerGameOverMenu=true;
 
   await page.evaluate(()=>{window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
@@ -111,6 +126,9 @@ try{
   }else report.checks.webglContextLoss='unsupported-in-ci';
 
   assert.deepEqual(diag.errors,[],'Runtime resilience scenarios must not raise page errors');
+  assert.deepEqual(diag.consoleErrors,[],'Runtime resilience scenarios must not emit console errors');
   writeReport('checks/runtime-resilience-report.json',report);
-  console.log('PASS runtime resilience: blur, visibility, gamepad disconnect and WebGL loss/restoration');
+  console.log('PASS runtime resilience: controller menus, blur, visibility, fallback and WebGL loss/restoration');
+}catch(error){
+  report.status='FAIL';report.error=error.message;writeReport('checks/runtime-resilience-report.json',report);throw error;
 }finally{await browser.close();}

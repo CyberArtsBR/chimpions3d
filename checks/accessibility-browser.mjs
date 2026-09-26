@@ -31,35 +31,67 @@ try{
   }
   report.checks.resultsDialogsLabeled=true;
 
-  await page.getByRole('button',{name:'Field Guide',exact:true}).click();
+  const guideButton=page.getByRole('button',{name:'Field Guide',exact:true});
+  await guideButton.focus();await page.keyboard.press('Enter');
   const guide=page.locator('#jump-guide-dialog[open]');
   assert(await guide.isVisible(),'Field Guide dialog must be visible');
   assert((await guide.getAttribute('aria-label'))||(await guide.getAttribute('aria-labelledby')),'Field Guide dialog must be labeled');
+  await page.keyboard.press('Escape');
+  await guide.waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'jump-guide-button','Escape must close Field Guide and restore opener focus');
+
+  const optionsButton=page.getByRole('button',{name:'Options',exact:true});
+  await optionsButton.focus();await page.keyboard.press('Enter');
+  const settings=page.locator('#jump-settings-dialog[open]');
+  assert(await settings.isVisible(),'Options dialog must be visible');
+  assert((await settings.getAttribute('aria-label'))||(await settings.getAttribute('aria-labelledby')),'Options dialog must be labeled');
   const reduced=page.getByLabel('Reduced Motion');
   const highVisibility=page.getByLabel('High Visibility');
-  await reduced.check();
-  assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
-  await highVisibility.check();
-  assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
+  await reduced.check();assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
+  await highVisibility.check();assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
   report.checks.reducedMotion=true;report.checks.highVisibility=true;
   await reduced.uncheck();await highVisibility.uncheck();
-  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await settings.waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'jump-options-button','Escape must close Options and restore opener focus');
 
-  const choose=page.getByRole('button',{name:'Choose chimp',exact:true});
-  await choose.click();
+  const play=page.getByRole('button',{name:'LET’S JUMP',exact:true});
+  await play.focus();await page.keyboard.press('Enter');
   const picker=page.locator('#collection-dialog[open]');
   assert((await picker.getAttribute('aria-label'))||(await picker.getAttribute('aria-labelledby')),'Character picker dialog must be labeled');
   await page.getByRole('searchbox',{name:'Search characters'}).waitFor({state:'visible'});
   assert(await page.evaluate(()=>document.getElementById('collection-dialog')?.contains(document.activeElement)),'Modal focus must enter picker');
+  const choices=page.locator('#collection-dialog .avatar-option:not(:disabled)');
+  await choices.first().focus();
+  const firstChoice=await page.evaluate(()=>document.activeElement?.getAttribute('aria-label'));
+  await page.keyboard.press('ArrowRight');
+  assert.notEqual(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),firstChoice,'ArrowRight must move exactly one picker choice');
   await page.keyboard.press('Escape');
   await picker.waitFor({state:'hidden'});
-  assert.equal(await page.evaluate(()=>document.activeElement?.id),'choose','Closing picker must restore focus to Choose chimp');
-  report.checks.modalFocus=true;
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'play','Closing Start-opened picker must restore focus to Start');
+  report.checks.modalFocus=true;report.checks.keyboardPicker=true;
 
   const primaryTargets=await page.locator('button:visible').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {id:n.id,width:r.width,height:r.height};}));
   const undersized=primaryTargets.filter(x=>x.width<32||x.height<32);
   assert.deepEqual(undersized,[],'Visible button touch/focus targets must be at least 32x32');
   report.checks.minTargetPx=32;
+
+  // Keyboard-only gameplay path: Start -> picker -> countdown -> pause -> resume.
+  await play.focus();await page.keyboard.press('Enter');
+  await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+  await page.locator('#confirm-chimpion').focus();await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode),{timeout:10000});
+  if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+    await page.locator('#jump-resume').focus();await page.keyboard.press('Enter');
+  }
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+  await page.keyboard.press('p');
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='paused',{timeout:5000});
+  await page.locator('#jump-resume').focus();await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+  report.checks.keyboardOnlyFlow=true;
 
   assert.deepEqual(diag.errors,[],'Accessibility flow must not raise page errors');
   assert.deepEqual(diag.consoleErrors,[],'Accessibility flow must not emit console errors');

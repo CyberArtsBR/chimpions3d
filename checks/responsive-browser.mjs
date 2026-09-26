@@ -32,9 +32,18 @@ try{
     await page.locator('#confirm-chimpion').click();
     await page.waitForFunction(()=>window.chimpJump?.().mode==='starting');
     await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+    await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode));
+    if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+      await page.locator('#jump-resume').click();
+      await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+    }
     await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
+    if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+      await page.locator('#jump-resume').click();
+      await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+    }
     item.playing=await assertNoHorizontalOverflow(page,viewport.name+' playing');
+    assert.equal(await page.evaluate(()=>window.chimpJump?.().mode),'playing',viewport.name+': gameplay must be active before HUD measurement');
     assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),viewport.name+': pause action hidden');
     if(viewport.width<=768){
       const touch=page.locator('#touch');
@@ -56,7 +65,20 @@ try{
     await page.waitForFunction(()=>window.chimpJump?.().mode==='paused');
     const pauseCard=page.locator('#overlay .card');
     const pauseBox=await pauseCard.boundingBox();
-    assert(pauseBox&&pauseBox.y>=-1&&pauseBox.y+pauseBox.height<=viewport.height+1,viewport.name+': pause UI exceeds viewport');
+    assert(pauseBox&&pauseBox.x>=-1&&pauseBox.y>=-1&&pauseBox.x+pauseBox.width<=viewport.width+1&&pauseBox.y+pauseBox.height<=viewport.height+1,viewport.name+': pause UI exceeds viewport');
+    item.pause={x:pauseBox.x,y:pauseBox.y,width:pauseBox.width,height:pauseBox.height};
+
+    await page.getByRole('button',{name:'Resume'}).click();
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
+    await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
+    const results=page.locator('#results-dialog[open]');
+    await results.waitFor({state:'visible'});
+    const resultBox=await results.boundingBox();
+    assert(resultBox&&resultBox.x>=-1&&resultBox.y>=-1&&resultBox.x+resultBox.width<=viewport.width+1&&resultBox.y+resultBox.height<=viewport.height+1,viewport.name+': results UI exceeds viewport');
+    assert(await page.locator('#try-again').isVisible(),viewport.name+': Retry must remain visible');
+    item.results={x:resultBox.x,y:resultBox.y,width:resultBox.width,height:resultBox.height};
+    await page.screenshot({path:`checks/responsive-${viewport.name}-results.png`,animations:'disabled'});
+
     item.errors=diag.errors;item.consoleErrors=diag.consoleErrors;item.sameOriginFailures=diag.sameOriginFailures;
     assert.deepEqual(diag.errors,[],viewport.name+': page errors');
     assert.deepEqual(diag.consoleErrors,[],viewport.name+': console errors');

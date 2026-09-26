@@ -16,9 +16,13 @@ try{
  const bytes=await response.body();
  assert.equal(bytes.length,4260793,'The complete supplied MP3 must be deployed, never a truncated upload');
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'18e24cefec0f28e787872a0bfae2ac4dc4ba1843703a1defa1a116e742d7f88c');
- assert.equal(await page.evaluate(()=>window.chimpJump().musicVolume),.19);
+ assert.equal(await page.evaluate(()=>window.chimpJump().musicVolume),.16);
  await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
  await page.locator('#confirm-chimpion').click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='starting');
+ await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
+ await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump().mode));
+ if(await page.evaluate(()=>window.chimpJump().mode==='paused'))await page.getByRole('button',{name:'Resume',exact:true}).click();
  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  await page.waitForFunction(()=>window.chimpJump().musicTime>.3&&!window.chimpJump().musicPaused);
  const before=await page.evaluate(()=>window.chimpJump().musicTime);
@@ -30,7 +34,7 @@ try{
  const pausedAt=await page.evaluate(()=>window.chimpJump().musicTime);
  await page.waitForTimeout(150);
  assert(Math.abs(await page.evaluate(()=>window.chimpJump().musicTime)-pausedAt)<.03);
- await page.getByRole('button',{name:'KEEP CLIMBING',exact:true}).click();
+ await page.getByRole('button',{name:'Resume',exact:true}).click();
  await page.waitForFunction(t=>window.chimpJump().musicTime>t+.15,pausedAt);
  await page.getByRole('button',{name:'Mute sound',exact:true}).click();
  assert(await page.evaluate(()=>window.chimpJump().musicMuted));
@@ -45,7 +49,9 @@ try{
  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'over');
  assert(await page.evaluate(()=>window.chimpJump().musicPaused));
  await page.getByRole('button',{name:'Try Again',exact:true}).click();
+ await page.waitForFunction(()=>window.chimpJump().mode==='starting');
+ await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
  await page.waitForFunction(()=>window.chimpJump().mode==='playing');
  assert(await page.evaluate(()=>window.chimpJump().musicTime)<.5,'A new climb restarts the music');
- console.log(`PASS music: full ${bytes.length} byte MP3 (${duration.toFixed(2)} s), 50% volume, play/pause/resume, mute, duplicate start, game over, restart, complete-track loop`);
+ console.log(`PASS music: full ${bytes.length} byte MP3 (${duration.toFixed(2)} s), 16% music mix, play/pause/resume, mute, duplicate start, game over, restart, complete-track loop`);
 }finally{await browser.close();}

@@ -22,8 +22,8 @@ import {getJumpQualityProfile,nextJumpQualityProfile,resolveJumpQualityProfile} 
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
-<header id="hud"><div class="stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Mute sound">♪</button><button id="pause" aria-label="Pause game" hidden>Ⅱ</button></div></header>
-<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace">PACE 1.06×</div><div id="canopy-event" hidden></div>
+<header id="hud" aria-label="Run status"><div class="stat height-stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Mute sound" aria-pressed="false" title="Audio">♪</button><button id="pause" aria-label="Pause game" aria-keyshortcuts="Escape P" title="Pause" hidden>Ⅱ</button></div></header>
+<div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace" role="status" aria-live="polite">PACE 1.06×</div><div id="canopy-event" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 <div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>🍃 Leaf</span><span>◌ Vanish</span><span>⌁ Swing</span><span>Risk routes · bonus bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
@@ -46,7 +46,12 @@ const selectionActions=document.createElement('div');selectionActions.className=
 selectionActions.innerHTML='<button id="random-chimpion">↻ Random</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Ready for the canopy</small></div><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
 collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
-collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();$('choose').focus();});
+collectionDialog.addEventListener('close',()=>{
+ $('avatar-list').hidden=true;$('avatar-list').replaceChildren();
+ const opener=document.getElementById(collectionDialog.dataset.opener||'');
+ const fallback=$('play'),target=opener&&getComputedStyle(opener).display!=='none'?opener:fallback;
+ target?.focus({preventScroll:true});delete collectionDialog.dataset.opener;
+});
 const scene=new THREE.Scene();
 const camera=new THREE.OrthographicCamera(-5,5,14,-2,0.1,60);camera.position.set(0,0,20);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
@@ -93,9 +98,10 @@ const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,
 
 const FACE_ANGLE=Math.PI/4;
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FACE_ANGLE;
-let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set();
+let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set(),lastHazardWarningAt=-Infinity;
 let renderThemeIndex=0,renderNight=0,renderLanding=0;
 const hudCache=new Map();function hudText(id,value){value=String(value);if(hudCache.get(id)!==value){$(id).textContent=value;hudCache.set(id,value);}}
+function pulseStat(id){const node=$(id)?.closest('.stat');if(!node||document.body.dataset.reducedMotion==='true')return;node.classList.remove('stat-pulse');void node.offsetWidth;node.classList.add('stat-pulse');}
 const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
 const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
@@ -103,12 +109,12 @@ let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,count
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='';
 const runSession=new RunSession({beginOnline:()=>leaderboard.begin()});
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=new InputTrace(),deathAge=0,deathPoint=null,splashed=false;
-const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
+const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection($('play'));},back:()=>{location.href='/';}}),recordBook=createRecordBook();
 const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
 const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.4;music.preload='metadata';const audio=createAudio(music);
 try{muted=localStorage.getItem('chimp-jump-muted')==='1';}catch{}audio.setMuted(muted);
-addEventListener('chimp-record',()=>audio.play('record'));document.addEventListener('click',event=>{if(event.target.closest('button')&&mode!=='playing')audio.play('menu');});
+addEventListener('chimp-record',()=>audio.play('record'));addEventListener('chimp-ui-nav',()=>audio.play('menu'));document.addEventListener('click',event=>{const button=event.target.closest('button');if(!button||mode==='playing')return;audio.play(button.matches('.primary,#confirm-chimpion,#try-again')?'confirm':/close|back|home/i.test((button.getAttribute('aria-label')||'')+' '+button.textContent)?'back':'menu');});
 try{best=Number(localStorage.getItem('chimp-jump-best'))||0;}catch{}
 const input=()=>inputManager.getMoveX({x:game.x,vx:game.vx});
 inputManager.bindMouseSurface(renderer.domElement,e=>{
@@ -135,6 +141,7 @@ function syncUI(){
  hudText('height',Math.floor(game.height));hudText('coins',game.bananas);hudText('hud-best',Math.floor(Math.max(best,game.height)));hudText('best','PERSONAL BEST  ·  '+Math.floor(best)+' m');
  const eventActive=mode==='playing'&&!!game.event;$('canopy-event').hidden=!eventActive;if(eventActive)$('canopy-event').textContent=eventLabels[game.event.type]||'CANOPY EVENT';
  $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';$('rig-link').hidden=mode==='paused';recordsButton.hidden=mode==='paused';giveUpButton.hidden=mode!=='paused';$('overlay').hidden=['playing','dying','over','starting'].includes(mode);
+ audio.setGameplayActive(mode==='playing'||mode==='starting');audio.setJetActive(mode==='playing'&&game.jetRemaining>0);
 }
 function menu(kind){
  if(collectionDialog.open)collectionDialog.close();mode=kind;music.pause();inputManager.clearGameplay();acc=0;
@@ -163,7 +170,7 @@ function beginPlaying(){
 function start(requestedSeed=null){
  if(requestedSeed instanceof Event)requestedSeed=null;
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
- if(mode==='menu'&&!selectionConfirmed){openSelection();return;}audio.unlock();const fresh=mode!=='paused';
+ if(mode==='menu'&&!selectionConfirmed){openSelection($('play'));return;}audio.unlock();const fresh=mode!=='paused';
  if(fresh){
   mode='starting';syncUI();runTicket=null;inputTrace.reset();cleanLandings=0;cleanPlatformIds.clear();
   const replaySeed=requestedSeed===null||requestedSeed===undefined?null:(Number(requestedSeed)>>>0),session=runSession.commit({replaySeed});
@@ -171,16 +178,15 @@ function start(requestedSeed=null){
   if(session.practice)toast('Practice trail · same route, no online submission');
   else if(!session.online)toast('Playing offline · online records unavailable');
   for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();for(const m of hazardMeshes.values())removeHazard(m);hazardMeshes.clear();scenery.reset();fallSplash.clear();quickRetry.hidden=true;landingImpulse=0;
-  runSeed=session.seed;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
+  runSeed=session.seed;game.reset(runSeed);avatar.root.visible=true;yaw=targetYaw=FACE_ANGLE;lastTheme=-1;lastHazardWarningAt=-Infinity;introTime=0;countdownTime=3;countdown.textContent='3';countdown.hidden=false;music.currentTime=0;deathPoint=null;splashed=false;
   music.muted=muted;music.play().catch(()=>{});inputManager.clearGameplay();acc=0;previous=performance.now();syncUI();return;
  }
  music.muted=muted;music.play().catch(()=>{});beginPlaying();
 }
 $('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
-function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
+function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');$('mute').setAttribute('aria-pressed',String(muted));}
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
-// Menu/dialog gamepad navigation is owned exclusively by runtimeEnhancements.js.
- // Keeping a second menu subscriber here made one D-pad/stick edge move focus twice.
+// Menu and dialog gamepad navigation is owned exclusively by runtimeEnhancements.js.
 inputManager.subscribe(({confirmPressed})=>{
  if(mode==='dying'&&confirmPressed)quickRetry.click();
 });
@@ -233,12 +239,14 @@ function renderCollection(){
  for(const [label,direction]of [['Previous',-1],['Next',1]]){const button=document.createElement('button');button.textContent=label;button.disabled=direction<0?collectionPage===0:collectionPage===pages-1;button.onclick=()=>{collectionPage+=direction;renderCollection();};nav.append(button);}
  const count=document.createElement('span');count.textContent=(collectionPage+1)+' / '+pages+' · '+entries.length+' chimps';nav.append(count);list.append(nav);
 }
-async function openSelection(){
- if(collectionDialog.open||!catalog.length)return;pendingEntry=catalog.find(entry=>entry.id===selectedId)||randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
+async function openSelection(opener=document.activeElement){
+ if(collectionDialog.open||!catalog.length)return;
+ collectionDialog.dataset.opener=opener?.id||'play';
+ pendingEntry=catalog.find(entry=>entry.id===selectedId)||randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
  const list=$('avatar-list');list.hidden=false;collectionDialog.showModal();if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=filterBuiltInRoster(await response.json());}catch{toast('Collection unavailable. Your chimp is ready.');}
  if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }
-$('choose').onclick=()=>{selectionConfirmed=false;openSelection();};
+$('choose').onclick=()=>{selectionConfirmed=false;openSelection($('choose'));};
 fetch(import.meta.env.BASE_URL+'avatars.json').then(r=>{if(!r.ok)throw new Error('Avatar catalog unavailable');return r.json();}).then(entries=>{catalog=filterBuiltInRoster(entries);if(catalog.length!==10)throw new Error('Expected exactly 10 approved built-in Chimpions');pendingEntry=randomEntry();return selectAvatar(pendingEntry);}).catch(e=>{$('description').textContent=e.message;$('play').textContent='RELOAD TO TRY AGAIN';console.error(e);});
 
 function drawWorld(dt=0){
@@ -251,6 +259,10 @@ function drawWorld(dt=0){
  }
  const liveHazards=new Set(game.hazards.map(h=>h.id));for(const [id,m]of hazardMeshes){if(!liveHazards.has(id)){removeHazard(m);hazardMeshes.delete(id);}}
  for(const h of game.hazards){let m=hazardMeshes.get(h.id);if(!m){m=scenery.hazard(h);world.add(m);hazardMeshes.set(h.id,m);}m.visible=Math.abs(h.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateHazard(m,h,visualTime);}
+ if(mode==='playing'&&game.hazardCooldown<=0&&game.time-lastHazardWarningAt>1.6){
+  const threat=game.hazards.find(h=>h.y>game.y+.45&&h.y<game.y+2.5&&Math.abs(h.x-game.x)<1.15);
+  if(threat){lastHazardWarningAt=game.time;sound('hazard-warning');}
+ }
  const idx=Math.floor(game.time/30)%4,blend=THREE.MathUtils.smoothstep(game.time%30,0,4);if(pixelMode)pixelBackdrop.draw(idx,game.time<30?1:blend);
  const current=themes[idx],previousTheme=themes[(idx+3)%4],from=game.time<30?current:previousTheme;if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
@@ -274,16 +286,17 @@ function tick(dt,control=input()){
    runSession.finish();runSession.prepare();
    inputManager.clearGameplay();avatar.root.visible=true;syncUI();
   }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
-  else if(e.type==='coin'){sound('coin');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
+  else if(e.type==='coin'){sound('coin');pulseStat('coins');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
   else if(e.type==='jet'){sound('jet');toast('JETPACK · 10 seconds!');}
-  else if(e.type==='jet-spawn')toast('Jetpack nearby! Find it in the canopy');
+  else if(e.type==='jet-end'){sound('jet-end');toast('JETPACK COMPLETE');}
+  else if(e.type==='jet-spawn')toast('JETPACK NEARBY · LOOK AHEAD');
   else if(e.type==='hazard'){sound('hazard');landingImpulse=reducedMotion?0:.04;toast('THORN POD · KNOCKBACK');}
   else if(e.type==='vanish'){sound('vanish');}
-  else if(e.type==='milestone'){sound('milestone');toast(e.meters+' M · CANOPY MILESTONE');}
+  else if(e.type==='milestone'){sound('milestone');pulseStat('height');toast(e.meters+' M · CANOPY MILESTONE');}
   else if(e.type==='event-start'){sound('event');const copy=e.eventType==='banana-bloom'?'BANANA BLOOM · BONUS FRUIT':e.eventType==='spring-fever'?'SPRING FEVER · BOOSTED MUSHROOMS':'CANOPY EVENT';toast(copy);}
-  else if(e.type==='event-end'){toast('CANOPY EVENT COMPLETE');}
+  else if(e.type==='event-end'){sound('event-out');toast('CANOPY EVENT COMPLETE');}
   else if(e.type==='bounce'){
-   const branchSound=e.spring?'spring':e.fragile?'fragile':e.platformType==='leaf'?'leaf':e.platformType==='swing'?'swing':e.platformType==='vanish'?'vanish':'bounce';sound(branchSound);
+   const branchSound=e.spring?'spring':e.fragile?'fragile':e.platformType==='moving'?'moving':e.platformType==='leaf'?'leaf':e.platformType==='swing'?'swing':e.platformType==='vanish'?'vanish-warning':'bounce';sound(branchSound);
    if(!['spring','cracked','vanish'].includes(e.platformType)&&!cleanPlatformIds.has(e.platformId)){cleanPlatformIds.add(e.platformId);cleanLandings++;}
    landingImpulse=reducedMotion?0:(e.spring ? .045 : .03);const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;
    if(e.spring){boostZoom=reducedMotion?1:.91;toast(game.event?.type==='spring-fever'?'SPRING FEVER BOOST!':'Spring boost!');}
