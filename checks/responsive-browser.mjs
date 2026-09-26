@@ -8,7 +8,9 @@ try{
     const page=await browser.newPage({viewport:{width:viewport.width,height:viewport.height}});
     const diag=attachPageDiagnostics(page);
     await gotoJump(page,{test:true});
+    await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
     const item={...viewport};
+    assert.equal(await page.evaluate(()=>window.chimpJump().uiReady),true,viewport.name+': Jump UI readiness not established');
     item.menu=await assertNoHorizontalOverflow(page,viewport.name+' menu');
     assert(await page.getByRole('button',{name:'LET’S JUMP',exact:true}).isVisible(),viewport.name+': play action hidden');
     assert(await page.getByRole('button',{name:'Field Guide',exact:true}).isVisible(),viewport.name+': Field Guide hidden');
