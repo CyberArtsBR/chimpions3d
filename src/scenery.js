@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
-import {createTrackedLoadingManager,prefetchVisualAsset} from './assetRuntime.js';
+import {createTrackedLoadingManager,prefetchVisualAsset,versionedAssetUrl} from './assetRuntime.js';
 
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function canvasTexture(w,h,draw){
@@ -133,7 +133,8 @@ export function createScenery(scene,renderer){
  };
 
  // Keep the wrap boundary invisible: no decorative vines hanging from the screen edges.
- let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false,runtimePrefetchRequested=false;
+ let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false,runtimePrefetchRequested=false,assetHashes=new Map();
+ const controlledAssetUrl=asset=>versionedAssetUrl(import.meta.env.BASE_URL+asset,assetHashes.get(asset));
  let activeVisualProfile={profile:'balanced',highScenery:false},visualConstraints={constrained:false};
  const desktopDetailAllowed=()=>allowsDesktopDetail(activeVisualProfile,visualConstraints);
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
@@ -208,7 +209,7 @@ export function createScenery(scene,renderer){
  }
  function loadPlatform(){
   if(!runtimeAssetsActive||!highQuality||!platformConfig?.platformModel||platformLoading)return;platformLoading=true;
-  new GLTFLoader(createTrackedLoadingManager('environment-glb')).load(import.meta.env.BASE_URL+platformConfig.platformModel,gltf=>{
+  new GLTFLoader(createTrackedLoadingManager('environment-glb')).load(controlledAssetUrl(platformConfig.platformModel),gltf=>{
    const model=gltf.scene;model.rotation.set(...(platformConfig.platformRotation||[0,0,0]));model.updateMatrixWorld(true);
    const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>0)){console.warn('Invalid branch bounds');platformLoading=false;return;}
    const normalizer=new THREE.Group();normalizer.add(model);normalizer.scale.set(1/size.x,(platformConfig.platformHeight||.42)/size.y,(platformConfig.platformDepth||.65)/size.z);
@@ -247,16 +248,24 @@ export function createScenery(scene,renderer){
    treeImageMesh.material.map=treeTextures.get(kind);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
   }
   if(treeRequests.has(kind))return;treeRequests.add(kind);
-  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(import.meta.env.BASE_URL+url,map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();invalidateStaticFrame();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
+  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();invalidateStaticFrame();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
  }
  function prefetchRuntimeAssets(){
   runtimePrefetchRequested=true;
   if(!platformConfig)return;
-  if(platformConfig.platformModel)prefetchVisualAsset(import.meta.env.BASE_URL+platformConfig.platformModel);
+  if(platformConfig.platformModel)prefetchVisualAsset(controlledAssetUrl(platformConfig.platformModel));
   const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages?.[kind];
-  if(url)prefetchVisualAsset(import.meta.env.BASE_URL+url);
+  if(url)prefetchVisualAsset(controlledAssetUrl(url));
  }
- fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}).then(config=>{platformConfig=config;if(runtimePrefetchRequested)prefetchRuntimeAssets();loadPlatform();loadTree();}).catch(()=>{});
+ Promise.all([
+  fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}),
+  fetch(import.meta.env.BASE_URL+'asset-manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({}))
+ ]).then(([config,manifest])=>{
+  platformConfig=config;
+  assetHashes=new Map((manifest.assets||[]).map(asset=>[asset.path,asset.sha256]));
+  if(runtimePrefetchRequested)prefetchRuntimeAssets();
+  loadPlatform();loadTree();
+ }).catch(()=>{});
 
  const r=rng(51),particleGeo=new THREE.BufferGeometry(),particlePositions=new Float32Array(48*3);particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
  const particleMaterial=new THREE.PointsMaterial({color:0xffdf79,size:.07,transparent:true,opacity:.85,depthWrite:false});
