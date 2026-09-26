@@ -41,8 +41,10 @@ export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored
     if(!s?.ready||!s.uiReady||document.body?.dataset?.uiReady!=='true'||document.body?.dataset?.mode!=='menu')return false;
     const requiredControls=['jump-guide-button','jump-options-button','play'];
     if(!requiredControls.every(id=>{const element=document.getElementById(id);return element&&!element.disabled&&element.getClientRects().length>0;}))return false;
+    // Heavy authored environment assets are intentionally deferred until run start.
+    // Menu readiness still requires the lightweight world plus all P0 controls.
     if(!requireAuthored)return true;
-    return ['high','cinematic-max'].includes(s.quality)?(s.platformReady&&s.backgroundReady):s.treeVisible;
+    return !!s.treeVisible;
   },requireAuthored,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
@@ -89,6 +91,10 @@ export async function startSelectedRun(page,{fastForward=true}={}){
       await page.locator('#jump-resume').click();
       await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
     }
+    await page.waitForFunction(()=>{
+      const state=window.chimpJump?.();
+      return !['high','ultra'].includes(state?.quality)||(state.platformReady&&state.backgroundReady);
+    },{timeout:45000});
   }
 }
 
