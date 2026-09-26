@@ -11,9 +11,9 @@ try{
   report.readiness=await page.evaluate(()=>{const s=window.chimpJump();return {ready:s.ready,quality:s.quality,treeVisible:s.treeVisible,platformReady:s.platformReady,backgroundReady:s.backgroundReady,mode:s.mode};});
   await assertNoHorizontalOverflow(page,name+' menu');
   assert(await page.getByRole('button',{name:'LET’S JUMP',exact:true}).isVisible());
-  await page.getByRole('button',{name:'Field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Field Guide',exact:true}).click();
   assert(await page.locator('#jump-guide-dialog[open]').isVisible());
-  await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#collection-dialog[open]').isVisible());
   assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10);
@@ -22,7 +22,14 @@ try{
   const hasQaHook=await page.evaluate(()=>typeof window.chimpJumpTest==='object');
   assert(hasQaHook,name+': dedicated QA build must expose deterministic countdown hook');
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:7000});
+  await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode),null,{timeout:10000});
+  // Headless software WebGL (especially WebKit in CI) can take long enough to trigger
+  // the game's intentional stalled-frame auto-pause. Resume it so this smoke checks
+  // application/browser compatibility rather than runner GPU speed.
+  if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+    await page.getByRole('button',{name:'Resume',exact:true}).click();
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:5000});
+  }
   assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),name+': gameplay pause action hidden');
   await page.getByRole('button',{name:'Pause game'}).click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='paused',null,{timeout:3000});

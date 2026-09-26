@@ -9,7 +9,7 @@ try{
   await gotoJump(page,{test:true});
   await page.evaluate(async()=>{await window.chimpJumpTest.selectAvatar('12');window.chimpJumpTest.suspendRendering();window.chimpJumpTest.render();});
   await shot('menu');
-  await page.getByRole('button',{name:'Field guide',exact:true}).click();await shot('field-guide');await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Field Guide',exact:true}).click();await shot('field-guide');await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();await shot('character-picker');
   await page.locator('#confirm-chimpion').click();await page.waitForFunction(()=>window.chimpJump().mode==='starting');await page.evaluate(()=>window.chimpJumpTest.render());await shot('countdown');
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
@@ -45,7 +45,7 @@ try{
   const biomes=[['jungle-morning',0],['emerald-mist',30],['golden-canopy',60],['moonlit-grove',90]];
   for(const [name,time] of biomes){await page.evaluate(t=>{const g=window.chimpJumpTest.game();g.time=t;},time);await shot('biome-'+name);}
 
-  await page.getByRole('button',{name:'Pause game'}).click();await shot('pause');await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Pause game'}).click();await shot('pause');await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
   await page.waitForFunction(()=>window.chimpJump().mode==='over');await shot('result');

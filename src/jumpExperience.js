@@ -236,6 +236,7 @@ export function setupJumpExperience(){
       (dialog.open?dialog:settings).close();return;
     }
     const collection=document.getElementById('collection-dialog');
+    if(event.key==='Escape'&&collection?.open){event.preventDefault();event.stopImmediatePropagation();collection.close();return;}
     if(!collection?.open||event.target?.matches?.('input,textarea,select'))return;
     const keys={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
     if(keys[event.key]){event.preventDefault();event.stopImmediatePropagation();focusGrid(collection,keys[event.key]);}

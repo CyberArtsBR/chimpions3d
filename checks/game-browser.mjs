@@ -34,24 +34,24 @@ try{
   assert((await page.evaluate(()=>window.chimpJump())).visible);
   assert(!['steamboat-willie','chimpion'].includes(await page.evaluate(()=>window.chimpJump().selectedId)),'Special Willie/Silver heroes must stay out of player selection');
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
-  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
+  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'cinematic-max');
 
   await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
   assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
-  assert(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible(),'Field guide must be visible on desktop');
+  assert(await page.getByRole('button',{name:'Field Guide',exact:true}).isVisible(),'Field guide must be visible on desktop');
   assert.equal(await page.locator('#audio-settings').isVisible(),false,'Title screen must hide Audio settings');
   assert.equal(await page.locator('#background-style').isVisible(),false,'Title screen must hide Scenery settings');
 
   await screenshot('game-menu-desktop.png');
-  await page.getByRole('button',{name:'Field guide',exact:true}).click();
-  await page.getByLabel('Reduced motion').check();
+  await page.getByRole('button',{name:'Field Guide',exact:true}).click();
+  await page.getByLabel('Reduced Motion').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
-  await page.getByLabel('Reduced motion').uncheck();
-  await page.getByLabel('High-visibility HUD').check();
+  await page.getByLabel('Reduced Motion').uncheck();
+  await page.getByLabel('High Visibility').check();
   assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
-  await page.getByLabel('High-visibility HUD').uncheck();
+  await page.getByLabel('High Visibility').uncheck();
   await screenshot('game-guide-desktop.png');
-  await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
 
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#selected-chimpion-meta').isVisible(),'Desktop picker must expose selected Chimpion metadata');
@@ -141,14 +141,14 @@ try{
   await page.setViewportSize({width:1920,height:1080});
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
   assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Desktop resize must safely auto-pause an active run');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   report.viewport1080p=await page.evaluate(()=>({innerWidth,innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight}));
   await screenshot('game-playing-desktop-1080p.png');
 
   await page.setViewportSize({width:1440,height:900});
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>['starting','playing'].includes(window.chimpJump().mode));if((await page.evaluate(()=>window.chimpJump().mode))==='starting')await page.evaluate(()=>window.chimpJumpTest.finishCountdown());await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   await page.getByRole('button',{name:'Pause game'}).click();
@@ -156,7 +156,7 @@ try{
   await page.evaluate(()=>window.chimpJumpTest.step(60));
   assert.equal(await page.evaluate(()=>window.chimpJump().time),pausedAt,'Pause must freeze game time');
   await screenshot('game-pause-desktop.png');
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Resume'}).click();
 
   // Long-session desktop pacing check using a deterministic safe bounce fixture.
   await page.evaluate(()=>{

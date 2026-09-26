@@ -31,19 +31,19 @@ try{
   }
   report.checks.resultsDialogsLabeled=true;
 
-  await page.getByRole('button',{name:'Field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Field Guide',exact:true}).click();
   const guide=page.locator('#jump-guide-dialog[open]');
   assert(await guide.isVisible(),'Field Guide dialog must be visible');
   assert((await guide.getAttribute('aria-label'))||(await guide.getAttribute('aria-labelledby')),'Field Guide dialog must be labeled');
-  const reduced=page.getByLabel('Reduced motion');
-  const highVisibility=page.getByLabel('High-visibility HUD');
+  const reduced=page.getByLabel('Reduced Motion');
+  const highVisibility=page.getByLabel('High Visibility');
   await reduced.check();
   assert.equal(await page.evaluate(()=>document.body.dataset.reducedMotion),'true');
   await highVisibility.check();
   assert.equal(await page.evaluate(()=>document.body.dataset.highVisibility),'true');
   report.checks.reducedMotion=true;report.checks.highVisibility=true;
   await reduced.uncheck();await highVisibility.uncheck();
-  await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
 
   const choose=page.getByRole('button',{name:'Choose chimp',exact:true});
   await choose.click();

@@ -40,7 +40,7 @@ export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored
     const s=window.chimpJump?.();
     if(!s?.ready||document.body?.dataset?.mode!=='menu')return false;
     if(!requireAuthored)return true;
-    return s.quality==='high'?(s.platformReady&&s.backgroundReady):s.treeVisible;
+    return ['high','cinematic-max'].includes(s.quality)?(s.platformReady&&s.backgroundReady):s.treeVisible;
   },requireAuthored,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
@@ -82,7 +82,11 @@ export async function startSelectedRun(page,{fastForward=true}={}){
     const hasHook=await page.evaluate(()=>typeof window.chimpJumpTest==='object');
     assert(hasHook,'QA browser build must expose chimpJumpTest only when VITE_CHIMP_QA_HOOKS=1');
     await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
-    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+    await page.waitForFunction(()=>['playing','paused'].includes(window.chimpJump?.().mode),{timeout:10000});
+    if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+      await page.locator('#jump-resume').click();
+      await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
+    }
   }
 }
 

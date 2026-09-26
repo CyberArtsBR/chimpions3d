@@ -14,14 +14,14 @@ try{
   await gotoJump(page,{test:true});
   await startSelectedRun(page,{fastForward:true});
 
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;});
-  await page.waitForFunction(()=>window.chimpJump().mode==='paused',{timeout:1500});
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>window.chimpJump().mode==='paused',{timeout:5000});
   await page.waitForTimeout(220);
   assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Held controller Start must trigger only one pause edge');
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;});
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;window.chimpJumpTest.render();});
   await page.waitForTimeout(120);
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;});
-  await page.waitForFunction(()=>window.chimpJump().mode==='playing',{timeout:1500});
+  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>window.chimpJump().mode==='playing',{timeout:5000});
   await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;});
   report.checks.controllerPauseEdge=true;
   await page.waitForTimeout(1300);
@@ -29,7 +29,7 @@ try{
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
   report.checks.blurPause=true;
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.waitForTimeout(1300);
 
@@ -40,7 +40,7 @@ try{
   });
   await page.waitForFunction(()=>window.chimpJump().mode==='paused');
   report.checks.visibilityPause=true;
-  await page.getByRole('button',{name:'KEEP CLIMBING'}).click();
+  await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
   await page.evaluate(()=>{window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
