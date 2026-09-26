@@ -198,8 +198,9 @@ export class Game {
    this.nextX=x;this.nextY=y;this.nextWidth=safePlatform.width;
 
    const optional=this.addOptional(step,safePlatform,difficulty);
-   if(optional&&step.hazard)this.addHazardNear(optional,safePlatform,step.hazard);
-   else if(optional&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<difficulty.hazardDensity)
+   const specialClear=!this.event&&this.jetRemaining<=0&&!this.jetpack&&this.time>=this.specialBlockedUntil;
+   if(specialClear&&optional&&step.hazard)this.addHazardNear(optional,safePlatform,step.hazard);
+   else if(specialClear&&optional&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<difficulty.hazardDensity)
     this.addHazardNear(optional,safePlatform,'thorn-pod');
 
    if(optional&&difficulty.complexity>=4&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<.28){
@@ -226,6 +227,9 @@ export class Game {
   }
   return false;
  }
+ hazardPressure(){
+  return this.hazards.some(h=>Math.abs(h.baseY-this.y)<5.2);
+ }
  updateCanopyEvent(events){
   if(this.event&&this.time>=this.event.ends){
    const ended=this.event.type;this.event=null;
@@ -233,7 +237,7 @@ export class Game {
    events.push({type:'event-end',eventType:ended});
   }
   if(!this.event&&this.time>=this.nextEventAt){
-   const busy=this.jetRemaining>0||!!this.jetpack||this.time<this.specialBlockedUntil;
+   const busy=this.jetRemaining>0||!!this.jetpack||this.hazardPressure()||this.time<this.specialBlockedUntil;
    if(!busy){
     const type=EVENT_TYPES[(this.runSeed+this.eventIndex*5)%EVENT_TYPES.length];
     this.event={type,started:this.time,ends:this.time+EVENT_DURATION};
@@ -285,7 +289,7 @@ export class Game {
   }
 
   if(this.time>=this.nextJetAt&&this.jetRemaining<=0&&!this.jetpack){
-   const busy=!!this.event||this.time<this.specialBlockedUntil;
+   const busy=!!this.event||this.hazardPressure()||this.time<this.specialBlockedUntil;
    if(!busy){
     if(this.spawnJetpack()){
      this.jetIndex++;this.nextJetAt=this.time+jetGapFor(this.runSeed,this.jetIndex);
