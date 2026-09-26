@@ -66,7 +66,7 @@ const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer),fallSplash=createFallSplash(scene),deathBounds=new THREE.Box3();
 const renderPipeline=createJumpRenderPipeline({renderer,scene,camera,sun,width:innerWidth,height:innerHeight});
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
-function removeHazard(m){world.remove(m);}
+function removeHazard(m){world.remove(m);m.userData.telegraph?.material?.dispose?.();}
 const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
 let selectedQuality='cinematic-max';
 try{selectedQuality=resolveJumpQualityProfile(localStorage.getItem('chimp-jump-detail')||'cinematic-max');}catch{}
@@ -93,7 +93,7 @@ const jetVisual=createJetpack(),jetEquipped=createJetpack();scene.add(jetVisual,
 
 const FACE_ANGLE=Math.PI/4;
 let game=new Game(7),avatar,ready=false,mode='menu',yaw=FACE_ANGLE,targetYaw=FACE_ANGLE;
-let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set();
+let themeAge=0,wrapShown=false,landingImpulse=0,boostZoom=1,lastIdleFrame=0,runSeed=7,cleanLandings=0,cleanPlatformIds=new Set(),nearMisses=0,encountersCompleted=0,riskLandings=0;
 let renderThemeIndex=0,renderNight=0,renderLanding=0;
 const hudCache=new Map();function hudText(id,value){value=String(value);if(hudCache.get(id)!==value){$(id).textContent=value;hudCache.set(id,value);}}
 const quickRetry=document.createElement('button');quickRetry.id='quick-retry';quickRetry.textContent='Try Again';quickRetry.hidden=true;document.body.append(quickRetry);
@@ -158,7 +158,7 @@ function start(requestedSeed=null){
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
  if(mode==='menu'&&!selectionConfirmed){openSelection();return;}audio.unlock();const fresh=mode!=='paused';
  if(fresh){
-  mode='starting';syncUI();runTicket=null;inputTrace.reset();cleanLandings=0;cleanPlatformIds.clear();
+  mode='starting';syncUI();runTicket=null;inputTrace.reset();cleanLandings=0;cleanPlatformIds.clear();nearMisses=0;encountersCompleted=0;riskLandings=0;
   const replaySeed=requestedSeed===null||requestedSeed===undefined?null:(Number(requestedSeed)>>>0),session=runSession.commit({replaySeed});
   runTicket=session.ticket;
   if(session.practice)toast('Practice trail · same route, no online submission');
@@ -311,9 +311,12 @@ function tick(dt,control=input()){
    inputManager.clearGameplay();avatar.root.visible=true;syncUI();
   }else if(e.type==='wrap'){sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
   else if(e.type==='coin'){sound('coin');if(e.bloom)toast('BANANA BLOOM · BONUS +1');}
-  else if(e.type==='jet'){sound('jet');toast('JETPACK · 10 seconds!');}
-  else if(e.type==='jet-spawn')toast('Jetpack nearby! Find it in the canopy');
-  else if(e.type==='hazard'){sound('hazard');landingImpulse=reducedMotion?0:.04;toast('THORN POD · KNOCKBACK');}
+  else if(e.type==='jet'){sound('jet');toast('JETPACK · '+Math.ceil(e.duration||game.jetRemaining)+' seconds!');}
+  else if(e.type==='jet-spawn')toast(e.route==='reward'?'JETPACK · REWARD ROUTE':'Jetpack nearby! Find it in the canopy');
+  else if(e.type==='hazard-telegraph'){sound('event');const hazardCopy={'swinging-pod':'SWINGING POD · WATCH THE ARC','vine-sweep':'VINE SWEEP · READ THE OPENING','falling-fruit':'FALLING FRUIT · MOVE ON THE SHAKE'}[e.hazardType];if(hazardCopy)toast(hazardCopy);}
+  else if(e.type==='hazard-active'){}
+  else if(e.type==='near-miss'){nearMisses++;if(nearMisses===1||nearMisses%5===0)toast('NEAR MISS · '+nearMisses);}
+  else if(e.type==='hazard'){sound('hazard');landingImpulse=reducedMotion?0:.04;const hazardName={'thorn-pod':'THORN POD','swinging-pod':'SWINGING POD','vine-sweep':'VINE SWEEP','falling-fruit':'FALLING FRUIT'}[e.hazardType]||'HAZARD';toast(hazardName+' · KNOCKBACK');}
   else if(e.type==='vanish'){sound('vanish');}
   else if(e.type==='milestone'){sound('milestone');toast(e.meters+' M · CANOPY MILESTONE');}
   else if(e.type==='event-start'){sound('event');const copy=e.eventType==='banana-bloom'?'BANANA BLOOM · BONUS FRUIT':e.eventType==='spring-fever'?'SPRING FEVER · BOOSTED MUSHROOMS':'CANOPY EVENT';toast(copy);}
@@ -321,15 +324,16 @@ function tick(dt,control=input()){
   else if(e.type==='bounce'){
    const branchSound=e.spring?'spring':e.fragile?'fragile':e.platformType==='leaf'?'leaf':e.platformType==='swing'?'swing':e.platformType==='vanish'?'vanish':'bounce';sound(branchSound);
    if(!['spring','cracked','vanish'].includes(e.platformType)&&!cleanPlatformIds.has(e.platformId)){cleanPlatformIds.add(e.platformId);cleanLandings++;}
+   if(e.route==='reward'||e.route==='risk')riskLandings++;
    landingImpulse=reducedMotion?0:(e.spring ? .045 : .03);const branch=platformMeshes.get(e.platformId);if(branch)branch.userData.impactAt=visualTime;
    if(e.spring){boostZoom=reducedMotion?1:.91;toast(game.event?.type==='spring-fever'?'SPRING FEVER BOOST!':'Spring boost!');}
    else if(e.platformType==='vanish')toast('VANISH BRANCH · MOVE!');
-  }
+  }else if(e.type==='encounter-complete'){encountersCompleted++;if(encountersCompleted===1||encountersCompleted%4===0)toast('ENCOUNTER CLEAR · '+encountersCompleted);}
  }
 }
 function updateEnding(dt){
  fallSplash.update(dt);results.update(dt);if(mode!=='dying')return;deathAge+=dt;if(deathPoint)deathPoint.visualY+=deathPoint.velocity*dt;quickRetry.hidden=deathAge<.65;
- if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}const transport=inputTrace.toTransport();const summary={id:transport.overflowed?undefined:runTicket?.id,trace:transport,meters:Math.floor(game.height),bananas:game.bananas,best,seed:runSeed,cleanLandings};window.dispatchEvent(new CustomEvent('chimp-run-finished',{detail:summary}));results.open(summary);syncUI();}
+ if(deathAge>=2){quickRetry.hidden=true;avatar.root.visible=false;mode='over';best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}const transport=inputTrace.toTransport();const summary={id:transport.overflowed?undefined:runTicket?.id,trace:transport,meters:Math.floor(game.height),bananas:game.bananas,best,seed:runSeed,cleanLandings,nearMisses,encountersCompleted,riskLandings};window.dispatchEvent(new CustomEvent('chimp-run-finished',{detail:summary}));results.open(summary);syncUI();}
 }
 function resize(){
  const w=innerWidth,h=innerHeight;renderer.setSize(w,h);const courtWidth=Math.min(w,h*WIDTH/VIEW_HEIGHT),viewWidth=w/courtWidth*WIDTH,viewHeight=h/courtWidth*WIDTH;renderer.setViewport(0,0,w,h);camera.left=-viewWidth/2;camera.right=viewWidth/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();renderPipeline.resize(w,h);scenery.resize(viewWidth,viewHeight);document.documentElement.style.setProperty('--court',courtWidth+'px');if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');previous=performance.now();
