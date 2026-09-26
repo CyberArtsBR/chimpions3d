@@ -2,7 +2,7 @@
 
 Branch: `feat/jump-aaa-gameplay-director`
 
-Baseline: P0 stabilization candidate `fix/jump-p0-green-baseline` at `e27ed60cb97aca0040a22396a510da545269fccf` (PR #57), layered directly on the current Jump runtime before gameplay tuning.
+Baseline: P0 stabilization candidate `fix/jump-p0-green-baseline` at `e27ed60cb97aca0040a22396a510da545269fccf` (PR #57). The gameplay branch is a clean descendant of that P0 head and the draft PR is temporarily targeted to the P0 branch so unrelated newer `main` commits are not mixed into gameplay validation. Nothing from this branch is merged or deployed.
 
 ## 1. Previous difficulty behavior
 
@@ -22,7 +22,7 @@ That produced approximately:
 | 300 s | 3.00× |
 | 5+ min | 3.00× |
 
-Because the pace multiplier scaled the simulation timestep, it compressed acceleration, jump arcs, horizontal reaction windows, camera follow and platform timing together. Difficulty therefore rose strongly through whole-simulation acceleration rather than primarily through route reading and encounter composition.
+`paceAt()` multiplied the fixed-step physics delta used by steering acceleration, horizontal travel, gravity/jump integration, bounce age and camera smoothing. Run time itself still advanced in real seconds, so event timers, jet duration and time-keyed platform/hazard motion were not uniformly accelerated. At high pace this created much shorter player reaction windows and an increasingly asymmetric relationship between player physics and real-time world motion. Difficulty therefore rose strongly through player/camera simulation compression rather than primarily through route reading and encounter composition.
 
 The old generator also built each row independently. It always preserved a solid safe route, but optional platform type, hazards and rewards did not form higher-level authored phrases.
 
@@ -68,11 +68,11 @@ No device-specific difficulty and no player-skill physics adaptation are used.
 
 The generator now selects seeded encounter templates above individual platform placement.
 
-Pacing phases:
+Pacing vocabulary:
 
-`READ → BUILD → CHALLENGE → RELEASE → REWARD`
+`READ · BUILD · CHALLENGE · REWARD · RELEASE`
 
-Not every phrase contains every phase, but every difficult phrase deliberately returns to a readable release/recovery state.
+Templates use those phases as a phrase grammar rather than a mandatory single ordering. Hard phrases finish in `RELEASE`; reward beats can occur before that release. The central `recoveryFrequency` can also deterministically extend the release by one extra safe row, with more breathing room early and slightly less at expert intensity.
 
 Current templates:
 
@@ -142,7 +142,7 @@ Generated hazards are attached to optional branches and their complete movement 
 
 Dynamic hazards have a minimum deterministic telegraph lead before their active collision window.
 
-Hazard collision is disabled during active jetpack flight.
+Hazard collision and telegraph spam are suppressed while a jetpack or canopy event is active. Dynamic hazards restart their timing after the special and must telegraph again before becoming dangerous.
 
 No hazard is allowed to convert the required route into intentional damage.
 
@@ -171,27 +171,34 @@ A deterministic special-intensity budget prevents accidental overlap among:
 - available jetpack pickup
 - Banana Bloom
 - Spring Fever
+- immediate hazard pressure
 
-A 9-second separation budget is reserved around completed special states.
+While a jetpack or canopy event is active, hazard collision/telegraph pressure is suspended. Dynamic hazard cycles restart with a fresh readable telegraph after the special. A 9-second separation budget is reserved around completed special states.
 
 ## 7. Deterministic test volume
 
-`checks/jump-gameplay-director.mjs` targets:
+`checks/jump-gameplay-director.mjs` covers:
 
-- 2,000 generated seeds
-- at least 50,000 required-route transfer validations
+- 2,000 broad generated-route seeds
+- 96 additional long-height expert-route seeds through 1,400+ m
+- at least 50,000 required-route transfer validations in the broad sweep
+- at least 30,000 additional simulated long-height transfers
 - all encounter templates
 - all four hazard families
-- complete hazard-envelope vs safe-route assertions
+- complete moving hazard-envelope vs safe-route sampling
 - telegraph-before-active assertions
 - fixed-step replay determinism
-- reset/restart determinism
+- reset/restart and pause-state determinism
 - wrap behavior
 - spring/cracked/vanish semantics
-- jet/event overlap budget
+- jet/event/hazard overlap budget
 - 30 / 60 / 120 / 144 Hz render-cadence independence
 
-The existing physics gate was updated to preserve the unchanged jump/collider fundamentals while removing assertions tied to the retired 3× pace and fixed 30-second jet schedule.
+The last executable FAST run before GitHub runner allocation became unavailable passed with **2,000 seeds, 175,646 validated transfers, 177,646 safe platforms and 5,059 generated hazards**, covering every encounter template and all four hazard families. The same run also passed build, source audit, determinism regression, assets and production-hook safety. Its Chromium STANDARD browser tier completed successfully. The EXTENDED run exposed a WebKit software-render timing race around the Pause control; the branch now freezes the QA render loop before that click.
+
+The current head adds the 96-seed long-height sweep plus stricter special/hazard overlap assertions. Subsequent GitHub Actions attempts have been rejected before runner allocation (`runner_id: 0`), so those latest additive checks remain pending execution rather than being reported as passed.
+
+The existing physics gate preserves the unchanged jump/collider fundamentals while removing assertions tied to the retired 3× pace and fixed 30-second jet schedule.
 
 ## 8. RULESET
 
@@ -207,7 +214,6 @@ This is required because deterministic generation, pace semantics, hazard behavi
 
 ## 9. Files changed
 
-- `.github/workflows/check.yml`
 - `src/jumpGameplayDirector.js`
 - `src/physics.js`
 - `src/game.js`
@@ -215,9 +221,10 @@ This is required because deterministic generation, pace semantics, hazard behavi
 - `checks/physics.mjs`
 - `checks/jump-audit.mjs`
 - `checks/jump-gameplay-director.mjs`
+- `checks/cross-browser-smoke.mjs`
 - `docs/JUMP_AAA_GAMEPLAY_DIRECTOR.md`
 
-Scoring implementation was not changed. The existing authoritative `scoreFor()` contract remains untouched. New near-miss, encounter-clear and risk-route counters are feedback/telemetry only.
+Scoring implementation was not changed. The repository already has an explicit compatible authoritative `scoreFor()` contract (height plus the existing banana contribution), and that contract remains untouched. New near-miss, encounter-clear and risk-route counters are feedback/telemetry only and do not redefine leaderboard scoring.
 
 ## 10. Remaining human playtest questions
 
