@@ -359,6 +359,7 @@ export function createScenery(scene,renderer){
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return !!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
+  get treeClimbOffset(){return treeClimbOffset;},
   get pooledBranches(){return pooledBranchCount;},
   resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
