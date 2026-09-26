@@ -7,7 +7,7 @@ page.on('pageerror',e=>errors.push(e.message));
 const report=[];
 try{
  await page.goto('http://127.0.0.1:4173/?test=1');
- await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().platformReady);
+ await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().treeVisible);
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  const entries=JSON.parse(fs.readFileSync('public/avatars.json','utf8')).filter(e=>e.url);
  for(const entry of entries.slice(0,Number(process.env.CHIMP_TEST_AVATAR_LIMIT)||entries.length)){
