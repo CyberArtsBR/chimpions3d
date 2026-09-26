@@ -181,9 +181,8 @@ function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute(
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
 // Menu/dialog gamepad navigation is owned exclusively by runtimeEnhancements.js.
  // Keeping a second menu subscriber here made one D-pad/stick edge move focus twice.
-inputManager.subscribe(({confirmPressed,pausePressed})=>{
- if(mode==='dying'&&confirmPressed){quickRetry.click();return;}
- if(pausePressed&&mode==='playing')menu('paused');
+inputManager.subscribe(({confirmPressed})=>{
+ if(mode==='dying'&&confirmPressed)quickRetry.click();
 });
 addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
