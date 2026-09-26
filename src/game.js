@@ -148,7 +148,14 @@ function menu(kind){
  }else{
   $('eyebrow').textContent='A little chimp. A big climb.';$('title').innerHTML='CHIMP<br><span>JUMP</span>';$('description').innerHTML='Read the branches. Time your landing.<br>Choose your route. Climb higher.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
  }
- syncUI();if(kind==='menu'&&ready)runSession.prepare();
+ syncUI();
+ requestAnimationFrame(()=>{
+  if(!inputManager.snapshot().connected)return;
+  document.body.dataset.inputMode='controller';
+  const target=kind==='paused'?document.getElementById('jump-resume'):kind==='menu'?$('play'):null;
+  if(target&&!target.disabled&&!target.hidden)target.focus({preventScroll:true});
+ });
+ if(kind==='menu'&&ready)runSession.prepare();
 }
 function beginPlaying(){
  mode='playing';countdown.hidden=true;countdownTime=0;introTime=0;autoPauseAfter=performance.now()+1200;runSession.markPlaying();
@@ -173,53 +180,10 @@ function start(requestedSeed=null){
 $('play').onclick=start;for(const event of ['pointerenter','focus','touchstart'])$('play').addEventListener(event,()=>scenery.prefetchRuntimeAssets(),{passive:true});$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
 function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
-function controllerMenuScope(){
- const openDialog=document.querySelector('dialog[open]');
- if(openDialog)return openDialog;
- if(!$('overlay').hidden)return $('overlay');
- return document.body;
-}
-function controllerMenuControls(){
- const scope=controllerMenuScope();
- return [...scope.querySelectorAll('button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled)')].filter(element=>{
-  if(element.hidden||element.closest('[hidden]'))return false;
-  const style=getComputedStyle(element);
-  return style.display!=='none'&&style.visibility!=='hidden'&&style.pointerEvents!=='none';
- });
-}
-function moveControllerMenuFocus(step){
- const controls=controllerMenuControls();if(!controls.length)return false;
- const current=controls.indexOf(document.activeElement);
- const next=current<0?(step>0?0:controls.length-1):(current+(step>0?1:-1)+controls.length)%controls.length;
- controls[next]?.focus();return true;
-}
-function confirmControllerMenu(){
- const controls=controllerMenuControls();if(!controls.length)return false;
- const active=controls.includes(document.activeElement)?document.activeElement:controls[0];
- active?.focus();active?.click?.();return true;
-}
-function cancelControllerMenu(){
- const dialog=document.querySelector('dialog[open]');
- if(dialog){
-  const close=[...dialog.querySelectorAll('button:not(:disabled)')].find(button=>/close|back|home/i.test((button.getAttribute('aria-label')||'')+' '+(button.textContent||'')));
-  if(close){close.click();return true;}
-  if(dialog===collectionDialog){dialog.close();return true;}
-  return false;
- }
- if(mode==='paused'){start();return true;}
- if(mode==='menu'){location.href='/';return true;}
- return false;
-}
-inputManager.subscribe(({confirmPressed,cancelPressed,pausePressed,menuX,menuY,source})=>{
- if(mode==='dying'&&confirmPressed){quickRetry.click();return;}
- const menuActive=mode!=='playing'||collectionDialog.open||results.isOpen||recordBook.isOpen;
- if(source==='gamepad'&&menuActive){
-  const direction=menuY||menuX;
-  if(direction){moveControllerMenuFocus(direction);return;}
-  if(confirmPressed){confirmControllerMenu();return;}
-  if(cancelPressed){cancelControllerMenu();return;}
- }
- if(pausePressed){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
+// Menu/dialog gamepad navigation is owned exclusively by runtimeEnhancements.js.
+// Keeping a second menu subscriber here made one D-pad/stick edge move focus twice.
+inputManager.subscribe(({confirmPressed})=>{
+ if(mode==='dying'&&confirmPressed)quickRetry.click();
 });
 addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
@@ -381,7 +345,7 @@ function renderFrame(now){if(document.hidden){previous=now;return;}if(!['startin
  renderPipeline.render(dt);
 }
 renderer.setAnimationLoop(renderFrame);
-const runtimeSnapshot=()=>({ready,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs?.length||0,pooledBranches:scenery.pooledBranches,assetTelemetry:assetRuntimeSnapshot(),controller:inputManager.snapshot(),diagnosticsVersion:2});
+const runtimeSnapshot=()=>({ready,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,treeClimbOffset:scenery.treeClimbOffset,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs?.length||0,pooledBranches:scenery.pooledBranches,assetTelemetry:assetRuntimeSnapshot(),controller:inputManager.snapshot(),diagnosticsVersion:2});
 const diagnostics=installDiagnostics(window,runtimeSnapshot);
 Object.defineProperty(window,'chimpJump',{value:()=>diagnostics.snapshot(),writable:false,configurable:false});
 const testApiEnabled=(import.meta.env.DEV||import.meta.env.VITE_CHIMP_QA_HOOKS==='1')&&['localhost','127.0.0.1'].includes(location.hostname);
