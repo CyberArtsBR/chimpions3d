@@ -159,7 +159,7 @@ function start(requestedSeed=null){
  if(!ready||['playing','starting','dying'].includes(mode)||results.isOpen||recordBook.isOpen)return;
  if(mode==='menu'&&!selectionConfirmed){openSelection();return;}audio.unlock();const fresh=mode!=='paused';
  if(fresh){
-  mode='starting';syncUI();runTicket=null;inputTrace.reset();cleanLandings=0;cleanPlatformIds.clear();
+  mode='starting';syncUI();scenery.prepareRuntimeAssets();renderPipeline.prewarm?.();runTicket=null;inputTrace.reset();cleanLandings=0;cleanPlatformIds.clear();
   const replaySeed=requestedSeed===null||requestedSeed===undefined?null:(Number(requestedSeed)>>>0),session=runSession.commit({replaySeed});
   runTicket=session.ticket;
   if(session.practice)toast('Practice trail · same route, no online submission');
