@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {BUILT_IN_CHIMPION_NAMES,filterBuiltInRoster} from '../src/roster.js';
 
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -23,7 +24,11 @@ for(const name of BUILT_IN_CHIMPION_NAMES){
  const entry={...card,id:String(card.id)};
  const reason=overrides[entry.name]?.unavailable;
  if(reason){entry.unavailable=reason;report.unavailable.push({name:entry.name,reason});}
- else entry.url=path.relative('public',full).split(path.sep).map(encodeURIComponent).join('/');
+ else {
+  entry.url=path.relative('public',full).split(path.sep).map(encodeURIComponent).join('/');
+  entry.assetBytes=fs.statSync(full).size;
+  entry.assetHash=crypto.createHash('sha256').update(fs.readFileSync(full)).digest('hex');
+ }
  entries.push(entry);
 }
 report.files=diskGlbs.length;

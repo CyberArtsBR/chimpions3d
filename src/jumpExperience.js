@@ -1,8 +1,9 @@
 import './jumpExperience.css';
+import './jumpPresentationV2.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
-const MENU_ART_URL='/ui/start-screen.webp';
+const MENU_ART_URL='/screens/chimp-jump-start.png';
 const loadJSON=(key,fallback)=>{try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{return {...fallback}}};
 const loadGoals=()=>{try{const value=JSON.parse(localStorage.getItem(GOALS_KEY)||'[]');return Array.isArray(value)?value:[]}catch{return []}};
 const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
@@ -146,7 +147,8 @@ export function setupJumpExperience(){
     }catch{}
     try{await document.fonts?.ready;}catch{}
     await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
-    const controlsReady=!!document.getElementById('play')&&!!document.querySelector('#overlay .card')&&!!document.getElementById('avatar-status');
+    const controlsReady=[document.getElementById('play'),document.querySelector('#overlay .card'),document.getElementById('avatar-status'),guideButton,optionsButton,dialog,settings].every(Boolean)
+      &&[guideButton,optionsButton].every(control=>control.isConnected&&control.getClientRects().length>0&&getComputedStyle(control).pointerEvents!=='none');
     document.body.dataset.uiReady=controlsReady?'true':'degraded';
     document.body.dataset.menuReady=artworkReady&&controlsReady?'true':'degraded';
     loader.hidden=true;
@@ -193,8 +195,9 @@ export function setupJumpExperience(){
     stats.newBest=Number(stats.meters)>rememberedBest;
     rememberedBest=Math.max(rememberedBest,Number(stats.meters)||0);
     const result=evaluateJumpGoals(stats,unlocked);unlocked=result.unlocked;save(GOALS_KEY,unlocked);renderGoals();
-    if(result.newlyUnlocked.length){
-      const names=result.newlyUnlocked.map(id=>JUMP_GOALS.find(goal=>goal.id===id)?.title).filter(Boolean);
+    const names=result.newlyUnlocked.map(id=>JUMP_GOALS.find(goal=>goal.id===id)?.title).filter(Boolean);
+    stats.goals={completed:unlocked.length,total:JUMP_GOALS.length,newlyUnlocked:names};
+    if(names.length){
       goalToast.textContent='Goal complete · '+names.join(' + ');goalToast.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>goalToast.hidden=true,3200);
     }
   });
@@ -242,7 +245,7 @@ export function setupJumpExperience(){
     if(keys[event.key]){event.preventDefault();event.stopImmediatePropagation();focusGrid(collection,keys[event.key]);}
   },true);
 
-  window.chimpJumpUX=Object.freeze({handleAction:handleNormalizedAction,get preferences(){return {...prefs}}});
+  window.chimpJumpUX=Object.freeze({handleAction:handleNormalizedAction,get ready(){return document.body.dataset.uiReady==='true';},get preferences(){return {...prefs}}});
 
   applyPrefs();renderGoals();syncStatus();syncReadyLoader();void setReadiness();
 }

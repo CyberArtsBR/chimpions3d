@@ -14,7 +14,9 @@ function parseGLB(filePath){
   assert(20+jsonLength<=b.length,`${filePath}: incomplete JSON chunk`);
   assert.equal(b.readUInt32LE(16),0x4e4f534a,`${filePath}: first chunk must be JSON`);
   const json=JSON.parse(b.subarray(20,20+jsonLength).toString().trim());
-  return {bytes:b.length,json};
+  const nextChunk=20+jsonLength;
+  const binOffset=nextChunk+8<=b.length&&b.readUInt32LE(nextChunk+4)===0x004e4942?nextChunk+8:null;
+  return {bytes:b.length,json,buffer:b,binOffset};
 }
 
 function triangles(json){
@@ -39,24 +41,58 @@ function vertices(json){
   return total;
 }
 
-function embeddedImageBytes(json,image){
-  if(image.bufferView!==undefined)return json.bufferViews?.[image.bufferView]?.byteLength||0;
+function embeddedImageBuffer(json,image,buffer,binOffset){
+  if(image.bufferView!==undefined&&buffer&&binOffset!==null){
+    const view=json.bufferViews?.[image.bufferView];
+    if(view){
+      const start=binOffset+(view.byteOffset||0),end=start+(view.byteLength||0);
+      if(start>=0&&end<=buffer.length)return buffer.subarray(start,end);
+    }
+  }
   if(typeof image.uri==='string'&&image.uri.startsWith('data:')){
     const comma=image.uri.indexOf(',');
     if(comma>=0){
       const body=image.uri.slice(comma+1);
-      return image.uri.slice(0,comma).includes(';base64')?Math.floor(body.length*3/4):Buffer.byteLength(decodeURIComponent(body));
+      return image.uri.slice(0,comma).includes(';base64')?Buffer.from(body,'base64'):Buffer.from(decodeURIComponent(body));
     }
   }
   return null;
 }
 
-function assetInfo(name,bytes,json){
+function imageDimensions(buffer){
+  if(!buffer?.length)return null;
+  if(buffer.length>=24&&buffer.toString('ascii',1,4)==='PNG')return {width:buffer.readUInt32BE(16),height:buffer.readUInt32BE(20)};
+  if(buffer.length>=30&&buffer.toString('ascii',0,4)==='RIFF'&&buffer.toString('ascii',8,12)==='WEBP'){
+    const type=buffer.toString('ascii',12,16);
+    if(type==='VP8X')return {width:1+buffer.readUIntLE(24,3),height:1+buffer.readUIntLE(27,3)};
+    if(type==='VP8 '&&buffer[23]===0x9d&&buffer[24]===0x01&&buffer[25]===0x2a)return {width:buffer.readUInt16LE(26)&0x3fff,height:buffer.readUInt16LE(28)&0x3fff};
+    if(type==='VP8L'&&buffer[20]===0x2f){const bits=buffer.readUInt32LE(21);return {width:(bits&0x3fff)+1,height:((bits>>14)&0x3fff)+1};}
+  }
+  if(buffer.length>=4&&buffer[0]===0xff&&buffer[1]===0xd8){
+    let offset=2;
+    while(offset+9<buffer.length){
+      if(buffer[offset]!==0xff){offset++;continue;}
+      const marker=buffer[offset+1],length=buffer.readUInt16BE(offset+2);
+      if(length<2||offset+2+length>buffer.length)break;
+      if((marker>=0xc0&&marker<=0xc3)||(marker>=0xc5&&marker<=0xc7)||(marker>=0xc9&&marker<=0xcb)||(marker>=0xcd&&marker<=0xcf)){
+        return {width:buffer.readUInt16BE(offset+7),height:buffer.readUInt16BE(offset+5)};
+      }
+      offset+=2+length;
+    }
+  }
+  return null;
+}
+
+function assetInfo(name,bytes,json,buffer=null,binOffset=null){
   const jointIndexes=[...new Set((json.skins||[]).flatMap(s=>s.joints||[]))];
-  const images=(json.images||[]).map((image,index)=>({
-    index,mimeType:image.mimeType||null,uri:image.uri||null,bufferView:image.bufferView??null,
-    encodedBytes:embeddedImageBytes(json,image)
-  }));
+  const images=(json.images||[]).map((image,index)=>{
+    const encoded=embeddedImageBuffer(json,image,buffer,binOffset);
+    return {
+      index,mimeType:image.mimeType||null,uri:image.uri||null,bufferView:image.bufferView??null,
+      encodedBytes:encoded?.byteLength||null,
+      dimensions:imageDimensions(encoded)
+    };
+  });
   const largestTexture=images.reduce((largest,image)=>(image.encodedBytes||0)>(largest?.encodedBytes||0)?image:largest,null);
   return {
     name,bytes,
@@ -142,8 +178,8 @@ const avatarReport=[];
 for(const avatar of avatars.filter(a=>a.url)){
   const filePath='public/'+decodeURIComponent(avatar.url);
   assert(fs.existsSync(filePath),`${avatar.name}: missing ${filePath}`);
-  const {bytes,json}=parseGLB(filePath);
-  const info=assetInfo(avatar.name,bytes,json);
+  const {bytes,json,buffer,binOffset}=parseGLB(filePath);
+  const info=assetInfo(avatar.name,bytes,json,buffer,binOffset);
   assert(info.skins>0,`${avatar.name}: no skin`);
   assert(info.joints>0,`${avatar.name}: skin has no joints`);
   assert(info.skinnedNodes>0,`${avatar.name}: no skinned mesh node`);
@@ -154,7 +190,7 @@ console.log('AVATAR_ASSET_COUNT:'+avatarReport.length);
 const branchPath='public/environment/platforms/branch-moss.glb';
 assert(fs.existsSync(branchPath),'Missing branch-moss.glb');
 const branch=parseGLB(branchPath);
-const branchReport=assetInfo('branch-moss.glb',branch.bytes,branch.json);
+const branchReport=assetInfo('branch-moss.glb',branch.bytes,branch.json,branch.buffer,branch.binOffset);
 assert(branchReport.meshes>0,'branch-moss.glb has no mesh');
 console.log('BRANCH_ASSET_REPORT:'+JSON.stringify(branchReport));
 
