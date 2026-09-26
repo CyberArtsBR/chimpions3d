@@ -61,7 +61,7 @@ try{
 
   const menu=await snap('menu');
   assert.equal(menu.cameraZoom,1,'Production title screen must keep full-route camera state');
-  assert(['high','balanced'].includes(menu.quality),'Production quality profile must be recognized');
+  assert(['balanced','high','ultra'].includes(menu.quality),'Production quality profile must be recognized');
   assert(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible());
   await shot('production-menu-desktop.png');
 
