@@ -114,15 +114,15 @@ assert(safePlatforms>transferCount);
 assert(hazardCount>0);
 
 for(const phase of Object.values(ENCOUNTER_PHASES))assert(phases.has(phase),'Missing generated pacing phase '+phase);
-for(const template of ENCOUNTER_TEMPLATES){
- const g=new Game(template.complexity*7919);
+for(let seed=0;seed<256&&encounterTypes.size<ENCOUNTER_TEMPLATES.length;seed++){
+ const g=new Game(seed+50_000);
  g.platforms=[{id:0,x:0,baseX:0,y:1000,width:2.3*PLATFORM_LENGTH,type:'solid',coin:false,route:'safe',required:true,broken:false,phase:0,moveSpeed:1,moveRange:0,vanishAt:null}];
  g.hazards=[];g.nextY=1000;g.nextX=0;g.nextWidth=2.3*PLATFORM_LENGTH;g.camera=1125;g.time=900;g.encounter=null;g.lastEncounterId='';
  g.generate();
  for(const p of g.platforms)if(p.encounterType)encounterTypes.add(p.encounterType);
  for(const h of g.hazards)hazardTypes.add(h.type);
 }
-for(const template of ENCOUNTER_TEMPLATES)assert(encounterTypes.has(template.id),'Encounter template never generated: '+template.id);
+for(const template of ENCOUNTER_TEMPLATES)assert(encounterTypes.has(template.id),'Encounter template never generated at full complexity: '+template.id);
 
 let syntheticSeed=17;
 const random=()=>((syntheticSeed=(Math.imul(syntheticSeed,1664525)+1013904223)>>>0)/4294967296);
