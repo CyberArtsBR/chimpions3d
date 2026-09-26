@@ -170,7 +170,7 @@ function start(requestedSeed=null){
  }
  music.muted=muted;music.play().catch(()=>{});beginPlaying();
 }
-$('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
+$('play').onclick=start;for(const event of ['pointerenter','focus','touchstart'])$('play').addEventListener(event,()=>scenery.prefetchRuntimeAssets(),{passive:true});$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
 function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
 function controllerMenuScope(){
