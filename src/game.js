@@ -46,7 +46,8 @@ const selectionActions=document.createElement('div');selectionActions.className=
 selectionActions.innerHTML='<button id="random-chimpion">↻ Random</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Ready for the canopy</small></div><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
 collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
-collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();$('choose').focus();});
+let collectionOpener=null;
+collectionDialog.addEventListener('close',()=>{$('avatar-list').hidden=true;$('avatar-list').replaceChildren();const target=collectionOpener&&collectionOpener.isConnected&&collectionOpener.getClientRects().length?collectionOpener:($('choose').getClientRects().length?$('choose'):$('play'));collectionOpener=null;target?.focus();});
 const scene=new THREE.Scene();
 const camera=new THREE.OrthographicCamera(-5,5,14,-2,0.1,60);camera.position.set(0,0,20);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
@@ -209,15 +210,10 @@ function cancelControllerMenu(){
  if(mode==='menu'){location.href='/';return true;}
  return false;
 }
-inputManager.subscribe(({confirmPressed,cancelPressed,pausePressed,menuX,menuY,source})=>{
+// runtimeEnhancements.js is the single owner for menu/dialog gamepad navigation.
+// Keeping a second navigation subscriber here caused one stick/D-pad edge to move focus twice.
+inputManager.subscribe(({confirmPressed,pausePressed})=>{
  if(mode==='dying'&&confirmPressed){quickRetry.click();return;}
- const menuActive=mode!=='playing'||collectionDialog.open||results.isOpen||recordBook.isOpen;
- if(source==='gamepad'&&menuActive){
-  const direction=menuY||menuX;
-  if(direction){moveControllerMenuFocus(direction);return;}
-  if(confirmPressed){confirmControllerMenu();return;}
-  if(cancelPressed){cancelControllerMenu();return;}
- }
  if(pausePressed){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
 });
 addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
@@ -270,7 +266,7 @@ function renderCollection(){
  const count=document.createElement('span');count.textContent=(collectionPage+1)+' / '+pages+' · '+entries.length+' chimps';nav.append(count);list.append(nav);
 }
 async function openSelection(){
- if(collectionDialog.open||!catalog.length)return;pendingEntry=catalog.find(entry=>entry.id===selectedId)||randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
+ if(collectionDialog.open||!catalog.length)return;collectionOpener=document.activeElement?.getClientRects?.().length?document.activeElement:null;pendingEntry=catalog.find(entry=>entry.id===selectedId)||randomEntry();showPending();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry.id)/12));
  const list=$('avatar-list');list.hidden=false;collectionDialog.showModal();if(!collection.length)try{const response=await fetch(import.meta.env.BASE_URL+'characters.json');if(!response.ok)throw new Error();collection=filterBuiltInRoster(await response.json());}catch{toast('Collection unavailable. Your chimp is ready.');}
  if(collectionDialog.open){showPending();renderCollection();list.querySelector('input')?.focus();}
 }
