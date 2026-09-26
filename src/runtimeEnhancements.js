@@ -1,10 +1,15 @@
 import {inputManager} from './InputManager.js';
+
 const isVisible=el=>{
  if(!el||el.disabled||el.hidden)return false;
- const style=getComputedStyle(el);return style.display!=='none'&&style.visibility!=='hidden'&&style.opacity!=='0'&&el.getClientRects().length>0;
+ const style=getComputedStyle(el);
+ return style.display!=='none'&&style.visibility!=='hidden'&&style.opacity!=='0'&&el.getClientRects().length>0;
 };
-const focusables=root=>[...root.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(isVisible);
-const focusElement=el=>{if(el&&isVisible(el)){el.focus({preventScroll:true});el.scrollIntoView?.({block:'nearest',inline:'nearest'});return true;}return false;};
+const focusables=root=>[...root.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),summary,[tabindex]:not([tabindex="-1"])')].filter(isVisible);
+const focusElement=el=>{
+ if(el&&isVisible(el)){el.focus({preventScroll:true});el.scrollIntoView?.({block:'nearest',inline:'nearest'});return true;}
+ return false;
+};
 const openDialog=()=>document.querySelector('#collection-dialog[open],#results-dialog[open],#record-book[open],#jump-guide-dialog[open],#jump-settings-dialog[open]');
 
 function moveCollection(dx,dy){
@@ -20,14 +25,19 @@ function moveCollection(dx,dy){
  const items=focusables(dialog);if(!items.length)return false;
  let index=items.indexOf(active);
  if(index<0)return focusElement(dialog.querySelector('#random-chimpion')||items[0]);
- const step=(dy||dx)>0?1:-1;index=(index+step+items.length)%items.length;return focusElement(items[index]);
+ const step=(dy||dx)>0?1:-1;
+ index=(index+step+items.length)%items.length;
+ return focusElement(items[index]);
 }
+
 function moveDialog(dialog,direction){
  const items=focusables(dialog);if(!items.length)return false;
  let index=items.indexOf(document.activeElement);
  if(index<0)return focusElement(dialog.querySelector('#try-again')||dialog.querySelector('header button')||items[0]);
- index=(index+direction+items.length)%items.length;return focusElement(items[index]);
+ index=(index+direction+items.length)%items.length;
+ return focusElement(items[index]);
 }
+
 function moveMenu(direction){
  const overlay=document.querySelector('#overlay');if(!overlay||overlay.hidden)return false;
  const items=focusables(overlay).filter(el=>!el.closest('#avatar-list'));
@@ -38,14 +48,17 @@ function moveMenu(direction){
   const preferred=mode==='paused'?document.querySelector('#jump-resume'):document.querySelector('#play');
   return focusElement(preferred)||focusElement(items[0]);
  }
- index=(index+direction+items.length)%items.length;return focusElement(items[index]);
+ index=(index+direction+items.length)%items.length;
+ return focusElement(items[index]);
 }
+
 function activateFocused(){
  const dialog=openDialog(),active=document.activeElement;
  if(dialog){
   if(active&&dialog.contains(active)&&isVisible(active)){active.click();return;}
-  const preferred=dialog.querySelector('#random-chimpion')||dialog.querySelector('#try-again')||dialog.querySelector('header button')||focusables(dialog)[0];
-  if(preferred?.click)preferred.click();else focusElement(preferred);return;
+  const preferred=dialog.querySelector('#try-again')||dialog.querySelector('#random-chimpion')||dialog.querySelector('header button')||focusables(dialog)[0];
+  if(preferred?.click){focusElement(preferred);preferred.click();}else focusElement(preferred);
+  return;
  }
  const mode=document.body?.dataset?.mode||'';
  if(mode==='menu'||mode==='paused'){
@@ -58,19 +71,35 @@ function activateFocused(){
 inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed,pausePressed,source,connected})=>{
  if(source==='gamepad'&&connected)document.body.dataset.inputMode='controller';
  const mode=document.body?.dataset?.mode||'',dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
- if(pausePressed){
+
+ if(pausePressed&&!dialog){
   if(mode==='playing'){document.querySelector('#pause')?.click();return;}
   if(mode==='paused'){document.querySelector('#jump-resume')?.click();return;}
-  if(mode==='menu'){const play=document.querySelector('#play');if(isVisible(play)){focusElement(play);play.click();}return;}
+  if(mode==='menu'){
+   const play=document.querySelector('#play');
+   if(isVisible(play)){focusElement(play);play.click();}
+   return;
+  }
  }
+
  if(!navigating)return;
- if(menuX){if(dialog?.id==='collection-dialog')moveCollection(menuX,0);else if(dialog)moveDialog(dialog,menuX);else moveMenu(menuX);return;}
- if(menuY){if(dialog?.id==='collection-dialog')moveCollection(0,menuY);else if(dialog)moveDialog(dialog,menuY);else moveMenu(menuY);return;}
+ if(menuX){
+  const moved=dialog?.id==='collection-dialog'?moveCollection(menuX,0):dialog?moveDialog(dialog,menuX):moveMenu(menuX);
+  if(moved)window.dispatchEvent(new Event('chimp-ui-nav'));
+  return;
+ }
+ if(menuY){
+  const moved=dialog?.id==='collection-dialog'?moveCollection(0,menuY):dialog?moveDialog(dialog,menuY):moveMenu(menuY);
+  if(moved)window.dispatchEvent(new Event('chimp-ui-nav'));
+  return;
+ }
  if(confirmPressed){activateFocused();return;}
  if(cancelPressed){
   if(dialog?.id==='collection-dialog'){document.querySelector('#close-collection')?.click();return;}
-  if(dialog?.id==='record-book'||dialog?.id==='jump-guide-dialog'||dialog?.id==='jump-settings-dialog'){dialog.querySelector('header button,.guide-close,.settings-close')?.click();return;}
+  if(dialog?.id==='record-book'||dialog?.id==='jump-guide-dialog'||dialog?.id==='jump-settings-dialog'){
+   dialog.querySelector('header button,.guide-close,.settings-close')?.click();return;
+  }
   if(dialog?.id==='results-dialog'){focusElement(dialog.querySelector('#back-to-games'));return;}
-  if(mode==='paused'){document.querySelector('#jump-resume')?.click();}
+  if(mode==='paused')document.querySelector('#jump-resume')?.click();
  }
 });
