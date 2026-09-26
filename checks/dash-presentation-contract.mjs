@@ -19,6 +19,7 @@ assert(dash.includes('Chimpion load timed out'),'Runtime must enforce avatar loa
 assert(dash.includes('cancelAvatarLoad'),'Runtime must expose avatar load cancellation');
 for(const bus of ['master','music','sfx','ui','ambience'])assert(audio.includes(`'${bus}'`),`Missing ${bus} audio bus`);
 for(const id of ['dash-score','dash-distance','dash-best','dash-bananas','dash-flow-value','dash-mult','dash-stage-number'])assert(dash.includes(`id="${id}"`),`Missing HUD field ${id}`);
+assert(dash.includes('id="dash-tip"'),'Dash runtime must provide the gameplay tip element used by start/tutorial flow');
 for(const id of ['result-score','result-distance','result-bananas','result-golden','result-stage','result-flow','result-combo','result-best','result-pb'])assert(dash.includes(`id="${id}"`),`Missing result field ${id}`);
 for(const id of ['setting-master','setting-music','setting-sfx','setting-ui','setting-ambience','setting-mute','setting-reduced-motion','setting-high-visibility','setting-screen-shake','setting-haptics','setting-large-touch'])assert(dash.includes(`id="${id}"`),`Missing setting ${id}`);
 assert(dash.includes("slideCodes=new Set(['ArrowDown','ShiftLeft','ShiftRight','KeyS'])"),'Keyboard slide bindings must match the presentation spec');
