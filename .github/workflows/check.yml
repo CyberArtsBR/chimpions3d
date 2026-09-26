@@ -53,6 +53,9 @@ jobs:
       - name: Syntax-check browser and production suites
         run: |
           node --check checks/game-browser.mjs
+          node --check checks/avatar-browser.mjs
+          node --check checks/character-gameplay-browser.mjs
+          node --check checks/character-rig.mjs
           node --check checks/collection-browser.mjs
           node --check checks/countdown-browser.mjs
           node --check checks/responsive-browser.mjs
