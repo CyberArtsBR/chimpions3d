@@ -45,6 +45,7 @@ function assertAnimation(name,animation){
   assert(animation.maxSecondaryResetError<=1e-6,name+': accessory reset drift '+animation.maxSecondaryResetError);
   assert(animation.maxSecondaryAngularOffset<=.24,name+': accessory angular explosion '+animation.maxSecondaryAngularOffset);
   assert(animation.maxHeadStep<=.50,name+': head snap '+animation.maxHeadStep);
+  assert(animation.minLandingRootOffset>=-.01,name+': landing root penetrated foot plane '+animation.minLandingRootOffset);
   for(const [label,expected] of requiredStates){
     const state=animation.states.find(item=>item.label===label);
     assert(state,name+': missing '+label+' scenario');
