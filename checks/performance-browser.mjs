@@ -130,7 +130,7 @@ try{
   const postFrameMode=await page.evaluate(()=>window.chimpJump().mode);
   report.frameTime.safetyPauseObserved=postFrameMode==='paused';
   if(postFrameMode==='paused'){
-    await page.locator('#play').click();
+    await page.evaluate(()=>window.chimpJumpTest.startRun());
     await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   }
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
