@@ -893,6 +893,7 @@ export class CharacterAnimator {
     let maxBoneScaleDelta = 0;
     let maxSecondaryAngularOffset = 0;
     let maxHeadStep = 0;
+    let minLandingRootOffset = 0;
     const failures = [];
     const states = [];
     const bounceCycles = 120;
@@ -913,6 +914,7 @@ export class CharacterAnimator {
       );
       maxVisualScaleDeviation = Math.max(maxVisualScaleDeviation, scaleDeviation);
       if (reducedMotion) maxReducedRootScaleDeviation = Math.max(maxReducedRootScaleDeviation, scaleDeviation);
+      if (this.state === ANIMATION_STATES.LAND) minLandingRootOffset = Math.min(minLandingRootOffset, this.visual.position.y);
       for (let index = 0; index < this.bones.length; index++) {
         maxBoneScaleDelta = Math.max(maxBoneScaleDelta, this.bones[index].scale.distanceTo(baseScales[index]));
       }
@@ -1085,6 +1087,7 @@ export class CharacterAnimator {
     if (maxSecondaryResetError > 1e-6) failures.push('secondary bones did not reset to captured rest transforms');
     if (maxSecondaryAngularOffset > 0.24) failures.push('secondary accessory motion exceeded angular safety envelope');
     if (maxHeadStep > 0.50) failures.push('head angular step exceeded continuity limit');
+    if (minLandingRootOffset < -0.01) failures.push('landing root translated below the normalized foot plane');
 
     return {
       ok:failures.length === 0,
@@ -1101,6 +1104,7 @@ export class CharacterAnimator {
       maxSecondaryResetError,
       maxSecondaryAngularOffset,
       maxHeadStep,
+      minLandingRootOffset,
       boneCount:this.bones.length,
       secondaryBoneCount:this.secondaryEntries.length,
       authoredRestSnapshots:this.rigEntries.filter(entry => entry.authoredBase).length,
