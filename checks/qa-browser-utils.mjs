@@ -38,7 +38,9 @@ export function attachPageDiagnostics(page){
 export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored=true}={}){
   await page.waitForFunction(requireAuthored=>{
     const s=window.chimpJump?.();
-    if(!s?.ready||document.body?.dataset?.mode!=='menu')return false;
+    if(!s?.ready||!s.uiReady||document.body?.dataset?.uiReady!=='true'||document.body?.dataset?.mode!=='menu')return false;
+    const requiredControls=['jump-guide-button','jump-options-button','play'];
+    if(!requiredControls.every(id=>{const element=document.getElementById(id);return element&&!element.disabled&&element.getClientRects().length>0;}))return false;
     if(!requireAuthored)return true;
     return ['high','cinematic-max'].includes(s.quality)?(s.platformReady&&s.backgroundReady):s.treeVisible;
   },requireAuthored,{timeout});
