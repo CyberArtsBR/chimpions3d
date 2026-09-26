@@ -11,15 +11,15 @@ try{
     const item={...viewport};
     item.menu=await assertNoHorizontalOverflow(page,viewport.name+' menu');
     assert(await page.getByRole('button',{name:'LET’S JUMP',exact:true}).isVisible(),viewport.name+': play action hidden');
-    assert(await page.getByRole('button',{name:'Field guide',exact:true}).isVisible(),viewport.name+': Field Guide hidden');
+    assert(await page.getByRole('button',{name:'Field Guide',exact:true}).isVisible(),viewport.name+': Field Guide hidden');
     await page.screenshot({path:`checks/responsive-${viewport.name}-menu.png`,animations:'disabled'});
 
-    await page.getByRole('button',{name:'Field guide',exact:true}).click();
+    await page.getByRole('button',{name:'Field Guide',exact:true}).click();
     const guide=page.locator('#jump-guide-dialog[open]');
     await guide.waitFor({state:'visible'});
     const guideBox=await guide.boundingBox();
     assert(guideBox&&guideBox.x>=-1&&guideBox.y>=-1&&guideBox.x+guideBox.width<=viewport.width+1&&guideBox.y+guideBox.height<=viewport.height+1,viewport.name+': Field Guide exceeds viewport');
-    await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+    await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
 
     await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
     const picker=page.locator('#collection-dialog[open]');
