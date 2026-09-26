@@ -10,6 +10,9 @@ try{
   await page.evaluate(async()=>{await window.chimpJumpTest.selectAvatar('12');window.chimpJumpTest.suspendRendering();window.chimpJumpTest.render();});
   await shot('menu');
   await page.getByRole('button',{name:'Field Guide',exact:true}).click();await shot('field-guide');await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
+  await page.getByRole('button',{name:'Options',exact:true}).click();
+  await page.getByLabel('Reduced Motion').check();await shot('options-reduced-motion');
+  await page.getByLabel('Reduced Motion').uncheck();await page.getByRole('button',{name:'Close Options',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();await shot('character-picker');
   await page.locator('#confirm-chimpion').click();await page.waitForFunction(()=>window.chimpJump().mode==='starting');await page.evaluate(()=>window.chimpJumpTest.render());await shot('countdown');
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
@@ -49,9 +52,11 @@ try{
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
   await page.waitForFunction(()=>window.chimpJump().mode==='over');await shot('result');
+  await page.evaluate(()=>document.body.dataset.reducedMotion='true');await shot('result-reduced-motion');
+  await page.evaluate(()=>document.body.dataset.reducedMotion='false');
 
-  const manifest={status:'PASS',suite:'visual-regression-capture',mode:'baseline-candidate',browser:'chromium',viewport:{width:1440,height:900,dpr:1},animations:'disabled',shots,note:'Capture set is deterministic; pixel-diff gating remains disabled until approved baselines are committed.'};
-  assert(shots.length>=12);
+  const manifest={status:'PASS',suite:'visual-regression-capture',mode:'baseline-candidate',browser:'chromium',viewport:{width:1440,height:900,dpr:1},animations:'disabled',shots,note:'Capture set includes reduced-motion Options/results states; pixel-diff gating remains disabled until approved baselines are committed.'};
+  assert(shots.length>=14);
   writeReport('checks/visual-regression-manifest.json',manifest);
   console.log('PASS visual capture manifest: '+shots.length+' deterministic states');
 }finally{await browser.close();}
