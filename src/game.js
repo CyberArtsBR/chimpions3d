@@ -19,6 +19,7 @@ import {createAudio} from './audio.js';
 import {filterBuiltInRoster} from './roster.js';
 import {createJumpRenderPipeline} from './jumpRenderPipeline.js';
 import {getJumpQualityProfile,nextJumpQualityProfile,resolveJumpQualityProfile} from './jumpRenderQuality.js';
+import {assetRuntimeSnapshot,versionedAssetUrl} from './assetRuntime.js';
 
 document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
@@ -68,18 +69,18 @@ const renderPipeline=createJumpRenderPipeline({renderer,scene,camera,sun,width:i
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
 function removeHazard(m){world.remove(m);}
 const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
-let selectedQuality='cinematic-max';
-try{selectedQuality=resolveJumpQualityProfile(localStorage.getItem('chimp-jump-detail')||'cinematic-max');}catch{}
-let activeQualityName=mobileProfile()?'medium':selectedQuality;
+let selectedQuality='high';
+try{selectedQuality=resolveJumpQualityProfile(localStorage.getItem('chimp-jump-detail')||'high');}catch{}
+let activeQualityName=mobileProfile()?'balanced':selectedQuality;
 let activeQuality=getJumpQualityProfile(activeQualityName);
 let highDetail=!!activeQuality.highScenery;
 function quality(){
- activeQualityName=mobileProfile()?'medium':selectedQuality;
+ activeQualityName=mobileProfile()?'balanced':selectedQuality;
  activeQuality=getJumpQualityProfile(activeQualityName);
  highDetail=!!activeQuality.highScenery;
  renderPipeline.applyQuality(activeQuality);
- scenery.setQuality(highDetail);
- $('quality').textContent='Detail: '+(mobileProfile()?'Medium · Mobile':activeQuality.label+' · Desktop');
+ scenery.setQuality(activeQuality,{constrained:mobileProfile()});
+ $('quality').textContent='Detail: '+(mobileProfile()?'Balanced · Mobile':activeQuality.label+' · Desktop');
  $('quality').disabled=mobileProfile();
  resize();
 }
@@ -100,7 +101,7 @@ const quickRetry=document.createElement('button');quickRetry.id='quick-retry';qu
 quickRetry.onclick=()=>{if(mode==='dying'&&deathAge>=.65){mode='over';quickRetry.hidden=true;start();}};
 const hudBest=document.createElement('div');hudBest.className='stat';hudBest.innerHTML='<small>BEST</small><strong id="hud-best">0</strong><em> m</em>';$('hud').insertBefore(hudBest,$('hud').children[1]);
 let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,countdownTime=0,autoPauseAfter=0;
-let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,catalog=[],collection=[],selectedId='';
+let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,avatarAbortController=null,catalog=[],collection=[],selectedId='';
 const runSession=new RunSession({beginOnline:()=>leaderboard.begin()});
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=new InputTrace(),deathAge=0,deathPoint=null,splashed=false;
 const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
@@ -224,13 +225,23 @@ addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAf
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
 for(const [id,dir]of [['left',-1],['right',1]])inputManager.bindTouchButton($(id),dir);
 async function selectAvatar(entry){
- selectionConfirmed=false;const request=++avatarRequest;ready=false;$('play').disabled=true;$('play').textContent='LOADING YOUR CHIMP…';$('avatar-status').textContent='Preparing pose and checking skeleton…';
+ selectionConfirmed=false;
+ const request=++avatarRequest;
+ avatarAbortController?.abort();
+ avatarAbortController=entry.buffer?null:new AbortController();
+ const signal=avatarAbortController?.signal;
+ ready=false;$('play').disabled=true;$('play').textContent='LOADING YOUR CHIMP…';$('avatar-status').textContent='Preparing pose and checking skeleton…';
  try{
-  const next=await loadCharacter(entry.buffer||import.meta.env.BASE_URL+entry.url,entry.bones||{});if(request!==avatarRequest){disposeCharacter(next);return;}
+  const source=entry.buffer||versionedAssetUrl(import.meta.env.BASE_URL+entry.url,entry.assetHash);
+  const next=await loadCharacter(source,entry.bones||{},{signal});
+  if(request!==avatarRequest){disposeCharacter(next);return;}
   if(avatar){characterLayer.remove(avatar.root);disposeCharacter(avatar);}for(const m of platformMeshes.values())removeBranch(m);platformMeshes.clear();scenery.reset();game.reset(7);lastTheme=-1;
   avatar=next;avatar.model.traverse(o=>{if(o.isMesh)o.layers.enable(1);});selectedId=entry.id||'';avatar.root.scale.multiplyScalar(1.3);avatar.root.rotation.y=yaw;characterLayer.add(avatar.root);ready=true;
   $('play').disabled=false;menu('menu');$('avatar-status').textContent=entry.name+' · '+avatar.boneCount+' bones'+(entry.buffer?' · local file':'');return true;
- }catch(e){if(request!==avatarRequest)return;console.warn('Avatar rejected:',e.message);ready=!!avatar;$('play').disabled=!ready;$('play').textContent=ready?'LET’S JUMP':'MODEL UNAVAILABLE';$('avatar-status').textContent=e.message+(ready?' Your previous avatar is still ready.':'');return false;}
+ }catch(e){
+  if(request!==avatarRequest||e?.name==='AbortError')return false;
+  console.warn('Avatar rejected:',e.message);ready=!!avatar;$('play').disabled=!ready;$('play').textContent=ready?'LET’S JUMP':'MODEL UNAVAILABLE';$('avatar-status').textContent=e.message+(ready?' Your previous avatar is still ready.':'');return false;
+ }
 }
 function chooseLocalAvatar(){$('avatar-file').click();}
 $('upload').onclick=chooseLocalAvatar;
@@ -370,10 +381,10 @@ function renderFrame(now){if(document.hidden){previous=now;return;}if(!['startin
  renderPipeline.render(dt);
 }
 renderer.setAnimationLoop(renderFrame);
-const runtimeSnapshot=()=>({ready,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,controller:inputManager.snapshot(),diagnosticsVersion:1});
+const runtimeSnapshot=()=>({ready,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs?.length||0,pooledBranches:scenery.pooledBranches,assetTelemetry:assetRuntimeSnapshot(),controller:inputManager.snapshot(),diagnosticsVersion:2});
 const diagnostics=installDiagnostics(window,runtimeSnapshot);
 Object.defineProperty(window,'chimpJump',{value:()=>diagnostics.snapshot(),writable:false,configurable:false});
 const testApiEnabled=(import.meta.env.DEV||import.meta.env.VITE_CHIMP_QA_HOOKS==='1')&&['localhost','127.0.0.1'].includes(location.hostname);
 if(testApiEnabled&&new URLSearchParams(location.search).has('test')){
- window.chimpJumpTest={advanceCountdown:seconds=>{if(mode!=='starting')return;countdownTime=Math.max(0,countdownTime-Math.max(0,Number(seconds)||0));if(countdownTime<=0){beginPlaying();return;}countdown.textContent=countdownTime<=.75?'GO':String(Math.max(1,Math.ceil(countdownTime/.75)-1));},finishCountdown:()=>{if(mode==='starting')beginPlaying();},settleIntro:()=>{introTime=1.35;},stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
+ window.chimpJumpTest={setQuality:name=>{selectedQuality=resolveJumpQualityProfile(name);quality();return activeQualityName;},advanceCountdown:seconds=>{if(mode!=='starting')return;countdownTime=Math.max(0,countdownTime-Math.max(0,Number(seconds)||0));if(countdownTime<=0){beginPlaying();return;}countdown.textContent=countdownTime<=.75?'GO':String(Math.max(1,Math.ceil(countdownTime/.75)-1));},finishCountdown:()=>{if(mode==='starting')beginPlaying();},settleIntro:()=>{introTime=1.35;},stepInput:count=>{for(let i=0;i<count;i++)tick(STEP,input());drawWorld();syncUI();previous=performance.now();},suspendRendering:()=>renderer.setAnimationLoop(null),resumeRendering:()=>{previous=performance.now();renderer.setAnimationLoop(renderFrame);},render:()=>{previous=performance.now();renderFrame(previous);},selectAvatar:id=>selectAvatar(catalog.find(e=>e.id===id)),step:(count,control=0)=>{for(let i=0;i<count;i++)tick(STEP,control);drawWorld();syncUI();previous=performance.now();},ending:seconds=>{for(let i=0;i<Math.ceil(seconds/STEP);i++)updateEnding(STEP);},game:()=>game};
 }
