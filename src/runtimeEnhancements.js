@@ -5,7 +5,7 @@ const isVisible=el=>{
 };
 const focusables=root=>[...root.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(isVisible);
 const focusElement=el=>{if(el&&isVisible(el)){el.focus({preventScroll:true});el.scrollIntoView?.({block:'nearest',inline:'nearest'});return true;}return false;};
-const openDialog=()=>document.querySelector('#collection-dialog[open],#results-dialog[open],#record-book[open]');
+const openDialog=()=>document.querySelector('#collection-dialog[open],#results-dialog[open],#record-book[open],#jump-guide-dialog[open],#jump-settings-dialog[open]');
 
 function moveCollection(dx,dy){
  const dialog=document.querySelector('#collection-dialog[open]');if(!dialog)return false;
@@ -32,8 +32,12 @@ function moveMenu(direction){
  const overlay=document.querySelector('#overlay');if(!overlay||overlay.hidden)return false;
  const items=focusables(overlay).filter(el=>!el.closest('#avatar-list'));
  if(!items.length)return false;
+ const mode=document.body?.dataset?.mode||'';
  let index=items.indexOf(document.activeElement);
- if(index<0)return focusElement(isVisible(document.querySelector('#play'))?document.querySelector('#play'):items[0]);
+ if(index<0){
+  const preferred=mode==='paused'?document.querySelector('#jump-resume'):document.querySelector('#play');
+  return focusElement(preferred)||focusElement(items[0]);
+ }
  index=(index+direction+items.length)%items.length;return focusElement(items[index]);
 }
 function activateFocused(){
@@ -46,15 +50,26 @@ function activateFocused(){
  const mode=document.body?.dataset?.mode||'';
  if(mode==='menu'||mode==='paused'){
   if(active&&document.querySelector('#overlay')?.contains(active)&&isVisible(active)){active.click();return;}
-  const play=document.querySelector('#play');if(isVisible(play))play.click();
+  const preferred=mode==='paused'?document.querySelector('#jump-resume'):document.querySelector('#play');
+  if(isVisible(preferred)){focusElement(preferred);preferred.click();}
  }
 }
 
-inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed})=>{
+inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed,pausePressed,source,connected})=>{
+ if(source==='gamepad'&&connected)document.body.dataset.inputMode='controller';
  const mode=document.body?.dataset?.mode||'',dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
+ if(pausePressed){
+  if(mode==='paused'){document.querySelector('#jump-resume')?.click();return;}
+  if(mode==='menu'){const play=document.querySelector('#play');if(isVisible(play)){focusElement(play);play.click();}return;}
+ }
  if(!navigating)return;
- if(menuX){if(dialog?.id==='collection-dialog')moveCollection(menuX,0);else if(dialog)moveDialog(dialog,menuX);else moveMenu(menuX);}
- if(menuY){if(dialog?.id==='collection-dialog')moveCollection(0,menuY);else if(dialog)moveDialog(dialog,menuY);else moveMenu(menuY);}
- if(confirmPressed)activateFocused();
- if(cancelPressed){if(dialog?.id==='collection-dialog')document.querySelector('#close-collection')?.click();else if(dialog?.id==='record-book')dialog.querySelector('header button')?.click();}
+ if(menuX){if(dialog?.id==='collection-dialog')moveCollection(menuX,0);else if(dialog)moveDialog(dialog,menuX);else moveMenu(menuX);return;}
+ if(menuY){if(dialog?.id==='collection-dialog')moveCollection(0,menuY);else if(dialog)moveDialog(dialog,menuY);else moveMenu(menuY);return;}
+ if(confirmPressed){activateFocused();return;}
+ if(cancelPressed){
+  if(dialog?.id==='collection-dialog'){document.querySelector('#close-collection')?.click();return;}
+  if(dialog?.id==='record-book'||dialog?.id==='jump-guide-dialog'||dialog?.id==='jump-settings-dialog'){dialog.querySelector('header button,.guide-close,.settings-close')?.click();return;}
+  if(dialog?.id==='results-dialog'){focusElement(dialog.querySelector('#back-to-games'));return;}
+  if(mode==='paused'){document.querySelector('#jump-resume')?.click();}
+ }
 });
