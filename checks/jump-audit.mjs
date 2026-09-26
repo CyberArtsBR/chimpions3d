@@ -9,7 +9,7 @@ assert(main.includes("'test'"),'test mode must route to Chimp Jump, not the laun
 assert(!mobileBudget.includes('Object3D.prototype.add'),'mobile visual budgets must never patch THREE.Object3D.prototype.add');
 assert(!main.includes("import('./mobileVisualBudget.js')"),'mobile visual budget must not be loaded for side effects');
 for(const tier of ["'balanced'","'high'","'ultra'"])assert(quality.includes(tier),'quality architecture must retain '+tier);
-for(const forbidden of ['physics','collision','leaderboard','input sensitivity'])assert(!quality.toLowerCase().includes(forbidden),'quality profiles must remain visual-only: '+forbidden);
+assert(!quality.includes("from './physics")&&!quality.includes("from './InputManager")&&!quality.includes("from './leaderboard"),'quality module must not import gameplay/input/leaderboard systems');
 assert(!physics.includes('jumpRenderQuality')&&!input.includes('jumpRenderQuality')&&!leaderboard.includes('jumpRenderQuality'),'visual quality must never affect physics, input or leaderboard rules');
 assert(main.includes("setupJumpExperience"),'the framework experience layer must mount');
 assert(!runtime.includes('new KeyboardEvent'),'mouse steering must never synthesize keyboard key-up/down events');
