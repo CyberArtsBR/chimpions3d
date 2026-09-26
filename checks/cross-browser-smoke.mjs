@@ -11,9 +11,9 @@ try{
   report.readiness=await page.evaluate(()=>{const s=window.chimpJump();return {ready:s.ready,quality:s.quality,treeVisible:s.treeVisible,platformReady:s.platformReady,backgroundReady:s.backgroundReady,mode:s.mode};});
   await assertNoHorizontalOverflow(page,name+' menu');
   assert(await page.getByRole('button',{name:'LET’S JUMP',exact:true}).isVisible());
-  await page.getByRole('button',{name:'Field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Field Guide',exact:true}).click();
   assert(await page.locator('#jump-guide-dialog[open]').isVisible());
-  await page.getByRole('button',{name:'Close field guide',exact:true}).click();
+  await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   assert(await page.locator('#collection-dialog[open]').isVisible());
   assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10);
