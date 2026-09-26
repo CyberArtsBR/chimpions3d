@@ -15,7 +15,8 @@ try{
     g.platforms=[{id:9950,x:0,baseX:0,y:0,width:10,type:'solid',coin:false,broken:false}];
   });
   const sample=async elapsed=>{
-    const state=await page.evaluate(()=>window.chimpJump());
+    const runtime=await page.evaluate(()=>({state:window.chimpJump(),jsHeapBytes:performance.memory?.usedJSHeapSize||null}));
+    const state=runtime.state;
     report.samples.push({
       elapsed,
       mode:state.mode,
@@ -26,7 +27,7 @@ try{
       textures:state.textures,
       programs:state.programs,
       pooledBranches:state.pooledBranches,
-      jsHeapBytes:performance.memory?.usedJSHeapSize||null,
+      jsHeapBytes:runtime.jsHeapBytes,
       assetActiveRequests:state.assetTelemetry?.active||0,
       platformCount:state.platformCount,
       visibleBranches:state.visibleBranches
