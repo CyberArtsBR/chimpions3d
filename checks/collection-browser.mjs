@@ -32,15 +32,13 @@ try{
  // Collection coverage must not depend on an unrelated presentation control.
  const qualityButton=page.locator('#quality');
  if(await qualityButton.isVisible()){
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'cinematic-max');
-  await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'low');
-  await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'medium');
-  await qualityButton.click();
   assert.equal(await page.evaluate(()=>window.chimpJump().quality),'high');
   await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'cinematic-max');
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'ultra');
+  await qualityButton.click();
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'balanced');
+  await qualityButton.click();
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'high');
  }
  await page.evaluate(()=>window.chimpJumpTest.render());
  assert.deepEqual(errors,[]);
