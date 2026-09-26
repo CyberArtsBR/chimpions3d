@@ -1,7 +1,7 @@
 name: Chimp Jump build and checks
 on:
   push:
-    branches: [main]
+    branches: [main, feat/jump-aaa-gameplay-director]
   pull_request:
   workflow_dispatch:
     inputs:
