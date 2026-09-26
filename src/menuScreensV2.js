@@ -120,6 +120,36 @@ export function setupDashMenu(){
     if(selected.image){preview.src=selected.image;preview.alt=selected.name+' preview';preview.hidden=false}
     else preview.hidden=true;
   }
+
+  async function launchSelected(entry=selected){
+    if(!entry||busy)return false;
+    const api=dashApi();
+    if(!api){status.textContent='Dash runtime is not ready.';return false}
+    selected=entry;
+    api.audioGesture?.();api.playUi?.('confirm');
+    setBusy(true,'Loading '+entry.name+'…');
+    try{
+      if(!entry.localReady)await api.selectAvatar(entry.id,{timeoutMs:15000});
+
+      // Close the modal BEFORE asking the runtime to enter gameplay. This makes
+      // it impossible for a successful run to remain visually trapped behind
+      // the character picker.
+      if(dialog.open)dialog.close();
+
+      const started=api.startRun();
+      if(started===false)throw new Error('Dash runtime rejected the start request');
+
+      const state=window.chimpionsDash?.().state;
+      if(state&&state!=='running')throw new Error('Dash did not enter gameplay');
+
+      return true;
+    }catch(error){
+      if(!dialog.open)dialog.showModal();
+      setBusy(false,'Could not start: '+(error?.message||String(error)));
+      return false;
+    }
+  }
+
   function render(){
     const q=search.value.trim().toLowerCase();
     filtered=entries.filter(e=>e.name.toLowerCase().includes(q));
@@ -133,7 +163,13 @@ export function setupDashMenu(){
       button.setAttribute('aria-label',entry.name+(selected?.id===entry.id?' selected':''));
       if(entry.image){const image=new Image();image.src=entry.image;image.loading='lazy';image.alt='';button.append(image)}
       const label=document.createElement('strong');label.textContent=entry.name;button.append(label);
-      button.onclick=()=>{selected=entry;status.textContent=entry.name+' selected';showSelected();render()};
+      button.onclick=()=>{
+        if(busy)return;
+        selected=entry;
+        status.textContent=entry.name+' selected';
+        showSelected();render();
+        void launchSelected(entry);
+      };
       grid.append(button);
     }
     if(!visible.length){const empty=document.createElement('p');empty.className='picker-empty';empty.textContent='No Chimpions match your search.';grid.append(empty)}
@@ -184,6 +220,7 @@ export function setupDashMenu(){
     selected=entries[Math.floor(Math.random()*entries.length)];
     search.value='';page=Math.max(0,Math.floor(entries.findIndex(e=>e.id===selected.id)/perPage));
     status.textContent='Random pick: '+selected.name;render();
+    void launchSelected(selected);
   };
   upload.onclick=()=>{dashApi()?.audioGesture?.();dashApi()?.playUi?.('click');document.querySelector('#dash-upload')?.click()};
 
@@ -207,20 +244,7 @@ export function setupDashMenu(){
     setBusy(false,'Could not load Chimpion: '+(event.detail?.message||'Unknown error'));
   });
 
-  play.onclick=async()=>{
-    if(!selected||busy)return;
-    const api=dashApi();
-    if(!api){status.textContent='Dash runtime is not ready.';return}
-    api.audioGesture?.();api.playUi?.('confirm');setBusy(true,'Preparing '+selected.name+'…');
-    try{
-      if(!selected.localReady)await api.selectAvatar(selected.id,{timeoutMs:15000});
-      const started=api.startRun();
-      if(started===false)throw new Error('Dash runtime did not enter the run');
-      dialog.close();
-    }catch(error){
-      setBusy(false,'Could not start: '+error.message);
-    }
-  };
+  play.onclick=()=>{void launchSelected(selected)};
 
   let lastPadState={},lastPadSignature='',lastAxis=0,lastPadMove=0;
   function pickerGamepadFrame(now){
