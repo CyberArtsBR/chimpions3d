@@ -2,7 +2,7 @@
 
 Branch: `feat/jump-aaa-gameplay-director`
 
-Baseline: latest fully successful `main` workflow commit at task start: `f2e7b2830651dd2ed53ea47452dae4b908953ec1`.
+Baseline: P0 stabilization candidate `fix/jump-p0-green-baseline` at `e27ed60cb97aca0040a22396a510da545269fccf` (PR #57), layered directly on the current Jump runtime before gameplay tuning.
 
 ## 1. Previous difficulty behavior
 
