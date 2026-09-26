@@ -27,6 +27,10 @@ if(params.has('lab')){
   document.body.innerHTML=`<main id="panel"><div>State: <output id="state">IDLE</output></div><div>Speed: <output id="speed">0</output></div><div>Grounded: <output id="grounded">true</output></div><nav><button data-state="IDLE">Idle</button><button data-state="WALK">Walk</button><button data-state="RUN">Run</button><button data-state="JUMP">Jump</button></nav><label><input id="skeleton" type="checkbox"> Show Skeleton</label><div><a href="/" style="color:#80e4dc">Back to Chimp Jump</a></div></main><p id="message" role="status">Loading character…</p>`;
   import('./rig-lab.js');
 }else{
+  // Jump readiness starts before async module loading so diagnostics can never
+  // advertise an interactive game before its presentation controls are mounted.
+  document.body.dataset.uiReady='loading';
+  document.body.dataset.menuReady='loading';
   import('./polish.css');
   if(params.has('dev'))document.body.dataset.devTools='true';
   Promise.all([
