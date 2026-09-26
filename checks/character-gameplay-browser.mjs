@@ -39,7 +39,7 @@ try{
   report.events.land=await eventTypes();
   assert(report.events.land.includes('foot-contact'),'real bounce must emit foot-contact');
 
-  await page.evaluate(()=>window.chimpJumpTest.renderStep(.10));
+  await page.evaluate(()=>{window.chimpJumpTest.renderStep(.05);window.chimpJumpTest.renderStep(.05);});
   report.states.postLand=await animationState();
   assert(['TAKEOFF','ASCEND'].includes(report.states.postLand),'landing pose must hand control back to launch immediately after contact window');
 
