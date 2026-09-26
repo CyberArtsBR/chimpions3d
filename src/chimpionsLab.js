@@ -53,6 +53,7 @@ document.body.innerHTML=`
   <div id="dash-stage-label">01 / THE EMERALD WILDS</div>
   <div id="dash-input-prompt" role="note">SPACE / W / ↑ JUMP · ↓ / S / SHIFT SLIDE</div>
   <div id="dash-feedback" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="dash-tip" role="status" aria-live="polite"></div>
 
   <section id="dash-menu" class="dash-panel" aria-label="Chimpions Dash start">
     <span class="eyebrow">THE JUNGLE IS CALLING</span>
@@ -580,10 +581,12 @@ function startRun(options={}){
   // makes the visual transition synchronous with the click that starts the run.
   setState('running');accumulator=0;performanceController.resetFrameWindow();
   voice.unlock();voice.stopMusic();voice.startMusic();voice.startAmbience();voice.play('click');
-  $('dash-stage-flash').textContent='GO!';stageFlashTimer=1.1;
+  const stageFlash=$('dash-stage-flash');
+  if(stageFlash)stageFlash.textContent='GO!';
+  stageFlashTimer=1.1;
   if(!run.tutorial.enabled){
-    $('dash-tip').textContent=DEFAULT_DASH_TIP;$('dash-tip').classList.add('show');
-    setTimeout(()=>$('dash-tip')?.classList.remove('show'),4200);
+    const tip=$('dash-tip');
+    if(tip){tip.textContent=DEFAULT_DASH_TIP;tip.classList.add('show');setTimeout(()=>tip.classList.remove('show'),4200);}
   }
   last=performance.now();return true;
 }

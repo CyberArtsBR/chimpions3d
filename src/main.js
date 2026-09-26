@@ -14,7 +14,14 @@ if(params.has('lab')){
   import('./menuScreensV2.js').then(({setupArenaGate})=>setupArenaGate());
 }else if(params.has('dash')){
   import('./polish.css');
-  import('./chimpionsLab.js').then(()=>import('./menuScreensV2.js')).then(({setupDashMenu})=>setupDashMenu());
+  // Load the Dash presentation CSS before the runtime builds its DOM, and mark
+  // the page as the artwork start screen immediately. This prevents the legacy
+  // internal 2.5D setup panel from flashing for a frame before the real menu.
+  document.body.classList.add('dash-start-screen');
+  import('./menuScreensV2.js').then(async({setupDashMenu})=>{
+    await import('./chimpionsLab.js');
+    setupDashMenu();
+  });
 }else if(params.has('rig')){
   import('./polish.css');
   document.body.innerHTML=`<main id="panel"><div>State: <output id="state">IDLE</output></div><div>Speed: <output id="speed">0</output></div><div>Grounded: <output id="grounded">true</output></div><nav><button data-state="IDLE">Idle</button><button data-state="WALK">Walk</button><button data-state="RUN">Run</button><button data-state="JUMP">Jump</button></nav><label><input id="skeleton" type="checkbox"> Show Skeleton</label><div><a href="/" style="color:#80e4dc">Back to Chimp Jump</a></div></main><p id="message" role="status">Loading character…</p>`;
