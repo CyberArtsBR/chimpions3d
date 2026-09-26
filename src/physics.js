@@ -65,7 +65,7 @@ export class Game {
   this.event=null;this.eventIndex=0;this.nextEventAt=firstEventTime(this.runSeed);this.specialBlockedUntil=0;
   this.lastMilestone=0;this.hazardCooldown=0;this.hazards=[];this.nextHazardId=0;
   this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;
-  this.encounterIndex=0;this.encounter=null;this.lastEncounterId='';
+  this.encounterIndex=0;this.encounter=null;this.lastEncounterId='';this.extraRecoveryPending=false;
   this.add(0,0,2.8,'solid',false,'safe',{encounterType:'start',encounterPhase:ENCOUNTER_PHASES.READ});
   this.generate();
  }
@@ -92,6 +92,17 @@ export class Game {
   return true;
  }
  nextEncounterStep(difficulty){
+  if(this.extraRecoveryPending){
+   this.extraRecoveryPending=false;this.encounter=null;
+  }else if(this.encounter&&this.encounter.step>=this.encounter.template.steps.length&&this.random()<difficulty.recoveryFrequency){
+   this.extraRecoveryPending=true;
+   return {
+    encounterId:this.encounter.id,
+    encounterType:this.encounter.template.id,
+    encounterStep:this.encounter.step,
+    phase:ENCOUNTER_PHASES.RELEASE,optional:null,recovery:true,extendedRecovery:true
+   };
+  }
   if(!this.encounter||this.encounter.step>=this.encounter.template.steps.length){
    const template=chooseEncounter(()=>this.random(),difficulty,this.lastEncounterId);
    this.encounter={id:this.encounterIndex++,template,step:0};
@@ -256,7 +267,7 @@ export class Game {
    const motion=hazardMotion(h,this.time);h.x=motion.x;h.y=motion.y;
    h.active=!specialBusy&&motion.active;h.telegraphing=!specialBusy&&motion.telegraphing;
    const nearView=Math.abs(h.baseY-this.camera)<VIEW_HEIGHT*.72+2;
-   if(nearView&&motion.telegraphing&&h.telegraphCycle!==motion.cycleIndex){
+   if(nearView&&h.telegraphing&&h.telegraphCycle!==motion.cycleIndex){
     h.telegraphCycle=motion.cycleIndex;
     events.push({
      type:'hazard-telegraph',hazardType:h.type,x:h.x,y:h.y,lead:h.lead||0,
