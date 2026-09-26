@@ -33,6 +33,7 @@ const early=difficultyAt(0,0),mid=difficultyAt(450,300),late=difficultyAt(1000,9
 assert(early.routeWidth>mid.routeWidth&&mid.routeWidth>late.routeWidth);
 assert(early.optionalRewardDistance<mid.optionalRewardDistance&&mid.optionalRewardDistance<late.optionalRewardDistance);
 assert(early.hazardDensity<mid.hazardDensity&&mid.hazardDensity<=late.hazardDensity);
+assert(early.recoveryFrequency>mid.recoveryFrequency&&mid.recoveryFrequency>late.recoveryFrequency);
 assert(early.complexity<late.complexity);
 
 function fixture(type='solid'){
@@ -87,7 +88,7 @@ for(const snapshot of renderSnapshots){
  assert.equal(snapshot.dead,renderReference.dead,'Render cadence changed death state at '+snapshot.hz+' Hz');
 }
 
-let transferCount=0,safePlatforms=0,hazardCount=0;
+let transferCount=0,safePlatforms=0,hazardCount=0,extendedRecoveries=0;
 const encounterTypes=new Set(),hazardTypes=new Set(),phases=new Set();
 for(let seed=0;seed<2000;seed++){
  const g=new Game(seed);
@@ -95,7 +96,7 @@ for(let seed=0;seed<2000;seed++){
  g.generate();
  const safe=g.platforms.filter(p=>p.route==='safe').sort((a,b)=>a.y-b.y);
  safePlatforms+=safe.length;
- for(const p of safe){if(p.encounterType)encounterTypes.add(p.encounterType);if(p.encounterPhase)phases.add(p.encounterPhase);}
+ for(const p of safe){if(p.encounterType)encounterTypes.add(p.encounterType);if(p.encounterPhase)phases.add(p.encounterPhase);if(p.extendedRecovery)extendedRecoveries++;}
  for(let i=1;i<safe.length;i++){
   const a=safe[i-1],b=safe[i],rise=b.y-a.y;
   const disc=JUMP*JUMP-2*GRAVITY*rise;
@@ -117,6 +118,7 @@ for(let seed=0;seed<2000;seed++){
 assert(transferCount>=50_000,'Expected at least fifty thousand validated transfers, got '+transferCount);
 assert(safePlatforms>transferCount);
 assert(hazardCount>0);
+assert(extendedRecoveries>0,'Seed sweep must exercise deterministic extended recovery rows');
 
 for(const phase of Object.values(ENCOUNTER_PHASES))assert(phases.has(phase),'Missing generated pacing phase '+phase);
 for(let seed=0;seed<256&&encounterTypes.size<ENCOUNTER_TEMPLATES.length;seed++){
@@ -244,6 +246,7 @@ console.log(JSON.stringify({
  totalValidatedTransfers:transferCount+longTransfers,
  safePlatforms,
  hazards:hazardCount,
+ extendedRecoveries,
  encounterTemplates:[...encounterTypes].sort(),
  hazardFamilies:[...hazardTypes].sort(),
  renderRates,
