@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
-import {createTrackedLoadingManager} from './assetRuntime.js';
+import {createTrackedLoadingManager,prefetchVisualAsset} from './assetRuntime.js';
 
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function canvasTexture(w,h,draw){
@@ -133,7 +133,7 @@ export function createScenery(scene,renderer){
  };
 
  // Keep the wrap boundary invisible: no decorative vines hanging from the screen edges.
- let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false;
+ let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false,runtimePrefetchRequested=false;
  let activeVisualProfile={profile:'balanced',highScenery:false},visualConstraints={constrained:false};
  const desktopDetailAllowed=()=>allowsDesktopDetail(activeVisualProfile,visualConstraints);
  function mesh(g,m,parent,x=0,y=0,z=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);parent.add(o);return o;}
@@ -249,7 +249,14 @@ export function createScenery(scene,renderer){
   if(treeRequests.has(kind))return;treeRequests.add(kind);
   new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(import.meta.env.BASE_URL+url,map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();invalidateStaticFrame();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
  }
- fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}).then(config=>{platformConfig=config;loadPlatform();loadTree();}).catch(()=>{});
+ function prefetchRuntimeAssets(){
+  runtimePrefetchRequested=true;
+  if(!platformConfig)return;
+  if(platformConfig.platformModel)prefetchVisualAsset(import.meta.env.BASE_URL+platformConfig.platformModel);
+  const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages?.[kind];
+  if(url)prefetchVisualAsset(import.meta.env.BASE_URL+url);
+ }
+ fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}).then(config=>{platformConfig=config;if(runtimePrefetchRequested)prefetchRuntimeAssets();loadPlatform();loadTree();}).catch(()=>{});
 
  const r=rng(51),particleGeo=new THREE.BufferGeometry(),particlePositions=new Float32Array(48*3);particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
  const particleMaterial=new THREE.PointsMaterial({color:0xffdf79,size:.07,transparent:true,opacity:.85,depthWrite:false});
@@ -361,13 +368,14 @@ export function createScenery(scene,renderer){
   get backgroundReady(){return !!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
   get pooledBranches(){return pooledBranchCount;},
+  prefetchRuntimeAssets,
   prepareRuntimeAssets(){
    runtimeAssetsActive=true;
    loadPlatform();
    loadTree();
    invalidateStaticFrame();
   },
-  resize(width,height){viewWidth=width;viewHeight=height;loadTree();fitTree();invalidateStaticFrame();},
+  resize(width,height){viewWidth=width;viewHeight=height;if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
    if(document.body?.dataset?.reducedMotion==='true')return;
    const colors={spring:0xffb94f,leaf:0xaee77b,swing:0x77d9c7,vanish:0xb792ff,cracked:0xe8b271,hazard:0xff765f,jet:0x7cecff,milestone:0xffe47a,coin:0xffdf79};
