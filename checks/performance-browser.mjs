@@ -64,8 +64,25 @@ function assertResourceGrowth(before,after,limits,label){
 
 try{
   await gotoJump(page,{test:true});
+  const resourceGraph=()=>page.evaluate(()=>performance.getEntriesByType('resource').map(entry=>({
+    url:new URL(entry.name).pathname,
+    initiatorType:entry.initiatorType,
+    transferSize:entry.transferSize||0,
+    encodedBodySize:entry.encodedBodySize||0,
+    decodedBodySize:entry.decodedBodySize||0,
+    durationMs:Number(entry.duration.toFixed(1))
+  })).filter(entry=>entry.url.startsWith('/')));
+  report.loading={initialMenu:await resourceGraph()};
+  const initialUrls=new Set(report.loading.initialMenu.map(entry=>entry.url));
+  assert(![...initialUrls].some(url=>url.includes('/environment/platforms/branch-moss.glb')),'Branch GLB must be lazy and absent from menu boot');
+  assert(![...initialUrls].some(url=>url.includes('/environment/tree-wide-v2-')),'Authored tree plates must be lazy and absent from menu boot');
+
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   await startSelectedRun(page,{fastForward:true});
+  report.loading.afterRunStart=await resourceGraph();
+  report.loading.deferred=report.loading.afterRunStart.filter(entry=>!initialUrls.has(entry.url));
+  assert(report.loading.deferred.some(entry=>entry.url.includes('/environment/platforms/branch-moss.glb')),'Branch GLB should load after run commitment');
+  assert(report.loading.deferred.some(entry=>entry.url.includes('/environment/tree-wide-v2-')),'Authored tree plate should load after run commitment');
 
   // Renderer ceilings are checked independently per visual quality. Gameplay state is untouched.
   for(const quality of ['balanced','high','ultra']){
