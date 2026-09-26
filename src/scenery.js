@@ -208,7 +208,7 @@ export function createScenery(scene,renderer){
   group.getObjectByName('procedural-branch').visible=!highQuality;armBranchPooling(group);
  }
  function loadPlatform(){
-  if(!runtimeAssetsActive||!highQuality||!platformConfig?.platformModel||platformLoading)return;platformLoading=true;
+  if(!runtimeAssetsActive||!highQuality||!platformConfig?.platformModel||platformLoading||platformTemplate)return;platformLoading=true;
   new GLTFLoader(createTrackedLoadingManager('environment-glb')).load(controlledAssetUrl(platformConfig.platformModel),gltf=>{
    const model=gltf.scene;model.rotation.set(...(platformConfig.platformRotation||[0,0,0]));model.updateMatrixWorld(true);
    const box=new THREE.Box3().setFromObject(model),size=box.getSize(new THREE.Vector3());if(![size.x,size.y,size.z].every(v=>Number.isFinite(v)&&v>0)){console.warn('Invalid branch bounds');platformLoading=false;return;}
