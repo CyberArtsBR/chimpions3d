@@ -40,7 +40,7 @@ try{
       }
       if(scenario.name==='slow-late-response'){
         const seedBefore=await page.evaluate(()=>window.chimpJump().runSeed);
-        await page.evaluate(()=>window.chimpJumpTest.finishCountdown());
+        await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.suspendRendering();});
         await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');
         await page.waitForTimeout(4300);
         const late=await page.evaluate(()=>({mode:window.chimpJump().mode,seed:window.chimpJump().runSeed}));
