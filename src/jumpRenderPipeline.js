@@ -171,7 +171,7 @@ function targetTypeLabel(type){
 
 export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerWidth,height=innerHeight}={}){
   let settings=null,composer=null,rootTarget=null,renderPass=null,ssaoPass=null,bloomPass=null,lutPass=null,atmospherePass=null,dofPass=null,sharpenPass=null,outputPass=null;
-  let viewportWidth=Math.max(1,width|0),viewportHeight=Math.max(1,height|0),activeTheme=0,builds=0;
+  let viewportWidth=Math.max(1,width|0),viewportHeight=Math.max(1,height|0),activeTheme=0,builds=0,prewarms=0;
   const luts=[0,1,2,3].map(index=>makeLut(16,index));
   const contactShadow=makeContactShadow();scene.add(contactShadow);
 
@@ -210,7 +210,7 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
     sun.shadow.mapSize.set(size,size);
     sun.shadow.bias=Number(settings.shadowBias)||-.0005;
     sun.shadow.normalBias=Math.max(0,Number(settings.shadowNormalBias)||.04);
-    sun.shadow.radius=settings.profile==='cinematic-max'?2:1;
+    sun.shadow.radius=settings.profile==='ultra'?2:1;
     if(changed&&sun.shadow.map){sun.shadow.map.dispose?.();sun.shadow.map=null;}
     renderer.shadowMap.needsUpdate=true;
   }
@@ -332,6 +332,17 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
     }else contactShadow.visible=false;
   }
 
+  async function prewarm(){
+    prewarms++;
+    try{
+      if(typeof renderer.compileAsync==='function')await renderer.compileAsync(scene,camera);
+      else renderer.compile(scene,camera);
+    }catch{
+      try{renderer.compile(scene,camera);}catch{}
+    }
+    return getDiagnostics();
+  }
+
   function render(dt=0){
     if(composer)composer.render(dt);
     else renderer.render(scene,camera);
@@ -360,7 +371,8 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
       atmosphereResolutionScale:settings?.atmosphereResolutionScale||0,
       lightShaftsEnabled:!!atmospherePass&&!!settings?.lightShafts,
       depthOfFieldEnabled:!!dofPass?.enabled,
-      pipelineBuilds:builds
+      pipelineBuilds:builds,
+      pipelinePrewarms:prewarms
     };
   }
 
@@ -373,5 +385,5 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
     for(const lut of luts)lut.dispose();
   }
 
-  return {applyQuality,resize,updateFrame,render,refreshAnisotropy,getDiagnostics,dispose};
+  return {applyQuality,resize,updateFrame,render,prewarm,refreshAnisotropy,getDiagnostics,dispose};
 }
