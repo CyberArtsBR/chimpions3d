@@ -3,9 +3,14 @@ import fs from 'node:fs';
 import {JUMP_GOALS,evaluateJumpGoals} from '../src/jumpGoals.js';
 
 const read=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),director=read('src/jumpGameplayDirector.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js'),character=read('src/character.js');
+const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),director=read('src/jumpGameplayDirector.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js'),character=read('src/character.js'),mobileBudget=read('src/mobileVisualBudget.js'),quality=read('src/jumpRenderQuality.js'),input=read('src/InputManager.js'),leaderboard=read('src/leaderboard.js');
 
 assert(main.includes("'test'"),'test mode must route to Chimp Jump, not the launcher');
+assert(!mobileBudget.includes('Object3D.prototype.add'),'mobile visual budgets must never patch THREE.Object3D.prototype.add');
+assert(!main.includes("import('./mobileVisualBudget.js')"),'mobile visual budget must not be loaded for side effects');
+for(const tier of ["'balanced'","'high'","'ultra'"])assert(quality.includes(tier),'quality architecture must retain '+tier);
+assert(!quality.includes("from './physics")&&!quality.includes("from './InputManager")&&!quality.includes("from './leaderboard"),'quality module must not import gameplay/input/leaderboard systems');
+assert(!physics.includes('jumpRenderQuality')&&!input.includes('jumpRenderQuality')&&!leaderboard.includes('jumpRenderQuality'),'visual quality must never affect physics, input or leaderboard rules');
 assert(main.includes("setupJumpExperience"),'the framework experience layer must mount');
 assert(!runtime.includes('new KeyboardEvent'),'mouse steering must never synthesize keyboard key-up/down events');
 assert(!runtime.includes('columns=3'),'desktop character navigation must not hardcode the old three-column grid');
