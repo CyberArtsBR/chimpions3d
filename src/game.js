@@ -66,7 +66,7 @@ const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer),fallSplash=createFallSplash(scene),deathBounds=new THREE.Box3();
 const renderPipeline=createJumpRenderPipeline({renderer,scene,camera,sun,width:innerWidth,height:innerHeight});
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
-function removeHazard(m){world.remove(m);}
+function removeHazard(m){world.remove(m);m.userData.telegraph?.material?.dispose?.();}
 const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
 let selectedQuality='cinematic-max';
 try{selectedQuality=resolveJumpQualityProfile(localStorage.getItem('chimp-jump-detail')||'cinematic-max');}catch{}
