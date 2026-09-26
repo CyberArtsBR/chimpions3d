@@ -60,7 +60,7 @@ export function createResults({retry,replay,choose,back}){
    $('replay-trail').hidden=!Number.isFinite(Number(result.seed));$('record-name').hidden=true;$('record-name').querySelector('button').disabled=false;$('player-name').value='';
    $('score-formula').textContent='ALTITUDE '+meters.toLocaleString()+' m · BANANAS '+bananas+' × 10';
    $('converted-score').textContent=String(meters);$('remaining-bananas').textContent=String(bananas*10);$('try-again').disabled=$('choose-again').disabled=false;renderBoard([]);setSubmissionState(result.id?'submitting':'offline',result.id?'SUBMITTING SCORE…':'OFFLINE RUN · score kept locally; online records unavailable.');
-   dialog.showModal();submit();
+   dialog.showModal();requestAnimationFrame(()=>$('try-again')?.focus({preventScroll:true}));submit();
   },
   update(dt){
    if(!dialog.open||finished)return;age+=dt;const t=Math.min(age/1.6,1),ease=1-(1-t)**3,total=scoreFor(run.meters,run.bananas),initial=run.meters;

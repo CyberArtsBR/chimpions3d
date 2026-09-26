@@ -27,6 +27,12 @@
 .jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons a:nth-child(2){left:50.0%;top:60.8%;width:13.3%;height:5.7%}
 .jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons a:nth-child(3){left:40.1%;top:67.0%;width:20.1%;height:5.7%}
 .jump-start-screen[data-mode="menu"] #overlay #play:focus-visible,.jump-start-screen[data-mode="menu"] #overlay #menu-social-buttons a:focus-visible{opacity:.12!important;outline:4px solid #fff6b7!important;outline-offset:2px!important}
+body[data-input-mode="controller"].jump-start-screen[data-mode="menu"] #overlay #play:focus{opacity:.16!important;outline:5px solid #fff6b7!important;outline-offset:3px!important}
+body[data-input-mode="controller"] #jump-pause-actions button:focus,
+body[data-input-mode="controller"] #results-dialog button:focus,
+body[data-input-mode="controller"] #collection-dialog button:focus,
+body[data-input-mode="controller"] #jump-guide-dialog button:focus,
+body[data-input-mode="controller"] #jump-settings-dialog button:focus{outline:4px solid #fff2a3!important;outline-offset:4px!important}
 .jump-start-screen[data-mode="menu"] #overlay .games-back{
   position:fixed!important;left:24px!important;bottom:24px!important;top:auto!important;transform:none!important;
   width:clamp(235px,18vw,330px)!important;min-height:56px!important;padding:11px 22px!important;

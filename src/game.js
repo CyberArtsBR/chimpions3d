@@ -147,7 +147,14 @@ function menu(kind){
  }else{
   $('eyebrow').textContent='A little chimp. A big climb.';$('title').innerHTML='CHIMP<br><span>JUMP</span>';$('description').innerHTML='Read the branches. Time your landing.<br>Choose your route. Climb higher.';$('play').textContent=ready?'LET’S JUMP':'LOADING YOUR CHIMP…';
  }
- syncUI();if(kind==='menu'&&ready)runSession.prepare();
+ syncUI();
+ requestAnimationFrame(()=>{
+  if(!inputManager.snapshot().connected)return;
+  document.body.dataset.inputMode='controller';
+  const target=kind==='paused'?document.getElementById('jump-resume'):kind==='menu'?$('play'):null;
+  if(target&&!target.disabled&&!target.hidden)target.focus({preventScroll:true});
+ });
+ if(kind==='menu'&&ready)runSession.prepare();
 }
 function beginPlaying(){
  mode='playing';countdown.hidden=true;countdownTime=0;introTime=0;autoPauseAfter=performance.now()+1200;runSession.markPlaying();
@@ -172,53 +179,10 @@ function start(requestedSeed=null){
 $('play').onclick=start;$('pause').onclick=()=>menu('paused');giveUpButton.onclick=()=>{runSession.abandon();menu('menu');runSession.prepare();};
 function syncMuteUI(){$('mute').style.opacity=muted?.5:1;$('mute').setAttribute('aria-label',muted?'Enable sound':'Mute sound');}
 $('mute').onclick=()=>{muted=!muted;audio.setMuted(muted);try{localStorage.setItem('chimp-jump-muted',muted?'1':'0');}catch{}syncMuteUI();if(!muted)sound('coin');};syncMuteUI();
-function controllerMenuScope(){
- const openDialog=document.querySelector('dialog[open]');
- if(openDialog)return openDialog;
- if(!$('overlay').hidden)return $('overlay');
- return document.body;
-}
-function controllerMenuControls(){
- const scope=controllerMenuScope();
- return [...scope.querySelectorAll('button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled)')].filter(element=>{
-  if(element.hidden||element.closest('[hidden]'))return false;
-  const style=getComputedStyle(element);
-  return style.display!=='none'&&style.visibility!=='hidden'&&style.pointerEvents!=='none';
- });
-}
-function moveControllerMenuFocus(step){
- const controls=controllerMenuControls();if(!controls.length)return false;
- const current=controls.indexOf(document.activeElement);
- const next=current<0?(step>0?0:controls.length-1):(current+(step>0?1:-1)+controls.length)%controls.length;
- controls[next]?.focus();return true;
-}
-function confirmControllerMenu(){
- const controls=controllerMenuControls();if(!controls.length)return false;
- const active=controls.includes(document.activeElement)?document.activeElement:controls[0];
- active?.focus();active?.click?.();return true;
-}
-function cancelControllerMenu(){
- const dialog=document.querySelector('dialog[open]');
- if(dialog){
-  const close=[...dialog.querySelectorAll('button:not(:disabled)')].find(button=>/close|back|home/i.test((button.getAttribute('aria-label')||'')+' '+(button.textContent||'')));
-  if(close){close.click();return true;}
-  if(dialog===collectionDialog){dialog.close();return true;}
-  return false;
- }
- if(mode==='paused'){start();return true;}
- if(mode==='menu'){location.href='/';return true;}
- return false;
-}
-inputManager.subscribe(({confirmPressed,cancelPressed,pausePressed,menuX,menuY,source})=>{
- if(mode==='dying'&&confirmPressed){quickRetry.click();return;}
- const menuActive=mode!=='playing'||collectionDialog.open||results.isOpen||recordBook.isOpen;
- if(source==='gamepad'&&menuActive){
-  const direction=menuY||menuX;
-  if(direction){moveControllerMenuFocus(direction);return;}
-  if(confirmPressed){confirmControllerMenu();return;}
-  if(cancelPressed){cancelControllerMenu();return;}
- }
- if(pausePressed){if(mode==='playing')menu('paused');else if(mode==='paused')start();}
+// Menu/dialog gamepad navigation is owned exclusively by runtimeEnhancements.js.
+ // Keeping a second menu subscriber here made one D-pad/stick edge move focus twice.
+inputManager.subscribe(({confirmPressed})=>{
+ if(mode==='dying'&&confirmPressed)quickRetry.click();
 });
 addEventListener('blur',()=>{if(mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='playing'&&performance.now()>=autoPauseAfter)menu('paused');});
