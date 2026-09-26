@@ -34,7 +34,7 @@ try{
   assert((await page.evaluate(()=>window.chimpJump())).visible);
   assert(!['steamboat-willie','chimpion'].includes(await page.evaluate(()=>window.chimpJump().selectedId)),'Special Willie/Silver heroes must stay out of player selection');
   assert.equal(await page.evaluate(()=>window.chimpJump().characterScale),1.3);
-  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'cinematic-max');
+  assert.equal((await page.evaluate(()=>window.chimpJump())).quality,'high');
 
   await page.waitForFunction(()=>window.chimpJump().platformReady&&window.chimpJump().backgroundReady);
   assert.equal(await page.evaluate(()=>window.chimpJump().cameraZoom),1,'Menu camera must retain the full-route view');
