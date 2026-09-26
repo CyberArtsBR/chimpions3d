@@ -4,6 +4,7 @@ import {validateGLB} from './upload.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {CharacterAnimator} from './character/CharacterAnimator.js';
 import {mapHumanoidRig, prepareAnimationRig} from './character/rigUtils.js';
+import {createTrackedLoadingManager,fetchAssetBuffer,trackAssetDecode} from './assetRuntime.js';
 
 const MODEL_YAW = 0; // Set Math.PI only for a deliberately reversed authored model.
 
@@ -95,9 +96,10 @@ function installTestHarness(controller, animator) {
   };
 }
 
-export async function loadCharacter(url, overrides = {}) {
-  const manager = new THREE.LoadingManager();
-  if (url instanceof ArrayBuffer) {
+export async function loadCharacter(url, overrides = {}, {signal} = {}) {
+  const localUpload=url instanceof ArrayBuffer;
+  const manager=createTrackedLoadingManager(localUpload?'avatar-upload-dependency':'avatar-dependency');
+  if (localUpload) {
     validateGLB(url);
     manager.setURLModifier(value => {
       if (!value.startsWith('blob:') && !value.startsWith('data:')) {
@@ -108,9 +110,17 @@ export async function loadCharacter(url, overrides = {}) {
   }
 
   const loader = new GLTFLoader(manager);
-  const gltf = url instanceof ArrayBuffer
-    ? await loader.parseAsync(url, '')
-    : await loader.loadAsync(url);
+  let gltf;
+  if(localUpload){
+    gltf=await trackAssetDecode('avatar-upload','local-glb',()=>loader.parseAsync(url,''));
+  }else{
+    const absolute=new URL(String(url),globalThis.location?.href||'http://localhost/').href;
+    const slash=absolute.lastIndexOf('/');
+    const resourcePath=slash>=0?absolute.slice(0,slash+1):'';
+    const bytes=await fetchAssetBuffer(absolute,{signal,kind:'avatar'});
+    if(signal?.aborted)throw new DOMException('Avatar request was cancelled.','AbortError');
+    gltf=await trackAssetDecode('avatar',absolute,()=>loader.parseAsync(bytes,resourcePath));
+  }
 
   const model = gltf.scene;
   model.visible = false;

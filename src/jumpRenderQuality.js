@@ -1,9 +1,9 @@
-const NAMES=Object.freeze(['low','medium','high','cinematic-max']);
+const NAMES=Object.freeze(['balanced','high','ultra']);
 
-const LOW=Object.freeze({
-  profile:'low',
-  label:'Low',
-  dprCap:1,
+const BALANCED=Object.freeze({
+  profile:'balanced',
+  label:'Balanced',
+  dprCap:1.10,
   postProcessing:false,
   renderTargetType:'unsigned-byte',
   msaaSamples:0,
@@ -24,34 +24,10 @@ const LOW=Object.freeze({
   contactShadow:false
 });
 
-const MEDIUM=Object.freeze({
-  profile:'medium',
-  label:'Medium',
-  dprCap:1.15,
-  postProcessing:false,
-  renderTargetType:'unsigned-byte',
-  msaaSamples:0,
-  shadows:true,
-  shadowMapSize:1024,
-  shadowBias:-.0005,
-  shadowNormalBias:.04,
-  highScenery:false,
-  maxAnisotropy:4,
-  ambientOcclusion:false,
-  aoResolutionScale:.5,
-  bloomEnabled:false,
-  colorGrading:false,
-  sharpenEnabled:false,
-  atmosphereEnabled:false,
-  lightShafts:false,
-  depthOfField:'off',
-  contactShadow:false
-});
-
 const HIGH=Object.freeze({
   profile:'high',
   label:'High',
-  dprCap:1.75,
+  dprCap:1.50,
   postProcessing:false,
   renderTargetType:'unsigned-byte',
   msaaSamples:0,
@@ -72,9 +48,9 @@ const HIGH=Object.freeze({
   contactShadow:false
 });
 
-const CINEMATIC_MAX=Object.freeze({
-  profile:'cinematic-max',
-  label:'Cinematic Max',
+const ULTRA=Object.freeze({
+  profile:'ultra',
+  label:'Ultra',
   dprCap:1.60,
   postProcessing:true,
   renderTargetType:'half-float',
@@ -110,27 +86,36 @@ const CINEMATIC_MAX=Object.freeze({
 });
 
 export const JUMP_QUALITY_PROFILES=Object.freeze({
-  low:LOW,
-  medium:MEDIUM,
+  balanced:BALANCED,
   high:HIGH,
-  'cinematic-max':CINEMATIC_MAX
+  ultra:ULTRA
 });
 
 export const JUMP_QUALITY_NAMES=NAMES;
 
-export function resolveJumpQualityProfile(value,fallback='cinematic-max'){
+// Compatibility aliases only affect visuals. Physics, collision, route generation,
+// scoring, input and leaderboard behavior never read this module.
+const LEGACY_ALIASES=Object.freeze({
+  low:'balanced',
+  medium:'balanced',
+  max:'ultra',
+  cinematic:'ultra',
+  'cinematic-max':'ultra'
+});
+
+export function resolveJumpQualityProfile(value,fallback='high'){
   const normalized=String(value??'').trim().toLowerCase();
-  if(normalized==='max'||normalized==='cinematic'||normalized==='ultra')return 'cinematic-max';
-  if(normalized==='balanced')return 'medium';
-  if(NAMES.includes(normalized))return normalized;
-  return NAMES.includes(fallback)?fallback:'cinematic-max';
+  const migrated=LEGACY_ALIASES[normalized]||normalized;
+  if(NAMES.includes(migrated))return migrated;
+  const fallbackName=LEGACY_ALIASES[String(fallback??'').trim().toLowerCase()]||String(fallback??'').trim().toLowerCase();
+  return NAMES.includes(fallbackName)?fallbackName:'high';
 }
 
-export function getJumpQualityProfile(value='cinematic-max'){
+export function getJumpQualityProfile(value='high'){
   return JUMP_QUALITY_PROFILES[resolveJumpQualityProfile(value)];
 }
 
-export function nextJumpQualityProfile(value='cinematic-max'){
+export function nextJumpQualityProfile(value='high'){
   const current=resolveJumpQualityProfile(value);
   return NAMES[(NAMES.indexOf(current)+1)%NAMES.length];
 }

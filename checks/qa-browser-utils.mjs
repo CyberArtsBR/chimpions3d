@@ -39,8 +39,10 @@ export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored
   await page.waitForFunction(requireAuthored=>{
     const s=window.chimpJump?.();
     if(!s?.ready||document.body?.dataset?.mode!=='menu')return false;
+    // Heavy authored environment assets are intentionally deferred until run start.
+    // Menu readiness only requires the lightweight procedural forest.
     if(!requireAuthored)return true;
-    return ['high','cinematic-max'].includes(s.quality)?(s.platformReady&&s.backgroundReady):s.treeVisible;
+    return !!s.treeVisible;
   },requireAuthored,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
@@ -87,6 +89,10 @@ export async function startSelectedRun(page,{fastForward=true}={}){
       await page.locator('#jump-resume').click();
       await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:5000});
     }
+    await page.waitForFunction(()=>{
+      const s=window.chimpJump?.();
+      return !['high','ultra'].includes(s?.quality)||(s.platformReady&&s.backgroundReady);
+    },{timeout:45000});
   }
 }
 

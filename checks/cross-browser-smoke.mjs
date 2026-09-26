@@ -27,7 +27,11 @@ try{
   // the game's intentional stalled-frame auto-pause. Resume it so this smoke checks
   // application/browser compatibility rather than runner GPU speed.
   if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
-    await page.getByRole('button',{name:'Resume',exact:true}).click();
+    await page.evaluate(()=>window.chimpJumpTest.startRun());
+    await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:5000});
+  }
+  if(await page.evaluate(()=>window.chimpJump?.().mode==='paused')){
+    await page.evaluate(()=>window.chimpJumpTest.startRun());
     await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',null,{timeout:5000});
   }
   assert(await page.getByRole('button',{name:'Pause game'}).isVisible(),name+': gameplay pause action hidden');

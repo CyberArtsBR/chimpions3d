@@ -15,7 +15,8 @@ try{
     g.platforms=[{id:9950,x:0,baseX:0,y:0,width:10,type:'solid',coin:false,broken:false}];
   });
   const sample=async elapsed=>{
-    const state=await page.evaluate(()=>window.chimpJump());
+    const runtime=await page.evaluate(()=>({state:window.chimpJump(),jsHeapBytes:performance.memory?.usedJSHeapSize||null}));
+    const state=runtime.state;
     report.samples.push({
       elapsed,
       mode:state.mode,
@@ -24,6 +25,10 @@ try{
       triangles:state.triangles,
       geometries:state.geometries,
       textures:state.textures,
+      programs:state.programs,
+      pooledBranches:state.pooledBranches,
+      jsHeapBytes:runtime.jsHeapBytes,
+      assetActiveRequests:state.assetTelemetry?.active||0,
       platformCount:state.platformCount,
       visibleBranches:state.visibleBranches
     });
@@ -42,6 +47,10 @@ try{
   const first=report.samples[0],last=report.samples.at(-1);
   assert(last.geometries<=first.geometries+8,'Rendered soak geometry count runaway');
   assert(last.textures<=first.textures+3,'Rendered soak texture count runaway');
+  assert(last.programs<=first.programs+6,'Rendered soak shader/program count runaway');
+  assert(last.pooledBranches<=56,'Rendered soak branch pool exceeded bounded capacity');
+  assert(last.assetActiveRequests===0,'Rendered soak ended with asset requests still active');
+  report.heapGrowthBytes=first.jsHeapBytes&&last.jsHeapBytes?last.jsHeapBytes-first.jsHeapBytes:null;
   assert(report.autoPauses<=3,'Rendered soak encountered excessive safety auto-pauses: '+report.autoPauses);
   writeReport('checks/long-session-rendered-report.json',report);
   console.log('PASS real-rendered soak: '+seconds+' seconds, '+report.autoPauses+' safety auto-pauses');

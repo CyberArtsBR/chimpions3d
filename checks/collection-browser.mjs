@@ -7,7 +7,7 @@ page.on('pageerror',e=>errors.push(e.message));
 const report=[];
 try{
  await page.goto('http://127.0.0.1:4173/?test=1');
- await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().platformReady);
+ await page.waitForFunction(()=>window.chimpJump?.().ready&&window.chimpJump().treeVisible);
  await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
  const entries=JSON.parse(fs.readFileSync('public/avatars.json','utf8')).filter(e=>e.url);
  for(const entry of entries.slice(0,Number(process.env.CHIMP_TEST_AVATAR_LIMIT)||entries.length)){
@@ -32,15 +32,13 @@ try{
  // Collection coverage must not depend on an unrelated presentation control.
  const qualityButton=page.locator('#quality');
  if(await qualityButton.isVisible()){
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'cinematic-max');
-  await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'low');
-  await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'medium');
-  await qualityButton.click();
   assert.equal(await page.evaluate(()=>window.chimpJump().quality),'high');
   await qualityButton.click();
-  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'cinematic-max');
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'ultra');
+  await qualityButton.click();
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'balanced');
+  await qualityButton.click();
+  assert.equal(await page.evaluate(()=>window.chimpJump().quality),'high');
  }
  await page.evaluate(()=>window.chimpJumpTest.render());
  assert.deepEqual(errors,[]);
