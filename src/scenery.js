@@ -223,6 +223,8 @@ export function createScenery(scene,renderer){
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
  // High detail uses the authored canopy image as a distant plate; Balanced uses only the layered forest.
  let viewWidth=20,viewHeight=14,currentCamera=5;
+ let treeCameraOrigin=null,treeClimbOffset=0;
+ const TREE_CLIMB_PARALLAX=.07;
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
   forest.forEach((m,i)=>{m.visible=background.visible&&(highQuality||i>0);});
@@ -234,7 +236,8 @@ export function createScenery(scene,renderer){
   const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;let repeatX=1,repeatY=1;
   if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;else repeatY=imageAspect/viewAspect;
   const marginX=(1-repeatX)/2,marginY=(1-repeatY)/2;map.repeat.set(repeatX,repeatY);map.offset.set(marginX,marginY+Math.sin(currentCamera*.012)*Math.min(.035,marginY*.65));
-  treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);treeImageMesh.position.set(0,currentCamera,-8);
+  treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);
+  treeImageMesh.position.set(0,currentCamera-treeClimbOffset,-8);
  }
  function loadTree(){
   if(!highQuality||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
@@ -379,6 +382,8 @@ export function createScenery(scene,renderer){
    const mode=document.body?.dataset?.mode||'',active=mode==='playing'||mode==='dying'||mode==='starting';
    if(!active&&!staticRenderDirty)return;
    currentCamera=cameraY;
+   if(treeCameraOrigin===null)treeCameraOrigin=cameraY;
+   treeClimbOffset=Math.max(0,cameraY-treeCameraOrigin)*TREE_CLIMB_PARALLAX;
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
     if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=Math.sin(time*.018)*.13;treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}
@@ -388,7 +393,7 @@ export function createScenery(scene,renderer){
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;invalidateStaticFrame();},
+  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;fitTree();invalidateStaticFrame();},
   setQuality(high){highQuality=high;loadPlatform();loadTree();scene.traverse(o=>{if(o.name==='authored-branch')o.visible=high;if(o.name==='procedural-branch')o.visible=!high||!o.parent.getObjectByName('authored-branch');if(o.userData.desktopDetail)o.visible=high;});refreshBackground();invalidateStaticFrame();},
   invalidateRender(){invalidateStaticFrame();}
  };
