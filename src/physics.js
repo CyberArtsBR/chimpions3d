@@ -234,6 +234,7 @@ export class Game {
   if(this.event&&this.time>=this.event.ends){
    const ended=this.event.type;this.event=null;
    this.specialBlockedUntil=Math.max(this.specialBlockedUntil,this.time+SPECIAL_INTENSITY.minimumGap);
+   for(const h of this.hazards)if(h.type!=='thorn-pod'){h.createdAt=this.time;h.telegraphCycle=-1;h.activeCycle=-1;}
    events.push({type:'event-end',eventType:ended});
   }
   if(!this.event&&this.time>=this.nextEventAt){
@@ -241,6 +242,7 @@ export class Game {
    if(!busy){
     const type=EVENT_TYPES[(this.runSeed+this.eventIndex*5)%EVENT_TYPES.length];
     this.event={type,started:this.time,ends:this.time+EVENT_DURATION};
+    for(const h of this.hazards){h.active=false;h.telegraphing=false;}
     this.eventIndex++;
     this.nextEventAt=this.event.ends+eventGapFor(this.runSeed,this.eventIndex);
     this.specialBlockedUntil=this.event.ends+SPECIAL_INTENSITY.minimumGap;
@@ -249,8 +251,10 @@ export class Game {
   }
  }
  updateHazards(events){
+  const specialBusy=!!this.event||this.jetRemaining>0;
   for(const h of this.hazards){
-   const motion=hazardMotion(h,this.time);h.x=motion.x;h.y=motion.y;h.active=motion.active;h.telegraphing=motion.telegraphing;
+   const motion=hazardMotion(h,this.time);h.x=motion.x;h.y=motion.y;
+   h.active=!specialBusy&&motion.active;h.telegraphing=!specialBusy&&motion.telegraphing;
    const nearView=Math.abs(h.baseY-this.camera)<VIEW_HEIGHT*.72+2;
    if(nearView&&motion.telegraphing&&h.telegraphCycle!==motion.cycleIndex){
     h.telegraphCycle=motion.cycleIndex;
@@ -259,7 +263,7 @@ export class Game {
      telegraphKind:motion.telegraphKind,hazardId:h.id,cycle:motion.cycleIndex
     });
    }
-   if(motion.active&&h.activeCycle!==motion.cycleIndex){
+   if(h.active&&h.activeCycle!==motion.cycleIndex){
     h.activeCycle=motion.cycleIndex;
     if(nearView)events.push({type:'hazard-active',hazardType:h.type,x:h.x,y:h.y,hazardId:h.id,cycle:motion.cycleIndex});
    }
@@ -283,7 +287,11 @@ export class Game {
 
   if(this.jetRemaining>0){
    const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
-   if(this.jetRemaining===0){this.vy=JUMP;events.push({type:'jet-end'});}
+   if(this.jetRemaining===0){
+    this.vy=JUMP;
+    for(const h of this.hazards)if(h.type!=='thorn-pod'){h.createdAt=this.time;h.telegraphCycle=-1;h.activeCycle=-1;}
+    events.push({type:'jet-end'});
+   }
   }else{
    this.y+=this.vy*dt-.5*GRAVITY*dt*dt;this.vy-=GRAVITY*dt;
   }
