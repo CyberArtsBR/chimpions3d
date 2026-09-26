@@ -1,9 +1,18 @@
 const params=new URLSearchParams(location.search);
-if(!['dash','lab','rig','play','dev','arena','test'].some(key=>params.has(key))){
+
+// Chimpions Dash has one canonical production route: ?dash=1.
+// Retire the old Lab/2D entry point instead of maintaining two Dash entry
+// paths that can drift apart. Any legacy ?lab link is permanently redirected
+// to the current Dash game while preserving unrelated query flags.
+if(params.has('lab')){
+  params.delete('lab');
+  params.set('dash','1');
+  location.replace(location.pathname+'?'+params.toString()+location.hash);
+}else if(!['dash','rig','play','dev','arena','test'].some(key=>params.has(key))){
   import('./launcherV2.js');
 }else if(params.has('arena')){
   import('./menuScreensV2.js').then(({setupArenaGate})=>setupArenaGate());
-}else if(params.has('dash')||params.has('lab')){
+}else if(params.has('dash')){
   import('./polish.css');
   import('./chimpionsLab.js').then(()=>import('./menuScreensV2.js')).then(({setupDashMenu})=>setupDashMenu());
 }else if(params.has('rig')){
