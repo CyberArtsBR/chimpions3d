@@ -11,19 +11,47 @@ await page.addInitScript(()=>{
 });
 const report={status:'PASS',suite:'runtime-resilience',checks:{}};
 try{
-  await gotoJump(page,{test:true});
-  await startSelectedRun(page,{fastForward:true});
+  const padEdge=async({button=null,axisX=null,axisY=null}={})=>{
+    await page.evaluate(({button,axisX,axisY})=>{
+      if(button!==null)window.__qaPad.buttons[button].pressed=true;
+      if(axisX!==null)window.__qaPad.axes[0]=axisX;
+      if(axisY!==null)window.__qaPad.axes[1]=axisY;
+    },{button,axisX,axisY});
+    await page.waitForTimeout(60);
+    await page.evaluate(({button,axisX,axisY})=>{
+      if(button!==null)window.__qaPad.buttons[button].pressed=false;
+      if(axisX!==null)window.__qaPad.axes[0]=0;
+      if(axisY!==null)window.__qaPad.axes[1]=0;
+    },{button,axisX,axisY});
+    await page.waitForTimeout(60);
+  };
 
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;window.chimpJumpTest.render();});
+  await gotoJump(page,{test:true});
+  await page.waitForFunction(()=>document.activeElement?.id==='play');
+  report.checks.controllerStartFocused=true;
+  await padEdge({button:0});
+  await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+  const avatarButtons=page.locator('#collection-dialog .avatar-option:not(:disabled)');
+  assert(await avatarButtons.count()>2,'Controller picker test needs at least three selectable avatars');
+  await avatarButtons.nth(2).focus();
+  await padEdge({axisX:-1});
+  assert.equal(await page.evaluate(()=>document.activeElement?.classList.contains('avatar-option')?[...document.querySelectorAll('#collection-dialog .avatar-option:not(:disabled)')].indexOf(document.activeElement):-1),1,'One left controller edge must move exactly one avatar');
+  report.checks.controllerPickerSingleStep=true;
+  await page.locator('#collection-dialog #confirm-chimpion').focus();
+  await padEdge({button:0});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='playing',{timeout:10000});
+
+  await padEdge({button:9});
   await page.waitForFunction(()=>window.chimpJump().mode==='paused',{timeout:5000});
-  await page.waitForTimeout(220);
-  assert.equal(await page.evaluate(()=>window.chimpJump().mode),'paused','Held controller Start must trigger only one pause edge');
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;window.chimpJumpTest.render();});
-  await page.waitForTimeout(120);
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=true;window.chimpJumpTest.render();});
+  await page.waitForFunction(()=>document.activeElement?.id==='jump-resume',{timeout:3000});
+  await padEdge({axisY:1});
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'jump-restart','Pause menu controller Down must move exactly one option');
+  await page.locator('#jump-resume').focus();
+  await padEdge({button:9});
   await page.waitForFunction(()=>window.chimpJump().mode==='playing',{timeout:5000});
-  await page.evaluate(()=>{window.__qaPad.buttons[9].pressed=false;});
-  report.checks.controllerPauseEdge=true;
+  report.checks.controllerPauseMenu=true;
   await page.waitForTimeout(1300);
 
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
@@ -43,7 +71,14 @@ try{
   await page.getByRole('button',{name:'Resume'}).click();
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
 
-  await page.evaluate(()=>{window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
+  await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.y=-100;window.chimpJumpTest.step(1);window.chimpJumpTest.ending(5);});
+  await page.locator('#results-dialog[open]').waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.activeElement?.id==='try-again',{timeout:3000});
+  await padEdge({axisY:1});
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'replay-trail','Game-over controller Down must move exactly one result action');
+  report.checks.controllerGameOverMenu=true;
+
+  await page.evaluate(()=>{document.querySelector('#results-dialog')?.close();window.__qaPad.connected=false;window.__qaPad.axes[0]=0;});
   await page.keyboard.down('ArrowRight');
   await page.evaluate(()=>window.chimpJumpTest.stepInput(20));
   await page.keyboard.up('ArrowRight');
