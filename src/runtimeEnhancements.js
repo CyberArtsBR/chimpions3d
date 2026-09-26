@@ -59,6 +59,7 @@ inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed,pausePressed,s
  if(source==='gamepad'&&connected)document.body.dataset.inputMode='controller';
  const mode=document.body?.dataset?.mode||'',dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
  if(pausePressed){
+  if(mode==='playing'){document.querySelector('#pause')?.click();return;}
   if(mode==='paused'){document.querySelector('#jump-resume')?.click();return;}
   if(mode==='menu'){const play=document.querySelector('#play');if(isVisible(play)){focusElement(play);play.click();}return;}
  }
