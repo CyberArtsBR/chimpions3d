@@ -158,7 +158,7 @@ export function dashPatternWeightModifier(pattern,{state=createDashDirectorState
   const overshoot=demand-capacity;
   if(overshoot>0)weight*=clamp(1-overshoot*1.25,.18,1);
   if(demand>headroom+.28)weight*=.56;
-  if((state.pressure||0)>capacity)weight*=pattern.recovery>=1.02?1.42:pattern.difficulty>=4?.42:.82;
+  if((state.pressure||0)>capacity)weight*=pattern.recovery>=1.02 ? 1.42 : (pattern.difficulty>=4 ? .42 : .82);
 
   const streak=dashRecentActionStreak(state.recentActions||[],firstAction);
   if(streak>=DASH_DIRECTOR_TUNING.repeatSoftLimit+1&&!pattern.rhythmIntent)weight*=.08;
@@ -193,7 +193,7 @@ export function advanceDashDirectorState(state,pattern,obstacles=[],{
   const demand=dashPatternPressure(pattern,{normalizedSpeed,visibility,previousAction});
   const recoverySeconds=Math.max(.55,Number(pattern?.recovery)||.8);
   const recoveryCredit=Math.max(0,recoverySeconds-.68)*DASH_DIRECTOR_TUNING.recoveryCredit+
-    (pattern?.recoveryClass==='breather'?.11:0);
+    (pattern?.recoveryClass==='breather' ? 0.11 : 0);
   const retention=DASH_DIRECTOR_TUNING.pressureRetention+clamp(normalizedSpeed,0,1)*.045;
   target.pressure=clamp((target.pressure||0)*retention+demand*DASH_DIRECTOR_TUNING.pressureGain-recoveryCredit,0,1.35);
   target.recovery=clamp(recoverySeconds*(1-demand*.18),.45,1.25);
