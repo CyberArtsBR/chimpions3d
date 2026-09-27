@@ -65,7 +65,7 @@ document.body.innerHTML=`
     <p>Automatic side-running at full pace. Jump, slide and read the jungle while your selected rigged Chimpion stays in motion.</p>
     <label>YOUR RUNNING MATE<select id="lab-avatar" aria-label="Choose Chimpion"></select></label>
     <div id="lab-message" role="status" aria-live="polite">Loading Chimpion…</div>
-    <div class="dash-menu-actions"><button id="dash-start" class="primary" disabled>▶ PLAY</button><button id="dash-random">Random Chimpion</button><button id="dash-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="dash-avatar-file" type="file" accept=".glb" hidden><a href="./">Back to Chimp Jump</a></div>
+    <div class="dash-menu-actions"><button id="dash-start" class="primary">▶ PLAY</button><button id="dash-random">Random Chimpion</button><button id="dash-upload" type="button">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="dash-avatar-file" type="file" accept=".glb" hidden><a href="./">Back to Chimp Jump</a></div>
   </section>
 
   <section id="dash-over" class="dash-panel modal results-panel" hidden role="dialog" aria-modal="true" aria-labelledby="dash-results-title">
@@ -203,7 +203,7 @@ async function loadAvatar(entry,{timeoutMs=15000}={}){
   if(!entry?.url&&!entry?.buffer)throw new Error('Invalid Chimpion asset');
   if(!entry.buffer&&character&&currentEntry?.id===entry.id)return true;
   const token=++avatarLoadToken;
-  loading=true;$('dash-start').disabled=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
+  loading=true;$('lab-avatar').disabled=true;$('lab-message').textContent='Loading '+entry.name+'…';
   window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loading',{detail:{id:entry.id,name:entry.name}}));
   let timeoutId=0,settled=false;
   const createPromise=createLabRunnerCharacter(entry.buffer||BASE+entry.url);
@@ -219,12 +219,11 @@ async function loadAvatar(entry,{timeoutMs=15000}={}){
     character=next;currentEntry=entry;scene.add(character.root);character.setFacingRight(true);performanceController?.invalidate?.();
     if(!entry.buffer)try{localStorage.setItem('chimpions-lab-avatar',entry.id);}catch{}
     $('lab-message').textContent=entry.name+' · rig validated · '+next.boneCount+' bones'+(entry.buffer?' · local file':'');
-    $('dash-start').disabled=false;
     window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-loaded',{detail:{id:entry.id||'local-custom',name:entry.name,local:!!entry.buffer,boneCount:next.boneCount}}));
     return true;
   }catch(error){
     if(token===avatarLoadToken){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;}
-    console.error(error);$('dash-start').disabled=!character;
+    console.error(error);
     $('lab-message').textContent='Could not load this Chimpion: '+error.message+(character?' Previous Chimpion is still available.':'');
     window.dispatchEvent(new CustomEvent('chimpions-dash-avatar-error',{detail:{id:entry.id,name:entry.name,message:error.message}}));
     throw error;
@@ -233,7 +232,7 @@ async function loadAvatar(entry,{timeoutMs=15000}={}){
     if(token===avatarLoadToken){loading=false;$('lab-avatar').disabled=false;}
   }
 }
-function cancelAvatarLoad(){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;$('dash-start').disabled=!character;}
+function cancelAvatarLoad(){avatarLoadToken++;loading=false;$('lab-avatar').disabled=false;}
 
 const hashSeed=hashDashSeed;
 const randomValue=nextDashRandom;
