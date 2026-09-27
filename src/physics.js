@@ -16,12 +16,12 @@ import {
  wrappedDistance as directedWrappedDistance
 } from './jumpGameplayDirector.js';
 
-export const WIDTH=14.4, GRAVITY=18, JUMP=12.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
+export const WIDTH=14.4, GRAVITY=18, JUMP=13.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
 export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5, BANANA_HEIGHT=1.35;
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v8-gameplay-director';
+export const RULESET='2026-09-expedition-v9-higher-lateral-routes';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
@@ -184,19 +184,30 @@ export class Game {
    const y=this.nextY+rise;
    const width=Math.min(2.58,difficulty.routeWidth+(recovery ? .18 : 0));
    const limit=WIDTH/2-VINE_INSET-.35-width*PLATFORM_LENGTH/2;
-   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD ? .84:recovery ? .62 : .74;
+   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.92:recovery?.76:.84;
    const reach=Math.min(difficulty.routeShift*phaseShift,WIDTH/2);
-   const candidates=[];
+   const minShiftFactor=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.92:recovery?.72:.86;
+   const minShift=Math.min(reach*.78,Math.max(.78,difficulty.routeMinShift*minShiftFactor));
+   const candidates=[],emergency=[];
    for(let x=-limit;x<=limit+.001;x+=.2){
     const distance=wrappedDistance(x,this.nextX);
-    if(distance>.34&&distance<=reach&&this.canPlace(x,y,width*PLATFORM_LENGTH,'solid')&&this.requiredTransferViable(x,y,width))candidates.push(x);
+    if(distance<=reach&&this.canPlace(x,y,width*PLATFORM_LENGTH,'solid')&&this.requiredTransferViable(x,y,width)){
+     if(distance>=minShift)candidates.push(x);
+     else if(distance>.58)emergency.push(x);
+    }
    }
    let x;
    if(candidates.length){
-    const centered=candidates.filter(value=>Math.abs(value)<=limit*.82);
+    const centered=candidates.filter(value=>Math.abs(value)<=limit*.88);
     const pool=centered.length?centered:candidates;
     x=pool[Math.floor(this.random()*pool.length)];
+   }else if(emergency.length){
+    emergency.sort((a,b)=>wrappedDistance(b,this.nextX)-wrappedDistance(a,this.nextX));
+    const pool=emergency.slice(0,Math.min(4,emergency.length));
+    x=pool[Math.floor(this.random()*pool.length)];
    }else{
+    // Preserve a guaranteed route only as a last resort. Normal generation now
+    // strongly avoids near-vertical "minimal side adjustment" safety chains.
     x=Math.max(-limit,Math.min(limit,this.nextX));
     if(!this.requiredTransferViable(x,y,width))break;
    }
