@@ -21,7 +21,7 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v12-200m-pace';
+export const RULESET='2026-09-expedition-v13-colored-lifts';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
@@ -73,7 +73,7 @@ export class Game {
  canPlace(x,y,width,type){
   const extent=width/2+platformTravelFor(type);
   if(Math.abs(x)+extent>WIDTH/2-VINE_INSET-.35)return false;
-  return this.platforms.every(p=>p.broken||Math.abs(p.y-y)>=PLATFORM_HEIGHT_BAND||
+  return this.platforms.every(p=>p.broken||Math.abs((p.baseY??p.y)-y)>=PLATFORM_HEIGHT_BAND+(type==='vertical'?.65:0)+(p.type==='vertical'?.65:0)||
    Math.abs(p.baseX-x)>=extent+p.width/2+platformTravelFor(p.type)+PLATFORM_GAP);
  }
  add(x,y,width,type,coin=true,route='safe',metadata={}){
@@ -82,13 +82,14 @@ export class Game {
   const moveRange=platformTravelFor(type),moveSpeed=1.25*(.62+.86*size);
   if(!this.canPlace(x,y,width,type))return false;
   this.platforms.push({
-   id:this.nextId++,x,baseX:x,y,width,type,coin,route,
+   id:this.nextId++,x,baseX:x,y,baseY:y,width,type,coin,route,
    reward:width<=1.3*PLATFORM_LENGTH?2:1,
    fragile:type==='cracked',broken:false,phase:this.random()*6.28,
    moveSpeed,moveRange,vanishAt:null,...metadata
   });
   const platform=this.platforms.at(-1);
   if(moveRange)platform.x=platformX(platform,this.time);
+  if(type==='vertical')platform.y=platform.baseY+Math.sin(platformPhaseAt(this.time)+platform.phase)*.65;
   return true;
  }
  nextEncounterStep(difficulty){
@@ -154,7 +155,7 @@ export class Game {
  }
  addOptional(step,safePlatform,difficulty){
   if(!step.optional)return null;
-  let type=step.optional;
+  let type=({leaf:'moving',swing:'moving',vanish:'cracked',spring:'vertical'})[step.optional]||step.optional;
   if(type==='solid'&&step.phase===ENCOUNTER_PHASES.BUILD&&this.random()<difficulty.movingFrequency)type='moving';
   const width=Math.max(.98,difficulty.optionalWidth+(this.random()-.5)*.34);
   const y=safePlatform.y-.92-this.random()*.34;
@@ -354,11 +355,12 @@ export class Game {
 
   let landing=null,earliest=2;
   for(const p of this.platforms){
-   const previousX=p.x;
+   const previousX=p.x,previousY=p.y;
+   if(p.type==='vertical')p.y=p.baseY+Math.sin(platformPhaseAt(this.time)+p.phase)*.65;
    if(platformTravelFor(p.type))p.x=platformX(p,this.time);
    if(p.broken)continue;
-   if(this.vy<0&&oldY>=p.y&&this.y<=p.y){
-    const t=(oldY-p.y)/(oldY-this.y),x=oldX+travel*t;
+   if(this.vy<0&&oldY>=previousY&&this.y<=p.y){
+    const t=(oldY-previousY)/((oldY-this.y)+(p.y-previousY)),x=oldX+travel*t;
     const px=previousX+(p.x-previousX)*t,distance=wrappedDistance(x,px);
     if(distance<p.width/2+.24&&t<earliest){earliest=t;landing=p;}
    }

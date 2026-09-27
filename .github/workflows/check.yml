@@ -34,6 +34,7 @@ concurrency:
 jobs:
   fast:
     name: FAST · build, source, deterministic gameplay, assets
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -86,6 +87,7 @@ jobs:
 
   reported-regressions:
     name: TARGETED · reported Jump regressions
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -123,6 +125,7 @@ jobs:
   standard-browser:
     name: STANDARD · Chromium E2E, responsive, a11y, network, soak
     needs: fast
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -211,7 +214,7 @@ jobs:
   extended:
     name: EXTENDED · Firefox and WebKit smoke
     needs: fast
-    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true') }}
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') && (github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_extended == 'true')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -251,7 +254,7 @@ jobs:
   soak:
     name: EXTENDED · real-rendered five-minute soak
     needs: fast
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.run_soak == 'true' }}
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') && (github.event_name == 'workflow_dispatch' && github.event.inputs.run_soak == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -288,7 +291,7 @@ jobs:
   production:
     name: PRODUCTION · deployed public smoke
     needs: fast
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.production_url != '' }}
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') && (github.event_name == 'workflow_dispatch' && github.event.inputs.production_url != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -312,3 +315,15 @@ jobs:
           path: |
             checks/production-*.png
             checks/production-browser-report.json
+
+  release-build:
+    if: ${{ contains(github.event.head_commit.message, '[build only]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build

@@ -1,3 +1,5 @@
+import {createExpeditionBackdrop,createTechPlatform} from './expeditionVisuals.js';
+import './expedition.css';
 import * as THREE from 'three';
 import {loadCharacter} from './character.js';
 import {createScenery} from './scenery.js';
@@ -25,9 +27,10 @@ document.body.innerHTML=`
 <div id="world"><div class="sun"></div><div class="rays"></div><div class="hill"></div><div class="hill two"></div><div class="mist"></div></div>
 <header id="hud" aria-label="Run status"><div class="stat height-stat"><small>HEIGHT</small><strong id="height">0</strong> <em>m</em></div><div class="right"><div class="stat coins"><small>BANANAS</small><strong id="coins">0</strong></div><button id="mute" aria-label="Mute sound" aria-pressed="false" title="Audio">♪</button><button id="pause" aria-label="Pause game" aria-keyshortcuts="Escape P" title="Pause" hidden>Ⅱ</button></div></header>
 <div class="court-edges" aria-hidden="true"><span>‹</span><span>›</span></div><div id="theme">Jungle Morning</div><div id="pace" role="status" aria-live="polite">PACE 1.06×</div><div id="canopy-event" role="status" aria-live="polite" aria-atomic="true" hidden></div>
-<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>↔ Moving</span><span>╱ Fragile</span><span>↑ Spring</span><span>🍃 Leaf</span><span>◌ Vanish</span><span>⌁ Swing</span><span>Risk routes · bonus bananas</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
+<div id="menu-backdrop" aria-hidden="true"></div><div id="overlay"><section class="card"><div class="eyebrow" id="eyebrow">A little chimp. A big climb.</div><h1 id="title">CHIMP<br><span>JUMP</span></h1><p id="description">Read the branches. Time your landing.<br>Choose your route. Climb higher.</p><div class="branch-guide"><span>Blue · Solid</span><span>Red · Breaks</span><span>Yellow ↔ Horizontal</span><span>Purple ↕ Vertical</span></div><div id="avatar-list" hidden></div><div id="avatar-status" role="status"></div><button class="primary" id="play" disabled>LOADING YOUR CHIMP…</button><div class="best" id="best"></div><div class="avatar-actions"><button class="secondary" id="choose">Choose chimp</button><button class="secondary" id="upload">UPLOAD YOUR 3D CHARACTER (GLB)</button><input id="avatar-file" type="file" accept=".glb" hidden></div><div class="options"><button id="quality">Detail: High</button><button id="flip" hidden>Flip avatar facing</button></div><div class="keys"><b>←</b><b>→</b> or <b>A</b><b>D</b><span>Mouse / gamepad · auto jump</span></div><a class="secondary" id="rig-link" href="?rig=1">Rig laboratory</a><div class="gamepad-callout" aria-label="Jogue com seu Controle"><svg viewBox="0 0 96 58" aria-hidden="true"><path d="M27 12h42c9 0 14 7 17 17l5 17c2 8-7 13-13 8L65 44H31L18 54c-6 5-15 0-13-8l5-17c3-10 8-17 17-17Z"/><path class="pad-detail" d="M27 24v15M19.5 31.5h15M67 27h.1M77 35h.1M43 31h10"/></svg><span>Jogue com seu Controle</span></div></section></div>
 <div id="touch" hidden><button class="touch" id="left" aria-label="Move left">←</button><button class="touch" id="right" aria-label="Move right">→</button></div>
 <div id="toast" role="status"></div><div class="footer">CHIMP JUMP · CANOPY EDITION</div>`;
+document.body.classList.add('expedition-ui');
 const $=id=>document.getElementById(id);
 const countdown=document.createElement('div');countdown.id='countdown';countdown.hidden=true;countdown.setAttribute('aria-live','polite');document.body.append(countdown);
 $('pace').hidden=true;
@@ -37,7 +40,7 @@ document.querySelector('.gamepad-callout span').textContent='Play with a control
 const pixelBackdrop=createPixelBackdrop($('world'));
 let pixelMode=new URLSearchParams(location.search).get('background')==='pixel';
 const backdropButton=document.createElement('button');backdropButton.id='background-style';document.body.append(backdropButton);
-function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel expedition':'Scenery: Golden forest';window.dispatchEvent(new CustomEvent('chimp-scenery-style-change',{detail:{pixelMode,label:backdropButton.textContent}}));}
+function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(true);expeditionBackdrop.setVisible(!pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel expedition':'Scenery: Mountain sanctuary';window.dispatchEvent(new CustomEvent('chimp-scenery-style-change',{detail:{pixelMode,label:backdropButton.textContent}}));}
 backdropButton.onclick=()=>{pixelMode=!pixelMode;applyBackdrop();};
 const collectionDialog=document.createElement('dialog');collectionDialog.id='collection-dialog';
 collectionDialog.setAttribute('aria-label','Choose your chimp');
@@ -66,6 +69,7 @@ const heroLight=new THREE.DirectionalLight(0xfff4e7,2.6);heroLight.target=heroTa
 const heroFill=new THREE.DirectionalLight(0xe7f3ff,1.05);heroFill.target=heroTarget;heroFill.layers.set(1);scene.add(heroFill);
 const world=new THREE.Group();scene.add(world);
 const scenery=createScenery(scene,renderer),fallSplash=createFallSplash(scene),deathBounds=new THREE.Box3();
+const expeditionBackdrop=createExpeditionBackdrop($('world'),scene,camera);
 const renderPipeline=createJumpRenderPipeline({renderer,scene,camera,sun,width:innerWidth,height:innerHeight});
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
 function removeHazard(m){world.remove(m);m.userData.telegraph?.material?.dispose?.();}
@@ -83,11 +87,12 @@ function quality(){
  // Quality is user-selected on both desktop and mobile. Lower presets remain
  // available for thermal/battery limits instead of silently forcing Balanced.
  scenery.setQuality(activeQuality,{constrained:false});
- $('quality').textContent='Graphics: '+activeQuality.label;
+ $('quality').textContent=activeQualityName==='ultra'?'ULTRA':activeQualityName==='high'?'HD':activeQualityName==='balanced'?'BAL':'ECO';$('quality').title='Graphics: '+activeQuality.label;$('quality').setAttribute('aria-label',$('quality').title);
  $('quality').disabled=false;
  window.dispatchEvent(new CustomEvent('chimp-graphics-quality-change',{detail:{profile:activeQualityName,label:activeQuality.label}}));
  resize();
 }
+document.querySelector('#hud .right').append($('quality'));
 $('quality').onclick=()=>{
  selectedQuality=nextJumpQualityProfile(selectedQuality);
  try{localStorage.setItem('chimp-jump-detail',selectedQuality);}catch{}
@@ -139,7 +144,7 @@ const themes=[
  {name:'Canopy Morning',rain:0},
  {name:'Golden Canopy',rain:0},
  {name:'Neon Mist',rain:0},
- {name:'Moonstorm Jungle',rain:1}
+ {name:'Moonlit Grove',rain:0}
 ];
 function themeAtHeight(height){
  const h=Math.max(0,Number(height)||0);
@@ -293,14 +298,14 @@ function drawWorld(dt=0){
  jetEquipped.visible=game.jetRemaining>0;jetEquipped.position.set(game.x,game.y+.55,-.25);jetEquipped.rotation.y=yaw;if(game.jetRemaining>0)scenery.jetTrail(game.x,game.y,visualTime);
  const live=new Set(game.platforms.map(p=>p.id));for(const [id,m]of platformMeshes){if(!live.has(id)){removeBranch(m);platformMeshes.delete(id);}}
  for(const p of game.platforms){
-  let m=platformMeshes.get(p.id);if(m&&m.userData.fragile!==!!p.fragile){removeBranch(m);platformMeshes.delete(p.id);m=null;}if(!m){m=scenery.branch(p);world.add(m);platformMeshes.set(p.id,m);}
+  let m=platformMeshes.get(p.id);if(m&&m.userData.fragile!==!!p.fragile){removeBranch(m);platformMeshes.delete(p.id);m=null;}if(!m){m=createTechPlatform(p,scenery.branch(p));world.add(m);platformMeshes.set(p.id,m);}
   m.position.set(p.x,p.y,0);m.visible=!p.broken&&Math.abs(p.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateBranch(m,p,visualTime);m.userData.coin.visible=p.coin;m.userData.coin.rotation.y=visualTime*1.2;m.userData.coin.position.y=BANANA_HEIGHT+Math.sin(visualTime*2+p.id)*.07;
  }
  const liveHazards=new Set(game.hazards.map(h=>h.id));for(const [id,m]of hazardMeshes){if(!liveHazards.has(id)){removeHazard(m);hazardMeshes.delete(id);}}
  for(const h of game.hazards){let m=hazardMeshes.get(h.id);if(!m){m=scenery.hazard(h);world.add(m);hazardMeshes.set(h.id,m);}m.visible=Math.abs(h.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateHazard(m,h,visualTime);}
  if(mode==='playing'&&game.hazardCooldown<=0&&game.time-lastHazardWarningAt>1.6){const threat=game.hazards.find(h=>h.y>game.y+.45&&h.y<game.y+2.5&&Math.abs(h.x-game.x)<1.15);if(threat){lastHazardWarningAt=game.time;sound('hazard-warning');}}
  const themeState=themeAtHeight(game.height),current=themes[themeState.to],idx=themeState.to,blend=themeState.blend;
- if(pixelMode)pixelBackdrop.draw(idx,blend);
+ expeditionBackdrop.update(idx);if(pixelMode)pixelBackdrop.draw(idx,blend);
  if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
  const rain=themeState.from===3?(themeState.to===3?1:1-blend):(themeState.to===3?blend:0);

@@ -63,10 +63,10 @@ export function setupJumpExperience(){
     <p class="guide-intro">Everything you need to climb quickly, grouped for fast reference.</p>
     <div class="guide-grid">
       <section><h3>Movement</h3><p>Auto-jump keeps the run moving. Steer in the air with ← → or A/D, mouse position, touch controls, or a normalized gamepad input.</p></section>
-      <section><h3>Platforms</h3><div class="guide-branches"><span>↔ <b>Moving</b></span><span>╱ <b>Fragile</b></span><span>↑ <b>Spring</b></span><span>🍃 <b>Leaf</b></span><span>⌁ <b>Swing</b></span><span>◌ <b>Vanish</b></span></div><p>Solid branches form the safest route. Small or unusual branches can offer better banana opportunities.</p></section>
+      <section><h3>Platforms</h3><div class="guide-branches"><span>Blue · Solid</span><span>Red · Breaks on landing</span><span>Yellow ↔ Horizontal</span><span>Purple ↕ Vertical</span></div><p>Solid branches form the safest route. Small or unusual branches can offer better banana opportunities.</p></section>
       <section><h3>Hazards</h3><p>Thorn pods knock the Chimpion off line. Keep landing space in reserve when one sits near your route.</p></section>
       <section><h3>Power-ups</h3><p>Jetpacks create a timed climb boost. The HUD shows the remaining boost time without blocking the landing area.</p></section>
-      <section><h3>Events</h3><p>Banana Bloom adds fruit rewards. Spring Fever boosts spring branches. A compact event badge appears only while an event is active.</p></section>
+      <section><h3>Events</h3><p>Banana Bloom adds fruit rewards. Purple platforms travel up and down. A compact event badge appears only while an event is active.</p></section>
       <section><h3>Scoring</h3><p>Altitude drives your run score and collected bananas add a bonus. Online placement is submitted after the run when the service is available.</p></section>
       <section><h3>Goals</h3><ul id="jump-goals"></ul></section>
       <section><h3>Controls</h3><p><b>Steer:</b> ← → / A D · mouse · touch · gamepad<br><b>Pause:</b> P or Escape<br><b>Menus:</b> Tab / Shift+Tab · Enter / Space · Escape</p></section>

@@ -164,6 +164,7 @@ export function createScenery(scene,renderer){
  const poolKeyFor=(p,variant=variantFor(p))=>[p.type,p.fragile?1:0,p.reward===2?2:1,Number(p.width).toFixed(3),variant].join('|');
  function permanentlyDisposeBranch(group){
   group.traverse(o=>{
+   if(o.geometry?.type==='TubeGeometry'&&!o.isInstancedMesh)o.geometry.dispose();
    if(!o.isInstancedMesh)return;
    const original=o.userData._poolOriginalDispose;
    if(original)original();else THREE.InstancedMesh.prototype.dispose.call(o);
@@ -207,6 +208,7 @@ export function createScenery(scene,renderer){
  }
 
  function attachPlatform(group){
+  if(group.userData.tech)return;
   const special=['leaf','swing','vanish'].includes(group.userData.platformType);
   if(!platformTemplate||special||(group.userData.platformType==='cracked'||group.userData.fragile)||group.getObjectByName('authored-branch'))return;
   const model=platformTemplate.clone(true),authored=new THREE.Group();authored.name='authored-branch';const variant=group.userData.variant||0;

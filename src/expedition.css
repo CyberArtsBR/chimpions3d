@@ -1,0 +1,29 @@
+/* Reference-inspired expedition HUD and untouched JPEG scenery. */
+body.expedition-ui[data-mode] #world>.expedition-backdrop{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;pointer-events:none;display:block}
+body.expedition-ui[data-mode] #world>.expedition-backdrop.active{opacity:1}
+.expedition-backdrop img{width:100%;height:100%;object-fit:cover;display:block}
+body.expedition-ui[data-mode] #world>.sun,body.expedition-ui[data-mode] #world>.rays,body.expedition-ui[data-mode] #world>.hill,body.expedition-ui[data-mode] #world>.mist,body.expedition-ui[data-mode] #world::before,body.expedition-ui[data-mode] #world::after{display:none!important}
+body.expedition-ui[data-mode] #hud{width:min(94vw,880px);gap:10px;align-items:stretch;z-index:30}
+body.expedition-ui[data-mode] #hud .stat,body.expedition-ui[data-mode] #hud button{position:relative;background:linear-gradient(160deg,#274650 0%,#071a25 35%,#03121c 75%,#143742);border:2px solid #74cbdb;border-radius:13px;box-shadow:inset 0 0 0 3px #0a2634,inset 0 0 18px #13d9ff35,0 0 0 3px #263e4b,0 0 0 5px #071822a6,0 4px 18px #00132188;color:#f0fcff}
+body.expedition-ui[data-mode] #hud .stat{flex:1;padding:10px 18px 10px 50px;min-width:0;backdrop-filter:blur(12px)}
+body.expedition-ui[data-mode] #hud .stat::before{content:'△';position:absolute;left:13px;top:20px;font-size:28px;color:#52eaff;text-shadow:0 0 9px #00d5ff}
+body.expedition-ui[data-mode] #hud>.stat:nth-child(2)::before{content:'♜'}
+body.expedition-ui[data-mode] #hud .stat::after,body.expedition-ui[data-mode] #hud button::after{content:'';position:absolute;bottom:2px;left:22%;right:22%;height:2px;background:#6bfbff;box-shadow:0 0 9px 2px #11dfff}
+body.expedition-ui[data-mode] #hud .stat small{color:#83edf3;letter-spacing:.08em;font-size:10px}
+body.expedition-ui[data-mode] #hud .stat strong{font-size:29px;text-shadow:0 2px 4px #000;font-variant-numeric:tabular-nums}
+body.expedition-ui[data-mode] #hud .right{gap:10px;align-items:stretch}
+body.expedition-ui[data-mode] #hud .coins{min-width:135px;border-color:#c2d16c}
+body.expedition-ui[data-mode] #hud .coins::before{content:'🍌';font-size:29px;filter:drop-shadow(0 0 7px #ffd12a77)}
+body.expedition-ui[data-mode] #hud .coins small{color:#e6eb85}
+body.expedition-ui[data-mode] #hud button{pointer-events:auto;width:52px;min-height:65px;height:auto;font-size:26px;text-shadow:0 0 10px #20eaff;padding:0;visibility:visible!important;display:block}
+body.expedition-ui[data-mode] #hud #quality{font-size:13px;font-weight:900;color:#8eefff;letter-spacing:.06em}
+body.expedition-ui[data-mode] #hud button[hidden]{display:none!important}
+body.expedition-ui[data-mode] #jump-help{top:auto;bottom:18px;right:16px;font-size:11px;min-height:36px}
+body.expedition-ui[data-mode] #jump-goal{top:106px}
+body.expedition-ui[data-mode=playing] #background-style{display:none}
+@media(max-width:600px){body.expedition-ui[data-mode] #hud{width:calc(100vw - 18px);gap:5px;top:max(12px,env(safe-area-inset-top))}body.expedition-ui[data-mode] #hud .right{gap:5px}body.expedition-ui[data-mode] #hud .stat{padding:9px 6px 9px 22px}body.expedition-ui[data-mode] #hud .stat::before{font-size:17px;left:4px;top:23px}body.expedition-ui[data-mode] #hud .stat small{font-size:7px;letter-spacing:0}body.expedition-ui[data-mode] #hud .stat strong{font-size:20px}body.expedition-ui[data-mode] #hud .stat em{font-size:9px}body.expedition-ui[data-mode] #hud .coins{min-width:65px}body.expedition-ui[data-mode] #hud .coins::before{font-size:17px}body.expedition-ui[data-mode] #hud button{width:32px;min-width:30px!important;min-height:53px;font-size:19px}body.expedition-ui[data-mode] #hud #quality{font-size:10px}body.expedition-ui[data-mode] #jump-goal{top:83px}body.expedition-ui[data-mode] #jump-help{bottom:6px;padding:4px 8px;min-height:30px}}
+@media(prefers-reduced-motion:reduce){body.expedition-ui[data-mode] #world>.expedition-backdrop{transition:none}}
+.jump-reduced-motion #world>.expedition-backdrop{transition:none}
+
+body.expedition-ui[data-mode] #hud #quality{display:block!important;position:relative!important;min-width:32px;width:52px;padding:0;top:auto!important;left:auto!important;transform:none!important}
+@media(max-width:600px){body.expedition-ui[data-mode] #hud #quality{width:32px;min-width:30px}}

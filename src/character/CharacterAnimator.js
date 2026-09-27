@@ -361,9 +361,9 @@ export class CharacterAnimator {
 
   _poseTakeoff(time, bounceAge, reduction) {
     const p = clamp01(Math.max(0, finite(bounceAge, 0)) / 0.16);
-    const compression = 1 - smooth01(p / 0.44);
+    const compression = 1 - smooth01(p / 0.52);
     const push = Math.sin(PI * clamp01(p));
-    const extension = smooth01((p - 0.25) / 0.75);
+    const extension = smooth01((p - 0.18) / 0.82);
     const asym = Math.sin(time * 3.1) * 0.025 * reduction;
 
     this._set('hips', 0.19 * compression - 0.055 * extension, 0, 0);
@@ -375,7 +375,7 @@ export class CharacterAnimator {
     for (const side of SIDES) {
       const sign = side === 'left' ? 1 : -1;
       this._set(side + 'Shoulder', -0.035 * extension, 0, sign * 0.028 * push);
-      this._set(side + 'UpperArm', 0.22 * compression - 0.92 * extension + sign * asym, 0, sign * 0.035 * push);
+      this._set(side + 'UpperArm', 0.28 * compression - 0.82 * extension + sign * asym, 0, sign * 0.035 * push);
       this._set(side + 'Forearm', -0.18 - 0.26 * extension, 0, 0);
       this._set(side + 'Hand', 0.030 + 0.055 * extension, 0, sign * 0.018 * extension);
       this._set(side + 'Thigh', -0.68 * compression - 0.10 * push + sign * asym, 0, 0);
@@ -385,13 +385,13 @@ export class CharacterAnimator {
 
     // Keep the normalized floor anchored; leg compression provides the contact squash.
     this.targetOffset = 0.045 * extension;
-    this.targetScaleXZ = 1 + 0.030 * compression - 0.010 * extension;
-    this.targetScaleY = 1 - 0.050 * compression + 0.028 * extension;
+    this.targetScaleXZ = 1 + 0.014 * compression - 0.006 * extension;
+    this.targetScaleY = 1 - 0.026 * compression + 0.014 * extension;
   }
 
   _poseAscend(time, velocityY, reduction) {
     const rise = clamp01(velocityY / this.launchVelocity);
-    const recover = 1 - rise;
+    const recover = smooth01(1 - rise);
     const delayed = Math.sin(time * 2.3 + 0.7) * 0.030 * reduction;
 
     this._set('hips', -0.045 * rise + 0.018 * recover, 0, 0);
@@ -412,8 +412,8 @@ export class CharacterAnimator {
     }
 
     this.targetOffset = 0.035 * rise;
-    this.targetScaleXZ = 0.992;
-    this.targetScaleY = 1.018;
+    this.targetScaleXZ = 0.996;
+    this.targetScaleY = 1.009;
   }
 
   _poseApex(time, velocityY, reduction) {
@@ -448,7 +448,7 @@ export class CharacterAnimator {
 
   _poseDescend(time, velocityY, landingAnticipation, reduction) {
     const fall = clamp01(-velocityY / this.launchVelocity);
-    const prep = landingAnticipation;
+    const prep = smooth01(landingAnticipation);
     const asym = Math.sin(time * 2.4) * 0.030 * reduction;
 
     this._set('hips', 0.045 + 0.10 * prep, 0, 0);
