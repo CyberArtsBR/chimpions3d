@@ -1,9 +1,13 @@
+import {dashPressureCapacity} from './dashDirector.js';
+
 export const DASH_SPEED_CURVE=Object.freeze({
   base:397.5,
   cap:610,
   timeConstant:155,
   stageSeconds:30
 });
+
+const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
 export function dashStageForTime(time){
   return Math.floor((Math.max(0,time)+1e-7)/DASH_SPEED_CURVE.stageSeconds)+1;
@@ -21,7 +25,7 @@ export function dashSpeedForTime(time,{unlimited=false}={}){
 
 export function dashNormalizedSpeed(time){
   const c=DASH_SPEED_CURVE;
-  return Math.max(0,Math.min(1,(dashSpeedForTime(time)-c.base)/(c.cap-c.base)));
+  return clamp((dashSpeedForTime(time)-c.base)/(c.cap-c.base),0,1);
 }
 
 export function dashDifficultyForTime(time){
@@ -32,7 +36,7 @@ export function dashDifficultyForTime(time){
 export function dashVisibilityForViewport({time=0,speed=dashSpeedForTime(time),viewportWidth=1080,playerX=150}={}){
   const usable=Math.max(0,viewportWidth-playerX);
   const targetDistance=Math.max(1,speed)*.90;
-  return Math.max(0,Math.min(1,usable/targetDistance));
+  return clamp(usable/targetDistance,0,1);
 }
 
 export function dashDifficultySnapshot({
@@ -45,23 +49,39 @@ export function dashDifficultySnapshot({
   visibility=1
 }={}){
   const target=dashDifficultyForTime(time);
-  const pressurePenalty=Math.max(0,Math.min(1,recentPressure))*.55;
-  const visibilityPenalty=(1-Math.max(0,Math.min(1,visibility)))*.45;
-  const recoveryBonus=Math.max(-.35,Math.min(.35,(recentRecovery-.85)*.4));
-  const varietyBonus=Math.max(-.2,Math.min(.2,(recentActionVariety-.5)*.35));
-  let effective=target-pressurePenalty-visibilityPenalty+recoveryBonus+varietyBonus;
-  if(previousDifficulty>=4.5&&recentRecovery<.8)effective=Math.min(effective,2.6);
-  effective=Math.max(1,Math.min(5,effective));
+  const stage=dashStageForTime(time);
+  const normalizedSpeed=dashNormalizedSpeed(time);
+  const safeVisibility=clamp(visibility,0,1);
+  const pressure=clamp(recentPressure,0,1.35);
+  const pressureCapacity=dashPressureCapacity({stage,normalizedSpeed,visibility:safeVisibility});
+  const pressureHeadroom=pressureCapacity-pressure;
+
+  // Continuous pressure shaping replaces the old hard "difficult -> easy" clamp.
+  // Pressure can temporarily soften selection, but never forces an abrupt tier reset.
+  const pressurePenalty=clamp(pressure*.36+Math.max(0,pressure-pressureCapacity)*.52,0,.72);
+  const visibilityPenalty=(1-safeVisibility)*.46;
+  const recoveryBonus=clamp((recentRecovery-.78)*.28,-.18,.16);
+  const varietyBonus=clamp((recentActionVariety-.5)*.26,-.14,.14);
+  const momentum=Math.max(0,previousDifficulty-target)*.04;
+
+  let effective=target-pressurePenalty-visibilityPenalty+recoveryBonus+varietyBonus-momentum;
+  effective=clamp(effective,1,5);
+
   return{
     time,
-    stage:dashStageForTime(time),
+    stage,
     speed:dashSpeedForTime(time),
-    normalizedSpeed:dashNormalizedSpeed(time),
+    normalizedSpeed,
     previousAction,
-    visibility:Math.max(0,Math.min(1,visibility)),
+    visibility:safeVisibility,
     targetDifficulty:target,
     effectiveDifficulty:effective,
-    maxPatternDifficulty:Math.max(2,Math.min(5,Math.floor(effective+.35)))
+    pressure,
+    pressureCapacity,
+    pressureHeadroom,
+    recentRecovery,
+    recentActionVariety,
+    maxPatternDifficulty:Math.max(2,Math.min(5,Math.floor(effective+.45)))
   };
 }
 
