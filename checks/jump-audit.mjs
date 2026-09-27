@@ -26,7 +26,7 @@ assert(!physics.includes('windAt')&&physics.includes("'event-start'"),'wind must
 for(const type of ["'thorn-pod'","'swinging-pod'","'vine-sweep'","'falling-fruit'"])assert(director.includes(type),'gameplay director must expose hazard '+type);
 assert(scenery.includes('animateHazard')&&scenery.includes('jetTrail'),'hazard animation and jet trail polish must remain');
 assert(scenery.includes("organic-platform-detail"),'special procedural platforms must retain the organic high-detail contour pass');
-assert(scenery.includes('TREE_CLIMB_PARALLAX')&&scenery.includes('currentCamera-treeClimbOffset'),'the authored giant tree must move downward relative to the climbing camera');
+assert(scenery.includes('TREE_SCROLL_PER_SCREEN')&&scenery.includes('computeTreeScroll')&&scenery.includes('treeClimbOffset'),'the authored giant tree must retain camera-relative infinite scrolling');
 assert(audio.includes('setIntensity')&&audio.includes('milestone'),'reactive music and milestone audio must remain');
 assert(game.includes("countdown.id='countdown'")&&game.includes("mode='starting'")&&game.includes('finishCountdown'),'run countdown must remain wired before gameplay');
 assert(game.includes('BANANA_HEIGHT+Math.sin'),'banana visuals must remain elevated above branches');
