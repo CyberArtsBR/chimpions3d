@@ -263,6 +263,20 @@ export function createScenery(scene,renderer){
  const rainMaterial=new THREE.LineBasicMaterial({color:0xb8dcff,transparent:true,opacity:0,depthWrite:false});
  const rainLines=new THREE.LineSegments(rainGeo,rainMaterial);rainLines.visible=false;rainLines.renderOrder=20;scene.add(rainLines);
 
+ // Full-frame phase treatments make each 400m atmosphere unmistakable even on
+ // bright authored backgrounds. They sit in front of the scenic plate, behind gameplay.
+ const washGeo=new THREE.PlaneGeometry(1,1);
+ const goldenWash=new THREE.Mesh(washGeo,new THREE.MeshBasicMaterial({color:0xff9a35,transparent:true,opacity:0,depthWrite:false,depthTest:false,toneMapped:false,fog:false}));
+ goldenWash.position.z=-7.34;goldenWash.renderOrder=-4;weatherBackdrop.add(goldenWash);
+ const neonWashTexture=canvasTexture(256,256,(c,w,h)=>{
+  const g=c.createLinearGradient(0,0,w,h);g.addColorStop(0,'#ff1fae');g.addColorStop(.42,'#a42cff');g.addColorStop(1,'#19d8ff');
+  c.fillStyle=g;c.fillRect(0,0,w,h);
+ });
+ const neonWash=new THREE.Mesh(washGeo,new THREE.MeshBasicMaterial({map:neonWashTexture,transparent:true,opacity:0,depthWrite:false,depthTest:false,toneMapped:false,fog:false,blending:THREE.AdditiveBlending}));
+ neonWash.position.z=-7.32;neonWash.renderOrder=-3;weatherBackdrop.add(neonWash);
+ const nightWash=new THREE.Mesh(washGeo,new THREE.MeshBasicMaterial({color:0x071a3c,transparent:true,opacity:0,depthWrite:false,depthTest:false,toneMapped:false,fog:false}));
+ nightWash.position.z=-7.30;nightWash.renderOrder=-2;weatherBackdrop.add(nightWash);
+
  const forest=[],forestTextureCache=new Map();
  const forestTextureFor=(index,scale=1)=>{
   const normalized=scale>1.01?1.5:1,key=`${index}:${normalized}`;
@@ -514,7 +528,7 @@ export function createScenery(scene,renderer){
  const forestTint=new THREE.Color(0x25483e);
  const treeThemeTints=[0xffffff,0xffb75f,0xe04dff,0x4f78bd].map(value=>new THREE.Color(value));
  const treeTint=new THREE.Color();
- const treeTintStrength=[0,.34,.50,.56];
+ const treeTintStrength=[0,.48,.66,.72];
 
  return {branch,hazard,
   animateBranch(group,p,time){
@@ -612,11 +626,15 @@ export function createScenery(scene,renderer){
     }
     const phaseFrom=Number.isFinite(weather.from)?weather.from:Math.max(0,biome-1),phaseTo=Number.isFinite(weather.to)?weather.to:biome;
     const phaseWeight=index=>phaseFrom===phaseTo?(phaseFrom===index?1:0):(phaseFrom===index?1-blend:0)+(phaseTo===index?blend:0);
-    const neonWeight=phaseWeight(2),nightWeight=phaseWeight(3),weatherMist=Math.max(0,Math.min(1,Number(weather.mist)||0));
+    const goldenWeight=phaseWeight(1),neonWeight=phaseWeight(2),nightWeight=phaseWeight(3),weatherMist=Math.max(0,Math.min(1,Number(weather.mist)||0));
     weatherBackdrop.position.y=cameraY;
-    synthSun.position.set(0,viewHeight*.29,-7.55);synthSun.material.opacity=neonWeight*.92;synthSun.visible=synthSun.material.opacity>.01;
-    moon.position.set(-viewWidth*.27,viewHeight*.31,-7.5);moon.material.opacity=nightWeight*.95;moon.visible=moon.material.opacity>.01;
-    stars.position.set(0,0,0);starMaterial.opacity=nightWeight*.9;stars.visible=starMaterial.opacity>.01;
+    const washWidth=viewWidth*1.18,washHeight=viewHeight*1.18;
+    goldenWash.scale.set(washWidth,washHeight,1);goldenWash.material.opacity=goldenWeight*.34;goldenWash.visible=goldenWash.material.opacity>.01;
+    neonWash.scale.set(washWidth,washHeight,1);neonWash.material.opacity=neonWeight*.30;neonWash.visible=neonWash.material.opacity>.01;
+    nightWash.scale.set(washWidth,washHeight,1);nightWash.material.opacity=nightWeight*.52;nightWash.visible=nightWash.material.opacity>.01;
+    synthSun.position.set(0,viewHeight*.29,-7.20);synthSun.material.opacity=neonWeight*.98;synthSun.visible=synthSun.material.opacity>.01;
+    moon.position.set(-viewWidth*.27,viewHeight*.31,-7.18);moon.material.opacity=nightWeight*.98;moon.visible=moon.material.opacity>.01;
+    stars.position.set(0,0,0);starMaterial.opacity=nightWeight*.95;stars.visible=starMaterial.opacity>.01;
     mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
     mistMaterial.opacity=.08+weatherMist*.34;
     mistLayers.visible=mistMaterial.opacity>.015;
@@ -641,7 +659,7 @@ export function createScenery(scene,renderer){
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;canopyVfx.reset();canopyArt.reset();ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;synthSun.visible=false;moon.visible=false;stars.visible=false;rainLines.visible=false;rainMaterial.opacity=0;fitTree();invalidateStaticFrame();},
+  reset(){sparks.length=0;particles.visible=false;canopyVfx.reset();canopyArt.reset();ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;synthSun.visible=false;moon.visible=false;stars.visible=false;goldenWash.visible=false;neonWash.visible=false;nightWash.visible=false;rainLines.visible=false;rainMaterial.opacity=0;fitTree();invalidateStaticFrame();},
   setQuality(profile,options={}){
    activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
    visualConstraints={constrained:!!options.constrained};

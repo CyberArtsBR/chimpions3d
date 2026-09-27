@@ -134,7 +134,7 @@ inputManager.bindMouseSurface(renderer.domElement,e=>{
  const court=Math.min(innerWidth,innerHeight*WIDTH/VIEW_HEIGHT);
  return Math.max(-WIDTH/2+.3,Math.min(WIDTH/2-.3,(e.clientX-innerWidth/2)/court*WIDTH));
 });
-const THEME_METERS=400,THEME_TRANSITION_METERS=120;
+const THEME_METERS=400,THEME_TRANSITION_METERS=80;
 const themes=[
  {name:'Canopy Morning',top:'#73c9ff',bottom:'#dff4ff',light:0xfff0d4,fog:0xd7efff,fogNear:25,fogFar:58,sun:2.65,hero:2.72,fill:1.02,mist:.12,rain:0,night:0},
  {name:'Golden Canopy',top:'#f49a42',bottom:'#ffd08a',light:0xffc778,fog:0xf4bc78,fogNear:23,fogFar:53,sun:2.35,hero:2.58,fill:.94,mist:.24,rain:0,night:.08},
@@ -302,7 +302,7 @@ function drawWorld(dt=0){
  if(mode==='playing'&&game.hazardCooldown<=0&&game.time-lastHazardWarningAt>1.6){const threat=game.hazards.find(h=>h.y>game.y+.45&&h.y<game.y+2.5&&Math.abs(h.x-game.x)<1.15);if(threat){lastHazardWarningAt=game.time;sound('hazard-warning');}}
  const themeState=themeAtHeight(game.height),from=themes[themeState.from],current=themes[themeState.to],idx=themeState.to,blend=themeState.blend;
  if(pixelMode)pixelBackdrop.draw(idx,blend);
- if(lastTheme!==idx&&blend>.5){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
+ if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
  const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
  const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone(),fogColor=color.setHex(from.fog).lerp(other.setHex(current.fog),blend).clone();
