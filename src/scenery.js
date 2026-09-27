@@ -143,7 +143,7 @@ export function createScenery(scene,renderer){
  };
 
  // Keep the wrap boundary invisible: no decorative vines hanging from the screen edges.
- let highQuality=false,treeImageMesh=null,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false,runtimePrefetchRequested=false,assetHashes=new Map();
+ let highQuality=false,treeImageMesh=null,phaseBackgroundMeshes=[],activePhaseFrom=0,activePhaseTo=0,activePhaseBlend=1,platformTemplate=null,platformLoading=false,platformConfig=null,runtimeAssetsActive=false,runtimePrefetchRequested=false,assetHashes=new Map();
  const controlledAssetUrl=asset=>versionedAssetUrl(import.meta.env.BASE_URL+asset,assetHashes.get(asset));
  let activeVisualProfile={profile:'balanced',highScenery:false},visualConstraints={constrained:false};
  const desktopDetailAllowed=()=>allowsDesktopDetail(activeVisualProfile,visualConstraints);
@@ -340,13 +340,79 @@ export function createScenery(scene,renderer){
   material.customProgramCacheKey=()=>'tree-overlap-v1';
  }
  const treeTextures=new Map(),treeRequests=new Set();
+ const phaseBackgroundUrl=index=>{
+  const phase=platformConfig?.phaseBackgrounds?.[index];
+  if(!phase)return null;
+  return phase[viewWidth>viewHeight?'landscape':'portrait']||null;
+ };
+ function ensurePhaseBackgroundMesh(index){
+  if(phaseBackgroundMeshes[index])return phaseBackgroundMeshes[index];
+  const material=new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false,transparent:true,opacity:0,depthWrite:false});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),material);
+  mesh.position.set(0,currentCamera,-8);mesh.visible=false;mesh.renderOrder=-20+index;background.add(mesh);
+  phaseBackgroundMeshes[index]=mesh;return mesh;
+ }
+ function fitPhaseBackgroundMesh(mesh){
+  const map=mesh?.material?.map,image=map?.image;
+  if(!image?.width||!image?.height)return;
+  const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;
+  let repeatX=1,repeatY=1;
+  if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;
+  else repeatY=imageAspect/viewAspect;
+  map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.ClampToEdgeWrapping;
+  map.repeat.set(repeatX,repeatY);map.offset.set((1-repeatX)/2,(1-repeatY)/2);
+  mesh.scale.set(viewWidth*1.10,viewHeight*1.10,1);mesh.position.set(0,currentCamera,-8);
+ }
+ const activePhaseBackgroundsReady=()=>{
+  const from=phaseBackgroundMeshes[activePhaseFrom],to=phaseBackgroundMeshes[activePhaseTo];
+  return !!from?.material?.map&&(activePhaseFrom===activePhaseTo||!!to?.material?.map);
+ };
+ function applyPhaseBackgroundBlend(from=0,to=0,blend=1){
+  activePhaseFrom=Math.max(0,Math.min(3,Number(from)||0));
+  activePhaseTo=Math.max(0,Math.min(3,Number(to)||0));
+  activePhaseBlend=Math.max(0,Math.min(1,Number(blend)||0));
+  const ready=activePhaseBackgroundsReady();
+  for(let i=0;i<phaseBackgroundMeshes.length;i++){
+   const mesh=phaseBackgroundMeshes[i];if(!mesh)continue;
+   let opacity=0;
+   if(ready){
+    if(activePhaseFrom===activePhaseTo)opacity=i===activePhaseTo?1:0;
+    else if(i===activePhaseFrom)opacity=1-activePhaseBlend;
+    else if(i===activePhaseTo)opacity=activePhaseBlend;
+   }
+   mesh.material.opacity=opacity;mesh.visible=background.visible&&ready&&opacity>.001;
+   mesh.renderOrder=i===activePhaseTo?-8:i===activePhaseFrom?-9:-20;
+   if(mesh.visible)fitPhaseBackgroundMesh(mesh);
+  }
+  return ready;
+ }
+ function loadPhaseBackground(index){
+  if(!runtimeAssetsActive||activeVisualProfile.backgroundMode!=='authored-tree'||!platformConfig?.phaseBackgrounds)return;
+  const url=phaseBackgroundUrl(index);if(!url)return;
+  const mesh=ensurePhaseBackgroundMesh(index);
+  if(treeTextures.has(url)){
+   mesh.material.map=treeTextures.get(url);mesh.material.needsUpdate=true;fitPhaseBackgroundMesh(mesh);applyPhaseBackgroundBlend(activePhaseFrom,activePhaseTo,activePhaseBlend);refreshBackground();return;
+  }
+  if(treeRequests.has(url))return;treeRequests.add(url);
+  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{
+   map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;
+   map.minFilter=THREE.LinearMipmapLinearFilter;map.magFilter=THREE.LinearFilter;
+   map.anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));
+   treeTextures.set(url,map);treeRequests.delete(url);loadPhaseBackground(index);invalidateStaticFrame();
+  },undefined,()=>{treeRequests.delete(url);console.warn('Phase background unavailable:',url);});
+ }
+ function loadPhaseBackgrounds(){
+  if(!platformConfig?.phaseBackgrounds)return;
+  for(let i=0;i<Math.min(4,platformConfig.phaseBackgrounds.length);i++)loadPhaseBackground(i);
+ }
  function refreshBackground(){
   const wantsAuthoredTree=activeVisualProfile.backgroundMode==='authored-tree';
-  const authoredTreeReady=wantsAuthoredTree&&!!treeImageMesh?.material.map;
-  // Balanced and High use the exact same layered-forest composition. HIGH only
-  // raises texture density/filtering/render quality; Ultra swaps to the authored tree.
-  forest.forEach((m,i)=>{m.visible=background.visible&&!authoredTreeReady&&i>0;});
+  const phaseReady=wantsAuthoredTree&&activePhaseBackgroundsReady();
+  const authoredTreeReady=wantsAuthoredTree&&!phaseReady&&!!treeImageMesh?.material.map;
+  forest.forEach((m,i)=>{m.visible=background.visible&&!phaseReady&&!authoredTreeReady&&i>0;});
   if(treeImageMesh)treeImageMesh.visible=background.visible&&authoredTreeReady;
+  if(phaseReady)applyPhaseBackgroundBlend(activePhaseFrom,activePhaseTo,activePhaseBlend);
+  else for(const mesh of phaseBackgroundMeshes)if(mesh)mesh.visible=false;
   invalidateStaticFrame();
  }
  function fitTree(){
@@ -406,6 +472,9 @@ export function createScenery(scene,renderer){
   if(platformConfig.platformModel)prefetchVisualAsset(controlledAssetUrl(platformConfig.platformModel));
   const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages?.[kind];
   if(activeVisualProfile.backgroundMode==='authored-tree'&&url)prefetchVisualAsset(controlledAssetUrl(url));
+  if(activeVisualProfile.backgroundMode==='authored-tree')for(const phase of platformConfig.phaseBackgrounds||[]){
+   const phaseUrl=phase?.[kind];if(phaseUrl)prefetchVisualAsset(controlledAssetUrl(phaseUrl));
+  }
  }
  Promise.all([
   fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}),
@@ -415,7 +484,7 @@ export function createScenery(scene,renderer){
   treeOverlap=Math.max(0,Math.min(.25,Number(config.treeScrollOverlap??.12)||0));
   assetHashes=new Map((manifest.assets||[]).map(asset=>[asset.path,asset.sha256]));
   if(runtimePrefetchRequested)prefetchRuntimeAssets();
-  loadPlatform();loadTree();
+  loadPlatform();loadTree();loadPhaseBackgrounds();
  }).catch(()=>{});
 
  const r=rng(51),particleGeo=new THREE.BufferGeometry(),particlePositions=new Float32Array(48*3);particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePositions,3));
@@ -559,18 +628,18 @@ export function createScenery(scene,renderer){
   },
   setPixelMode(enabled){background.visible=!enabled;canopyArt.setVisible(!enabled);refreshBackground();},
   get platformReady(){return !!platformTemplate;},
-  get backgroundReady(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
-  get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
+  get backgroundReady(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible||phaseBackgroundMeshes.some(m=>m?.visible);},
+  get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible||phaseBackgroundMeshes.some(m=>m?.visible);},
   get treeClimbOffset(){return treeClimbOffset;},
   get treeScrollDiagnostics(){return {
    treeScrollNormalized:treePhase(),treeScrollScreens:Math.max(0,currentCamera-(treeCameraOrigin??currentCamera))/Math.max(.001,viewHeight),
    treeScrollSpeedFactor,treeWrapEnabled:treeImageMesh?.material.map?.wrapT===THREE.RepeatWrapping,
-   treeTextureKind:treeImageMesh?.material.map?(platformConfig?.treeImageMode==='cover'?'premium-cover':'overlap-strip'):'forest-fallback',
+   treeTextureKind:phaseBackgroundMeshes.some(m=>m?.visible)?'phase-background':treeImageMesh?.material.map?(platformConfig?.treeImageMode==='cover'?'premium-cover':'overlap-strip'):'forest-fallback',
    treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
    backgroundMode:activeVisualProfile.backgroundMode||'layered-forest',
    forestTextureScale:activeVisualProfile.backgroundTextureScale||1,
    forestVisibleLayers:forest.filter(m=>m.visible).length,
-   treeAuthoredVisible:!!treeImageMesh?.visible,treeFallbackVisible:forest.some(m=>m.visible),
+   treeAuthoredVisible:!!treeImageMesh?.visible||phaseBackgroundMeshes.some(m=>m?.visible),treeFallbackVisible:forest.some(m=>m.visible),
    treeMistVisible:!!mistLayers.visible&&mistMaterial.opacity>.001,
    treeMaterialOpacity:treeImageMesh?.material?.opacity??null,
    treeMaterialTransparent:treeImageMesh?.material?.transparent??null,
@@ -583,9 +652,10 @@ export function createScenery(scene,renderer){
    runtimeAssetsActive=true;
    loadPlatform();
    loadTree();
+   loadPhaseBackgrounds();
    invalidateStaticFrame();
   },
-  resize(width,height){const phase=treePhase();viewWidth=Math.max(.001,width);viewHeight=Math.max(.001,height);updateTreeScroll();treeScrollBias=wrap01(phase-treeClimbOffset*treeRepeatY);if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();fitTree();invalidateStaticFrame();},
+  resize(width,height){const phase=treePhase();viewWidth=Math.max(.001,width);viewHeight=Math.max(.001,height);updateTreeScroll();treeScrollBias=wrap01(phase-treeClimbOffset*treeRepeatY);if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();loadPhaseBackgrounds();fitTree();for(const mesh of phaseBackgroundMeshes)if(mesh)fitPhaseBackgroundMesh(mesh);applyPhaseBackgroundBlend(activePhaseFrom,activePhaseTo,activePhaseBlend);invalidateStaticFrame();},
   burst(event){
    if(document.body?.dataset?.reducedMotion==='true')return;
    canopyVfx.burst(event);
@@ -613,32 +683,21 @@ export function createScenery(scene,renderer){
      fitTree();
      const coverMode=platformConfig?.treeImageMode==='cover';
      const reduced=document.body?.dataset?.reducedMotion==='true';
-     // Camera-locked scenic cover with only a restrained distant parallax drift.
      treeImageMesh.position.x=coverMode&&!reduced?Math.sin(cameraY*.008)*viewWidth*.012:0;
      treeImageMesh.position.y=currentCamera+(coverMode&&!reduced?Math.sin(cameraY*.011)*viewHeight*.012:0);
-     // The authored tropical background is opaque, so the DOM gradient behind it
-     // cannot communicate biome changes. Tint the scenic plate itself while
-     // preserving its texture detail and smooth four-theme transition.
-     const previousBiome=(biome+3)%4;
-     treeTint.copy(treeThemeTints[previousBiome]).lerp(treeThemeTints[biome],blend);
-     const tintAmount=THREE.MathUtils.lerp(treeTintStrength[previousBiome],treeTintStrength[biome],blend);
-     treeImageMesh.material.color.set(0xffffff).lerp(treeTint,tintAmount);
+     treeImageMesh.material.color.set(0xffffff);
     }
-    const phaseFrom=Number.isFinite(weather.from)?weather.from:Math.max(0,biome-1),phaseTo=Number.isFinite(weather.to)?weather.to:biome;
-    const phaseWeight=index=>phaseFrom===phaseTo?(phaseFrom===index?1:0):(phaseFrom===index?1-blend:0)+(phaseTo===index?blend:0);
-    const goldenWeight=phaseWeight(1),neonWeight=phaseWeight(2),nightWeight=phaseWeight(3),weatherMist=Math.max(0,Math.min(1,Number(weather.mist)||0));
-    weatherBackdrop.position.y=cameraY;
-    const washWidth=viewWidth*1.18,washHeight=viewHeight*1.18;
-    goldenWash.scale.set(washWidth,washHeight,1);goldenWash.material.opacity=goldenWeight*.34;goldenWash.visible=goldenWash.material.opacity>.01;
-    neonWash.scale.set(washWidth,washHeight,1);neonWash.material.opacity=neonWeight*.30;neonWash.visible=neonWash.material.opacity>.01;
-    nightWash.scale.set(washWidth,washHeight,1);nightWash.material.opacity=nightWeight*.52;nightWash.visible=nightWash.material.opacity>.01;
-    synthSun.position.set(0,viewHeight*.29,-7.20);synthSun.material.opacity=neonWeight*.98;synthSun.visible=synthSun.material.opacity>.01;
-    moon.position.set(-viewWidth*.27,viewHeight*.31,-7.18);moon.material.opacity=nightWeight*.98;moon.visible=moon.material.opacity>.01;
-    stars.position.set(0,0,0);starMaterial.opacity=nightWeight*.95;stars.visible=starMaterial.opacity>.01;
-    mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
-    mistMaterial.opacity=.08+weatherMist*.34;
-    mistLayers.visible=mistMaterial.opacity>.015;
-    moss.roughness=.96-weatherMist*.18;bark.roughness=.87-weatherMist*.12;
+    const phaseFrom=Number.isFinite(weather.from)?weather.from:biome,phaseTo=Number.isFinite(weather.to)?weather.to:biome;
+    loadPhaseBackgrounds();applyPhaseBackgroundBlend(phaseFrom,phaseTo,blend);refreshBackground();
+    for(const mesh of phaseBackgroundMeshes)if(mesh?.visible){mesh.position.x=0;mesh.position.y=currentCamera;}
+    goldenWash.visible=false;goldenWash.material.opacity=0;
+    neonWash.visible=false;neonWash.material.opacity=0;
+    nightWash.visible=false;nightWash.material.opacity=0;
+    synthSun.visible=false;synthSun.material.opacity=0;
+    moon.visible=false;moon.material.opacity=0;
+    stars.visible=false;starMaterial.opacity=0;
+    mistLayers.visible=false;mistMaterial.opacity=0;
+    moss.roughness=.96;bark.roughness=.87;
 
     const rain=Math.max(0,Math.min(1,Number(weather.rain)||0));
     rainLines.visible=rain>.01;rainMaterial.opacity=.08+rain*.62;
@@ -654,12 +713,12 @@ export function createScenery(scene,renderer){
      }
      rainGeo.attributes.position.needsUpdate=true;
     }
-   }else{mistLayers.visible=false;rainLines.visible=false;}
+   }else{mistLayers.visible=false;rainLines.visible=false;for(const mesh of phaseBackgroundMeshes)if(mesh)mesh.visible=false;}
    wrapAge+=dt;if(wrapAge<.45){wrapCues.visible=true;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);}else{wrapCues.visible=false;cueMaterial.opacity=0;}
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;canopyVfx.reset();canopyArt.reset();ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;synthSun.visible=false;moon.visible=false;stars.visible=false;goldenWash.visible=false;neonWash.visible=false;nightWash.visible=false;rainLines.visible=false;rainMaterial.opacity=0;fitTree();invalidateStaticFrame();},
+  reset(){sparks.length=0;particles.visible=false;canopyVfx.reset();canopyArt.reset();ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;synthSun.visible=false;moon.visible=false;stars.visible=false;goldenWash.visible=false;neonWash.visible=false;nightWash.visible=false;mistLayers.visible=false;rainLines.visible=false;rainMaterial.opacity=0;activePhaseFrom=0;activePhaseTo=0;activePhaseBlend=1;applyPhaseBackgroundBlend(0,0,1);fitTree();invalidateStaticFrame();},
   setQuality(profile,options={}){
    activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
    visualConstraints={constrained:!!options.constrained};
@@ -671,7 +730,7 @@ export function createScenery(scene,renderer){
     if(texture.anisotropy!==anisotropy){texture.anisotropy=anisotropy;texture.needsUpdate=true;}
    }
    refreshForestTextureQuality();
-   loadPlatform();loadTree();
+   loadPlatform();loadTree();loadPhaseBackgrounds();
    scene.traverse(o=>{
     if(o.name==='authored-branch')o.visible=highQuality;
     if(o.name==='procedural-branch')o.visible=!highQuality||!o.parent.getObjectByName('authored-branch');
