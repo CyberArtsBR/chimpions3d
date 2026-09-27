@@ -93,7 +93,8 @@ class DashWorldRenderer{
       shaft:basic({color:0xfff1ba,transparent:true,opacity:.08,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
       moon:basic({color:0xdce6ff,transparent:true,opacity:.9,depthWrite:false}),
       glow:basic({map:makeSoftTexture(),color:0xffe890,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}),
-      shadow:basic({map:makeShadowTexture(),transparent:true,opacity:.7,depthWrite:false,color:0x0b1a13})
+      shadow:basic({map:makeShadowTexture(),transparent:true,opacity:.7,depthWrite:false,color:0x0b1a13}),
+      hazardOutline:basic({color:0xfff2a8,wireframe:true,transparent:true,opacity:.86,depthTest:false,depthWrite:false})
     };
     this.mat.bananaGlow=this.mat.glow.clone();this.mat.bananaGlow.color.setHex(0xffd84a);this.mat.bananaGlow.opacity=.13;
     this.mat.goldenGlow=this.mat.glow.clone();this.mat.goldenGlow.color.setHex(0xffdf6a);this.mat.goldenGlow.opacity=.38;
@@ -166,6 +167,9 @@ class DashWorldRenderer{
     this.mat.hazardRim.emissiveIntensity=.18*rim*(high?1.55:1);this.mat.hazardSlide.emissiveIntensity=.22*rim*(high?1.5:1);this.mat.hazardRisk.emissiveIntensity=.24*rim*(high?1.5:1);
     this.mat.banana.emissiveIntensity=.42*collect*(high?1.25:1);this.mat.golden.emissiveIntensity=1.05*collect*(high?1.18:1);
     this.mat.bananaGlow.opacity=.13*collect*(high?1.35:1);this.mat.goldenGlow.opacity=.38*collect*(high?1.2:1);this.mat.goldenGlint.opacity=.62*collect;
+    const applyOutline=group=>{const outline=group?.getObjectByName?.('dash-high-visibility-outline');if(outline)outline.visible=high;};
+    for(const entry of this.hazardMap.values())applyOutline(entry.group);
+    for(const pool of this.hazardPools.values())for(const group of pool)applyOutline(group);
     return{...this.visibility};
   }
   setAccessibility({highVisibility=this.highVisibility,reducedMotion=this.reducedMotion,screenShake=this.screenShake}={}){
@@ -326,6 +330,7 @@ class DashWorldRenderer{
       default:this.createMesh(u.box,this.mat.stone,g,{x:xOffset,y:solidBottom+solidH*.5,z:.08,sx:solidW,sy:solidH,sz:.5});
     }
     if(!['overhead','flex'].includes(type.family))this.createMesh(u.circle,this.mat.shadow,g,{x:xOffset,y:.025,z:-.02,sx:Math.min(nominalW,solidW)*.88,sy:.16,sz:1,cast:false});
+    const outline=this.createMesh(u.box,this.mat.hazardOutline,g,{x:xOffset,y:solidBottom+solidH*.5,z:.42,sx:solidW*1.08,sy:solidH*1.08,sz:.7,cast:false});outline.name='dash-high-visibility-outline';outline.visible=this.highVisibility;outline.renderOrder=22;
     const cue=this.createMesh(u.circle,this.mat.hazardCue,g,{x:xOffset,y:solidBottom+.035,z:.205,sx:solidW*.92,sy:.1,sz:1,cast:false});cue.visible=false;cue.userData.baseScaleX=cue.scale.x;
     g.userData.type=type.id;g.userData.family=type.family;g.userData.state='idle';g.userData.cue=cue;g.userData.collision={left,right,bottom,top};
     return g;
@@ -335,7 +340,7 @@ class DashWorldRenderer{
     const next=['idle','telegraph','active','recover'].includes(state)?state:'idle',cue=entry.group.userData.cue;
     entry.group.userData.state=next;if(cue)cue.visible=next==='telegraph'||next==='active';return true;
   }
-  acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
+  acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);const outline=group.getObjectByName?.('dash-high-visibility-outline');if(outline)outline.visible=this.highVisibility;group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
   releaseHazard(entry){entry.group.visible=false;entry.group.userData.state='idle';if(entry.group.userData.cue)entry.group.userData.cue.visible=false;this.gameplayRoot.remove(entry.group);const pool=this.hazardPools.get(entry.typeId)||[];if(pool.length<10)pool.push(entry.group);this.hazardPools.set(entry.typeId,pool);}
   syncHazards(obstacles,scroll){
     const live=this.liveHazards;live.clear();for(const obstacle of obstacles)live.add(obstacle);
@@ -424,8 +429,9 @@ class DashWorldRenderer{
     }
   }
   stats(){
+    const highlightedHazards=[...this.hazardMap.values()].filter(entry=>entry.group.getObjectByName?.('dash-high-visibility-outline')?.visible).length;
     return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,
-      hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,collectibleGlowInstances:this.bananaGlow.count+this.goldenGlow.count+this.goldenGlint.count,
+      hazards:this.hazardMap.size,highlightedHazards,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,collectibleGlowInstances:this.bananaGlow.count+this.goldenGlow.count+this.goldenGlint.count,
       visibility:{...this.visibility},environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count+(this.environmentArt?.instanceCount?.()||0),
       accessibility:{highVisibility:this.highVisibility,reducedMotion:this.reducedMotion,screenShake:this.screenShake},shakeAmount:this.shakeAmount,vfx:this.vfx.stats(),
       safeMode:this.safeMode,contextLost:this.contextLost,lastRenderError:this.lastRenderError};
