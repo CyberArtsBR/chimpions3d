@@ -232,6 +232,8 @@ export class GameAudio {
     this.ambienceNodes=[];this.windGain=null;this.windFilter=null;
   }
 
+  diagnostics(){return{enabled:this.enabled,failed:this.failed,muted:this.muted,volumes:{...this.volumes},musicWanted:this.musicWanted,musicBlocked:!!this.musicBlocked,musicError:!!this.musicError,dashActive:this.dashActive,ambienceActive:this.ambienceNodes.length>0,contextState:this.context?.state||'uninitialized'};}
+
   destroy(){
     this.stopMusic();this.stopDashLoop(false);this.stopAmbience();
     try{this.context?.close?.()}catch{}

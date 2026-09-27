@@ -3,10 +3,12 @@ import {chromium} from '@playwright/test';
 
 const targets=[
   ['1920x1080',1920,1080],
-  ['2560x1440',2560,1440],
+  ['1600x900',1600,900],
+  ['1440x900',1440,900],
   ['1366x768',1366,768],
   ['tablet',1024,768],
   ['mobile-portrait',390,844],
+  ['mobile-large',430,932],
   ['mobile-landscape',844,390],
   ['ultrawide',2560,1080]
 ];
