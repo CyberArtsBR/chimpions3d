@@ -293,10 +293,9 @@ export function createScenery(scene,renderer){
  function refreshBackground(){
   const wantsAuthoredTree=highQuality&&activeVisualProfile.backgroundMode==='authored-tree';
   const authoredTreeReady=wantsAuthoredTree&&!!treeImageMesh?.material.map;
-  const maxLayeredForest=highQuality&&activeVisualProfile.backgroundMode==='layered-forest';
-  // Balanced and High share the layered-forest art direction. High keeps all three
-  // layers at higher texture density; Ultra alone swaps to the authored tree plate.
-  forest.forEach((m,i)=>{m.visible=background.visible&&!authoredTreeReady&&(maxLayeredForest||i>0);});
+  // Balanced and High use the exact same layered-forest composition. HIGH only
+  // raises texture density/filtering/render quality; Ultra swaps to the authored tree.
+  forest.forEach((m,i)=>{m.visible=background.visible&&!authoredTreeReady&&i>0;});
   if(treeImageMesh)treeImageMesh.visible=background.visible&&authoredTreeReady;
   invalidateStaticFrame();
  }
@@ -485,6 +484,7 @@ export function createScenery(scene,renderer){
    treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
    backgroundMode:activeVisualProfile.backgroundMode||'layered-forest',
    forestTextureScale:activeVisualProfile.backgroundTextureScale||1,
+   forestVisibleLayers:forest.filter(m=>m.visible).length,
    treeAuthoredVisible:!!treeImageMesh?.visible,treeFallbackVisible:forest.some(m=>m.visible),
    treeMistVisible:!!mistLayers.visible&&mistMaterial.opacity>.001,
    treeMaterialOpacity:treeImageMesh?.material?.opacity??null,
