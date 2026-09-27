@@ -27,8 +27,8 @@ export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>directedWrappedDistance(a,b,WRAP_SPAN);
 
-// Gameplay pace is now deliberately modest. Difficulty comes mainly from encounter
-// composition, route decisions and hazard timing rather than global time compression.
+// Preserve deterministic physics while progressively compressing simulation time.
+// The director owns the curve so the run gets faster without changing jump geometry.
 export const paceAt=time=>directedPaceAt(time);
 
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
