@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "qa:fast": "node checks/run-tier.mjs fast",
     "qa:standard": "node checks/run-tier.mjs standard",
+    "qa:release": "node checks/run-tier.mjs release",
     "qa:cross-browser": "node checks/cross-browser-smoke.mjs",
     "qa:network": "node checks/run-tier.mjs network",
     "qa:soak": "node checks/long-session-rendered.mjs",

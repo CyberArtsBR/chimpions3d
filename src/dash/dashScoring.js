@@ -5,6 +5,7 @@ export const DASH_FLOW=Object.freeze({
   bananaGain:3,
   goldenGain:30,
   perfectGain:8,
+  perfectChainGain:1.5,
   nearMissGain:6,
   riskGain:10
 });
@@ -14,8 +15,16 @@ export const DASH_REWARDS=Object.freeze({
   banana:25,
   goldenBanana:500,
   perfect:75,
+  perfectChain:15,
   nearMiss:50,
   riskLine:125
+});
+
+export const DASH_FLOW_SAVE_DEFAULTS=Object.freeze({
+  enabled:false,
+  requiredFlow:DASH_FLOW.max,
+  cost:DASH_FLOW.max,
+  maxPerRun:1
 });
 
 export function dashMultiplier(flow){
@@ -74,21 +83,33 @@ export function rewardDashObstaclePass(run,obstacle,{clearance=Infinity,riskLine
   dashFlowGain(run,DASH_FLOW.passGain);
   const rewards=[{kind:'pass',points:dashAward(run,DASH_REWARDS.pass)}];
   const precision=dashPrecisionFromClearance(precisionAction,clearance);
+
   if(precision.nearMiss){
+    run.perfectChain=0;
     run.nearMisses=(run.nearMisses||0)+1;
     dashFlowGain(run,DASH_FLOW.nearMissGain);
     rewards.push({kind:'near-miss',points:dashAward(run,DASH_REWARDS.nearMiss)});
   }else if(precision.perfect){
+    run.perfectChain=(run.perfectChain||0)+1;
+    run.maxPerfectChain=Math.max(run.maxPerfectChain||0,run.perfectChain);
     if(precisionAction==='slide')run.perfectSlides=(run.perfectSlides||0)+1;
     else run.perfectJumps=(run.perfectJumps||0)+1;
     dashFlowGain(run,DASH_FLOW.perfectGain);
     rewards.push({kind:precisionAction==='slide'?'perfect-slide':'perfect-jump',points:dashAward(run,DASH_REWARDS.perfect)});
+    if(run.perfectChain>=2){
+      const tier=Math.min(3,run.perfectChain-1);
+      dashFlowGain(run,DASH_FLOW.perfectChainGain*tier);
+      rewards.push({kind:'perfect-chain',chain:run.perfectChain,points:dashAward(run,DASH_REWARDS.perfectChain*tier)});
+    }
+  }else{
+    run.perfectChain=0;
   }
+
   if(riskLine){
     dashFlowGain(run,DASH_FLOW.riskGain);
     rewards.push({kind:'risk-line',points:dashAward(run,DASH_REWARDS.riskLine)});
   }
-  return{precision,rewards};
+  return{precision,rewards,perfectChain:run.perfectChain||0};
 }
 
 export function rewardDashBanana(run,golden=false){
@@ -96,4 +117,18 @@ export function rewardDashBanana(run,golden=false){
   if(golden)run.goldenBananas++;
   dashFlowGain(run,golden?DASH_FLOW.goldenGain:DASH_FLOW.bananaGain);
   return dashAward(run,golden?DASH_REWARDS.goldenBanana:DASH_REWARDS.banana);
+}
+
+export function tryDashFlowSave(run,config=DASH_FLOW_SAVE_DEFAULTS){
+  const enabled=!!config?.enabled;
+  const required=Math.max(0,Number(config?.requiredFlow??DASH_FLOW.max));
+  const cost=Math.max(0,Number(config?.cost??DASH_FLOW.max));
+  const limit=Math.max(0,Math.floor(Number(config?.maxPerRun??1)));
+  const used=Math.max(0,Math.floor(run?.flowSavesUsed||0));
+  if(!enabled||!run||run.flow<required||used>=limit)return{saved:false,reason:enabled?'unavailable':'disabled'};
+  run.flow=Math.max(0,run.flow-cost);
+  run.flowSavesUsed=used+1;
+  run.combo=0;
+  run.perfectChain=0;
+  return{saved:true,remainingFlow:run.flow,uses:run.flowSavesUsed};
 }

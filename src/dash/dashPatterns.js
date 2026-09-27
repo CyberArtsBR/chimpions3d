@@ -1,6 +1,12 @@
 import {dashDifficultySnapshot,dashPlanningSpeed} from './dashDifficulty.js';
 import {chooseDashWeighted,dashRandomInt} from './dashSeed.js';
 import {dashJumpArcProfiles,DASH_PHYSICS} from './dashPhysics.js';
+import {
+  createDashDirectorState,
+  dashPatternWeightModifier,
+  advanceDashDirectorState,
+  chooseDashSetPiece
+} from './dashDirector.js';
 
 export const DASH_OBSTACLE_TYPES=Object.freeze([
  {id:'log',name:'fallen log',family:'short',action:'jump',w:64,h:38,boxes:[[9,0,46,28]],minStage:1,difficulty:1,recovery:.58},
@@ -16,22 +22,36 @@ export const DASH_OBSTACLE_TYPES=Object.freeze([
  {id:'canopy',name:'fallen canopy',family:'flex',action:'jump-or-slide',w:98,h:74,boxes:[[5,49,88,20]],minStage:4,difficulty:3,recovery:.72}
 ]);
 
-const PATTERNS=Object.freeze([
- {id:'easy-hop',difficulty:1,baseWeight:4.6,minStage:1,items:[['short',0]],recovery:.75},
- {id:'stage-one-long-jump',difficulty:2,baseWeight:2.1,minStage:1,maxStage:1,items:[['wide',0]],recovery:1.04},
- {id:'high-wall',difficulty:2,baseWeight:3,minStage:2,items:[['high',0]],recovery:.95},
- {id:'wide-leap',difficulty:2,baseWeight:3.2,minStage:1,items:[['wide',0]],recovery:1.03},
- {id:'duck-under',difficulty:2,baseWeight:4,minStage:2,items:[['overhead',0]],recovery:.78},
- {id:'choice-line',difficulty:3,baseWeight:2.1,minStage:4,items:[['flex',0]],recovery:.82,riskReward:true},
- {id:'quick-hop-high',difficulty:3,baseWeight:2.4,minStage:2,items:[['short',0],['high',.88]],recovery:.98},
- {id:'duck-then-hop',difficulty:3,baseWeight:2.8,minStage:3,items:[['overhead',0],['short',.84]],recovery:.92},
- {id:'slide-gauntlet',difficulty:3,baseWeight:3.2,minStage:4,items:[['overhead',0],['overhead',.90]],recovery:.86},
- {id:'hop-then-duck',difficulty:4,baseWeight:2.2,minStage:4,items:[['short',0],['overhead',.98]],recovery:.96},
- {id:'double-rhythm',difficulty:4,baseWeight:1.4,minStage:5,items:[['short',0],['short',.82]],recovery:.90},
- {id:'wide-into-slide',difficulty:4,baseWeight:2.1,minStage:5,items:[['wide',0],['overhead',1.05]],recovery:.98},
- {id:'high-into-slide',difficulty:4,baseWeight:2.1,minStage:5,items:[['high',0],['overhead',.96]],recovery:.96},
- {id:'beam-pressure',difficulty:5,baseWeight:1.8,minStage:6,items:[['overhead',0],['short',.90],['overhead',.92]],recovery:.94},
- {id:'triple-rhythm',difficulty:5,baseWeight:1,minStage:7,items:[['short',0],['overhead',.92],['wide',1.02]],recovery:1}
+export const DASH_PATTERN_DEFINITIONS=Object.freeze([
+ {id:'easy-hop',difficulty:1,baseWeight:4.2,minStage:1,items:[['short',0]],recovery:.82,focus:'intro'},
+ {id:'breather-hop',difficulty:1,baseWeight:1.35,minStage:1,items:[['short',0]],recovery:1.18,recoveryClass:'breather',focus:'intro'},
+ {id:'stage-one-long-jump',difficulty:2,baseWeight:2.0,minStage:1,maxStage:1,items:[['wide',0]],recovery:1.08,mastery:'hold',focus:'airtime'},
+ {id:'tap-landing',difficulty:2,baseWeight:1.7,minStage:1,items:[['short',0]],recovery:.94,mastery:'tap',precision:true,focus:'precision',safeRoute:true,riskRoute:{kind:'precision-landing',reward:'banana'}},
+ {id:'high-wall',difficulty:2,baseWeight:2.9,minStage:2,items:[['high',0]],recovery:.98,mastery:'hold'},
+ {id:'wide-leap',difficulty:2,baseWeight:2.9,minStage:1,items:[['wide',0]],recovery:1.06,mastery:'hold',focus:'airtime'},
+ {id:'duck-under',difficulty:2,baseWeight:3.7,minStage:2,items:[['overhead',0]],recovery:.82,focus:'transitions'},
+ {id:'low-low-rhythm',difficulty:2,baseWeight:1.8,minStage:2,items:[['short',0],['short',.74]],recovery:.96,rhythmIntent:true,mastery:'tap',focus:'intro'},
+ {id:'choice-line',difficulty:3,baseWeight:2.0,minStage:4,items:[['flex',0]],recovery:.88,riskReward:true,safeRoute:true,riskRoute:{kind:'high-arc',reward:'flow'},focus:'risk'},
+ {id:'low-to-high',difficulty:3,baseWeight:2.35,minStage:2,items:[['short',0],['high',.88]],recovery:1.00,mastery:'transition',focus:'precision'},
+ {id:'high-to-low',difficulty:3,baseWeight:1.85,minStage:3,items:[['high',0],['short',.98]],recovery:1.04,mastery:'hold',precision:true,focus:'precision'},
+ {id:'duck-then-hop',difficulty:3,baseWeight:2.55,minStage:3,items:[['overhead',0],['short',.84]],recovery:.96,mastery:'transition',focus:'transitions'},
+ {id:'slide-to-high',difficulty:3,baseWeight:2.05,minStage:3,items:[['overhead',0],['high',.88]],recovery:1.02,mastery:'transition',focus:'transitions'},
+ {id:'slide-gauntlet',difficulty:3,baseWeight:2.35,minStage:4,items:[['overhead',0],['overhead',.90]],recovery:.90,rhythmIntent:true,focus:'transitions'},
+ {id:'wide-recovery',difficulty:3,baseWeight:1.45,minStage:4,items:[['wide',0]],recovery:1.24,recoveryClass:'breather',mastery:'hold',focus:'airtime'},
+ {id:'risk-arc',difficulty:3,baseWeight:1.4,minStage:5,items:[['flex',0]],recovery:.92,riskReward:true,safeRoute:true,riskRoute:{kind:'high-arc',reward:'golden'},precision:true,focus:'risk'},
+ {id:'hop-then-duck',difficulty:4,baseWeight:2.0,minStage:4,items:[['short',0],['overhead',.98]],recovery:1.00,mastery:'tap',focus:'transitions'},
+ {id:'tap-then-slide',difficulty:4,baseWeight:1.35,minStage:4,items:[['short',0],['overhead',1.05]],recovery:1.02,mastery:'tap',precision:true,focus:'precision',safeRoute:true,riskRoute:{kind:'precision-landing',reward:'banana'}},
+ {id:'double-rhythm',difficulty:4,baseWeight:1.45,minStage:5,items:[['short',0],['short',.82]],recovery:.94,rhythmIntent:true,mastery:'tap'},
+ {id:'low-low-slide',difficulty:4,baseWeight:1.2,minStage:5,items:[['short',0],['short',.80],['overhead',.96]],recovery:1.02,rhythmIntent:true,mastery:'tap',focus:'pressure'},
+ {id:'wide-into-slide',difficulty:4,baseWeight:1.9,minStage:5,items:[['wide',0],['overhead',1.05]],recovery:1.04,mastery:'transition',focus:'airtime'},
+ {id:'high-into-slide',difficulty:4,baseWeight:1.9,minStage:5,items:[['high',0],['overhead',.96]],recovery:1.02,mastery:'transition',focus:'transitions'},
+ {id:'slide-to-wide',difficulty:4,baseWeight:1.55,minStage:5,items:[['overhead',0],['wide',.94]],recovery:1.08,mastery:'transition',focus:'airtime'},
+ {id:'high-precision-landing',difficulty:4,baseWeight:1.25,minStage:5,items:[['high',0],['short',1.08]],recovery:1.08,mastery:'hold',precision:true,focus:'precision',safeRoute:true,riskRoute:{kind:'precision-landing',reward:'golden'}},
+ {id:'jump-slide-jump',difficulty:4,baseWeight:1.15,minStage:5,items:[['short',0],['overhead',.98],['short',.90]],recovery:1.03,rhythmIntent:true,mastery:'mixed',focus:'transitions'},
+ {id:'beam-pressure',difficulty:5,baseWeight:1.45,minStage:6,items:[['overhead',0],['short',.90],['overhead',.92]],recovery:.98,rhythmIntent:true,mastery:'mixed',focus:'pressure'},
+ {id:'triple-rhythm',difficulty:5,baseWeight:1.05,minStage:7,items:[['short',0],['overhead',.92],['wide',1.02]],recovery:1.04,rhythmIntent:true,mastery:'mixed',focus:'mastery'},
+ {id:'moonlit-mix',difficulty:5,baseWeight:.90,minStage:7,items:[['high',0],['short',.98],['overhead',1.02],['wide',1.12]],recovery:1.10,mastery:'mixed',precision:true,focus:'mastery'},
+ {id:'expert-choice-chain',difficulty:5,baseWeight:.76,minStage:7,items:[['flex',0],['short',.94],['overhead',1.02]],recovery:1.08,riskReward:true,safeRoute:true,riskRoute:{kind:'high-arc',reward:'golden'},mastery:'mixed',focus:'risk'}
 ]);
 
 export const DASH_REACTION_CONTRACT=Object.freeze({
@@ -47,7 +67,10 @@ export const DASH_REACTION_CONTRACT=Object.freeze({
     'slide>high-jump':.84,
     'slide>slide':.60,
     'jump-or-slide>jump':.68,
-    'jump-or-slide>slide':.64
+    'jump-or-slide>slide':.64,
+    'jump-or-slide>high-jump':.76,
+    'high-jump>jump-or-slide':.78,
+    'slide>jump-or-slide':.72
   }),
   chainExtra:Object.freeze({2:.05,3:.10}),
   visibilityFloor:.42
@@ -55,20 +78,35 @@ export const DASH_REACTION_CONTRACT=Object.freeze({
 
 const ACTION_BY_FAMILY=Object.freeze({short:'jump',high:'high-jump',wide:'high-jump',overhead:'slide',flex:'jump-or-slide'});
 
-export function dashPatternCatalog(snapshot){
+function transientDirector({recentPressure=0,recentRecovery=1,recentActionVariety=.5,previousAction=null}={}){
+  const state=createDashDirectorState();
+  state.pressure=recentPressure;
+  state.recovery=recentRecovery;
+  state.actionVariety=recentActionVariety;
+  if(previousAction)state.recentActions=[previousAction];
+  return state;
+}
+
+export function dashPatternCatalog(snapshot,directorState=null){
   const {stage,maxPatternDifficulty}=snapshot;
-  return PATTERNS.filter(p=>p.minStage<=stage&&(!p.maxStage||stage<=p.maxStage)&&p.difficulty<=maxPatternDifficulty).map(p=>{
-    let weight=p.baseWeight;
-    const firstAction=ACTION_BY_FAMILY[p.items[0]?.[0]]||null;
-    if(p.id==='duck-under'&&stage>=5)weight=6;
-    if(p.id==='wide-leap'&&stage===1)weight=1.4;
-    if(p.difficulty>=4&&snapshot.effectiveDifficulty<3.6)weight*=.35;
-    if(snapshot.previousAction&&firstAction===snapshot.previousAction)weight*=1.08;
-    if(snapshot.previousAction==='slide'&&firstAction==='high-jump'&&p.difficulty>=4)weight*=.72;
-    if(snapshot.previousAction==='high-jump'&&firstAction==='slide'&&p.difficulty>=4)weight*=.76;
-    if(snapshot.visibility<.9&&p.difficulty>=4)weight*=.72;
-    return{...p,firstAction,weight};
+  const state=directorState||transientDirector({
+    recentPressure:snapshot.pressure,
+    recentRecovery:snapshot.recentRecovery,
+    recentActionVariety:snapshot.recentActionVariety,
+    previousAction:snapshot.previousAction
   });
+  return DASH_PATTERN_DEFINITIONS
+    .filter(p=>p.minStage<=stage&&(!p.maxStage||stage<=p.maxStage)&&p.difficulty<=maxPatternDifficulty)
+    .map(p=>{
+      let weight=p.baseWeight;
+      const firstAction=ACTION_BY_FAMILY[p.items[0]?.[0]]||null;
+      if(p.id==='duck-under'&&stage>=5)weight*=1.22;
+      if(p.id==='wide-leap'&&stage===1)weight*=.72;
+      if(p.difficulty>=4&&snapshot.effectiveDifficulty<3.6)weight*=.42;
+      if(snapshot.visibility<.9&&p.difficulty>=4)weight*=.68;
+      weight*=dashPatternWeightModifier({...p,firstAction},{state,snapshot});
+      return{...p,firstAction,weight};
+    });
 }
 
 export function requiredDashWarningTime(next){
@@ -109,16 +147,57 @@ export function chooseDashObstacle(holder,{family,difficulty,stage}){
   return list[dashRandomInt(holder,list.length)]||DASH_OBSTACLE_TYPES[0];
 }
 
-export function chooseDashPattern(holder,{time,previousDifficulty=1,previousAction=null,recentPressure=0,recentRecovery=1,recentActionVariety=.5,visibility=1}={}){
-  const snapshot=dashDifficultySnapshot({time,previousDifficulty,previousAction,recentPressure,recentRecovery,recentActionVariety,visibility});
-  let options=dashPatternCatalog(snapshot);
-  if(previousDifficulty>=4)options=options.filter(p=>p.difficulty<=2.5);
+export function chooseDashPattern(holder,{
+  time,
+  previousDifficulty=1,
+  previousAction=null,
+  recentPressure=0,
+  recentRecovery=1,
+  recentActionVariety=.5,
+  visibility=1,
+  directorState=null,
+  allowSetPiece=true
+}={}){
+  const state=directorState||transientDirector({recentPressure,recentRecovery,recentActionVariety,previousAction});
+  const snapshot=dashDifficultySnapshot({
+    time,previousDifficulty,previousAction,
+    recentPressure:state.pressure??recentPressure,
+    recentRecovery:state.recovery??recentRecovery,
+    recentActionVariety:state.actionVariety??recentActionVariety,
+    visibility
+  });
+  if(allowSetPiece){
+    const setPiece=chooseDashSetPiece(holder,state,{
+      time,stage:snapshot.stage,normalizedSpeed:snapshot.normalizedSpeed,visibility:snapshot.visibility
+    });
+    if(setPiece)return{pattern:setPiece,snapshot,directorState:state};
+  }
+  const options=dashPatternCatalog(snapshot,state);
   const pattern=chooseDashWeighted(holder,options);
-  return{pattern,snapshot};
+  return{pattern,snapshot,directorState:state};
 }
 
-export function planDashPattern(holder,{time,spawnX,currentScroll=0,playerX=DASH_PHYSICS.playerX,previousDifficulty=1,previousAction=null,visibility=1}={}){
-  const {pattern,snapshot}=chooseDashPattern(holder,{time,previousDifficulty,previousAction,visibility});
+export function planDashPattern(holder,{
+  time,
+  spawnX,
+  currentScroll=0,
+  playerX=DASH_PHYSICS.playerX,
+  previousDifficulty=1,
+  previousAction=null,
+  recentPressure=0,
+  recentRecovery=1,
+  recentActionVariety=.5,
+  visibility=1,
+  directorState=null,
+  allowSetPiece=true
+}={}){
+  const state=directorState||transientDirector({recentPressure,recentRecovery,recentActionVariety,previousAction});
+  const {pattern,snapshot}=chooseDashPattern(holder,{
+    time,previousDifficulty,previousAction,recentPressure,recentRecovery,recentActionVariety,
+    visibility,directorState:state,allowSetPiece
+  });
+  if(!pattern)return{pattern:null,snapshot,obstacles:[],nextSpawn:spawnX,recoverySeconds:1,directorState:state};
+
   const obstacles=[];
   let x=spawnX;
   for(let i=0;i<pattern.items.length;i++){
@@ -136,7 +215,10 @@ export function planDashPattern(holder,{time,spawnX,currentScroll=0,playerX=DASH
   const recoverySpeed=dashPlanningSpeed({runTime:time,worldDistance:(last?.x||x)+(last?.w||0),currentScroll,playerX});
   const recoverySeconds=Math.max(1.02,pattern.recovery+.28);
   const nextSpawn=(last?.x||x)+(last?.w||0)+recoverySpeed*recoverySeconds;
-  return{pattern,snapshot,obstacles,nextSpawn,recoverySeconds};
+  advanceDashDirectorState(state,pattern,obstacles,{
+    normalizedSpeed:snapshot.normalizedSpeed,visibility:snapshot.visibility,stage:snapshot.stage
+  });
+  return{pattern,snapshot,obstacles,nextSpawn,recoverySeconds,directorState:state};
 }
 
 export function validateDashObstacleGeometry(){

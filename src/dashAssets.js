@@ -1,4 +1,5 @@
-const ROOT=`${import.meta.env.BASE_URL}dash/assets/`;
+const BASE=import.meta.env.BASE_URL;
+const ROOT=`${BASE}dash/assets/`;
 
 const SPRITE_FILES=Object.freeze({
   log:'sprites/log.bdc546a2.png',
@@ -20,9 +21,16 @@ export const DASH_SCENERY=Object.freeze({
   ground:ROOT+'ground-green.5163bede.png'
 });
 
-// Music is non-critical and remains lazy-loaded from the pinned legacy bundle until
-// the 4.5 MiB source track can be migrated without changing the audio master.
-export const DASH_MUSIC_URL='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/chimpions-army.mp3';
+// Repository-owned music master. Versioning keeps caches safe across releases.
+export const DASH_MUSIC_URL=BASE+'audio/music-full.mp3?v=9606f223';
+
+// Authored one-shots are optional. Synthesized cues remain the resilient fallback
+// until local sample masters are populated here.
+export const DASH_AUDIO_SAMPLE_SLOTS=Object.freeze({
+  footstepLeft:null,footstepRight:null,jump:null,land:null,slide:null,'near-miss':null,
+  banana:null,golden:null,'perfect-jump':null,'perfect-slide':null,flow:null,multiplier:null,
+  stage:null,hit:null,dead:null,record:null
+});
 
 export function dashSpriteUrl(id){
   const key=id==='log-pile'?'log':id;
@@ -39,4 +47,11 @@ export function warmDashImages(ids){
     image.src=id==='jungle'?DASH_SCENERY.jungle:id==='ground'?DASH_SCENERY.ground:dashSpriteUrl(id);
     image.decode?.().catch(()=>{});
   }
+}
+
+export function warmDashFallbackAssets(){
+  warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
+  const secondary=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
+  if(globalThis.requestIdleCallback)globalThis.requestIdleCallback(secondary,{timeout:1800});
+  else setTimeout(secondary,700);
 }

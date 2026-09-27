@@ -1,31 +1,95 @@
 import {normalizeDashSeed,nextDashRandom} from './dashSeed.js';
-import {dashSpeedForTime,dashStageForTime} from './dashDifficulty.js';
+import {dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dashDifficulty.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dashPhysics.js';
-import {planDashPattern,dashTransitionReport} from './dashPatterns.js';
+import {planDashPattern,dashTransitionReport,dashWarningReport} from './dashPatterns.js';
+import {createDashDirectorState} from './dashDirector.js';
 
-export const DASH_GAMEPLAY_VERSION='dash-aaa-1';
+export const DASH_GAMEPLAY_VERSION='dash-director-v3';
 
-export function generateDashPlan({seed=1,time=0,count=20,startX=1200,currentScroll=0}={}){
+export function generateDashPlan({seed=1,time=0,count=20,startX=1200,currentScroll=0,viewportWidth=1080}={}){
   const normalized=normalizeDashSeed(seed);
   const holder={seedState:normalized};
+  const directorState=createDashDirectorState();
   const patterns=[];
   let spawnX=startX,previousDifficulty=1,previousAction=null;
   for(let i=0;i<count;i++){
-    const planned=planDashPattern(holder,{time,spawnX,currentScroll,previousDifficulty,previousAction});
+    const speed=dashSpeedForTime(time);
+    const visibility=dashVisibilityForViewport({time,speed,viewportWidth,playerX:DASH_PHYSICS.playerX});
+    const planned=planDashPattern(holder,{
+      time,spawnX,currentScroll,previousDifficulty,previousAction,visibility,directorState
+    });
+    if(!planned.pattern)break;
     const jitter=.18+nextDashRandom(holder)*.24;
     spawnX=planned.nextSpawn+planned.snapshot.speed*jitter;
     previousDifficulty=planned.pattern.difficulty;
     previousAction=planned.obstacles.at(-1)?.action||previousAction;
-    patterns.push(planned);
-    const travel=Math.max(0,spawnX-currentScroll-150);
+    const director={
+      pressure:directorState.pressure,
+      recovery:directorState.recovery,
+      actionVariety:directorState.actionVariety,
+      recentActions:[...directorState.recentActions],
+      recentPatterns:[...directorState.recentPatterns],
+      nextSetPieceAt:directorState.nextSetPieceAt,
+      setPieceCount:directorState.setPieceCount
+    };
+    patterns.push({...planned,directorState:undefined,director});
+    const travel=Math.max(0,spawnX-currentScroll-DASH_PHYSICS.playerX);
     time+=travel/Math.max(1,dashSpeedForTime(time))*0.08;
   }
-  return{seed:normalized,seedState:holder.seedState,patterns};
+  return{
+    seed:normalized,
+    seedState:holder.seedState,
+    viewportWidth,
+    patterns,
+    director:{
+      pressure:directorState.pressure,
+      recovery:directorState.recovery,
+      actionVariety:directorState.actionVariety,
+      recentActions:[...directorState.recentActions],
+      recentPatterns:[...directorState.recentPatterns],
+      nextSetPieceAt:directorState.nextSetPieceAt,
+      setPieceCount:directorState.setPieceCount
+    }
+  };
 }
 
 export function validateDashPlan(plan){
   const failures=[];
+  const viewportWidth=Math.max(600,Number(plan.viewportWidth)||600);
   for(const entry of plan.patterns){
+    const first=entry.obstacles[0];
+    if(!entry.pattern||!first){
+      failures.push({seed:plan.seed,kind:'empty-pattern'});
+      continue;
+    }
+    const warning=dashWarningReport(first,{
+      speed:entry.snapshot.speed,viewportWidth,playerX:DASH_PHYSICS.playerX,obstacleWidth:first.w
+    });
+    if(!warning.ok)failures.push({
+      seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,obstacle:first.id,
+      availableReactionTime:warning.available,minimumReactionTime:warning.required,kind:'warning-window'
+    });
+    if((entry.pattern.riskReward||entry.pattern.riskRoute)&&entry.pattern.safeRoute!==true){
+      failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'mandatory-risk-route'});
+    }
+    if(entry.pattern.setPiece){
+      if(entry.pattern.setPiece.durationSeconds<10||entry.pattern.setPiece.durationSeconds>20){
+        failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'set-piece-duration'});
+      }
+      const last=entry.obstacles.at(-1);
+      const playableSeconds=first&&last?(last.x+last.w-first.x)/Math.max(1,entry.snapshot.speed):0;
+      if(playableSeconds<10||playableSeconds>20.5){
+        failures.push({
+          seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,
+          playableSeconds,kind:'set-piece-playable-duration'
+        });
+      }
+    }
+    for(const obstacle of entry.obstacles){
+      if(!Number.isFinite(obstacle.x)||!Number.isFinite(obstacle.w)||obstacle.w<=0){
+        failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'invalid-obstacle'});
+      }
+    }
     for(let i=1;i<entry.obstacles.length;i++){
       const previous=entry.obstacles[i-1],next=entry.obstacles[i];
       const gap=next.x-(previous.x+previous.w);
