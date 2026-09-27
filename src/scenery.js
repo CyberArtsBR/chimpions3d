@@ -479,6 +479,9 @@ export function createScenery(scene,renderer){
  let wrapAge=1;const wrapCues=new THREE.Group();wrapCues.visible=false;scene.add(wrapCues);const cueMaterial=new THREE.MeshBasicMaterial({color:0xb9ffdb,transparent:true,opacity:0,depthWrite:false});
  for(const side of [-1,1]){const cue=new THREE.Mesh(new THREE.RingGeometry(.26,.32,20),cueMaterial);cue.position.x=side*(WIDTH/2-VINE_INSET);cue.position.z=.8;wrapCues.add(cue);}
  const forestTint=new THREE.Color(0x25483e);
+ const treeThemeTints=[0xfff1d2,0xb7f0d4,0xffbd84,0x879bd7].map(value=>new THREE.Color(value));
+ const treeTint=new THREE.Color();
+ const treeTintStrength=[.12,.30,.38,.50];
 
  return {branch,hazard,
   animateBranch(group,p,time){
@@ -566,7 +569,13 @@ export function createScenery(scene,renderer){
      // Camera-locked scenic cover with only a restrained distant parallax drift.
      treeImageMesh.position.x=coverMode&&!reduced?Math.sin(cameraY*.008)*viewWidth*.012:0;
      treeImageMesh.position.y=currentCamera+(coverMode&&!reduced?Math.sin(cameraY*.011)*viewHeight*.012:0);
-     treeImageMesh.material.color.set(0xffffff);
+     // The authored tropical background is opaque, so the DOM gradient behind it
+     // cannot communicate biome changes. Tint the scenic plate itself while
+     // preserving its texture detail and smooth four-theme transition.
+     const previousBiome=(biome+3)%4;
+     treeTint.copy(treeThemeTints[previousBiome]).lerp(treeThemeTints[biome],blend);
+     const tintAmount=THREE.MathUtils.lerp(treeTintStrength[previousBiome],treeTintStrength[biome],blend);
+     treeImageMesh.material.color.set(0xffffff).lerp(treeTint,tintAmount);
     }
     const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1),authoredTreeOnly=!!treeImageMesh?.visible;
     mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
