@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1536" viewBox="0 0 2048 1536">
+<defs>
+ <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b8dbca" stop-opacity=".32"/><stop offset=".55" stop-color="#557e69" stop-opacity=".42"/><stop offset="1" stop-color="#173b32" stop-opacity=".84"/></linearGradient>
+ <filter id="soft"><feGaussianBlur stdDeviation="5"/></filter>
+ <pattern id="flecks" width="180" height="170" patternUnits="userSpaceOnUse"><circle cx="24" cy="40" r="3" fill="#edf3b2" opacity=".2"/><circle cx="116" cy="92" r="5" fill="#dce8a5" opacity=".12"/><circle cx="160" cy="26" r="2" fill="#fff0a8" opacity=".16"/></pattern>
+</defs>
+<rect width="2048" height="1536" fill="url(#h)"/>
+<g fill="#244b40" opacity=".55" filter="url(#soft)">
+ <path d="M70 1536C120 1200 82 910 250 620c48-82 96-160 114-310 30 152 8 270-60 382-82 136-76 410-45 844z"/>
+ <path d="M530 1536c-5-280-72-530 64-820 52-110 90-220 72-420 72 152 68 304 4 456-72 170-30 486 8 784z"/>
+ <path d="M1020 1536c18-302-54-558 82-850 58-124 86-242 72-430 72 170 74 322 12 474-76 185-30 506-4 806z"/>
+ <path d="M1490 1536c22-270-56-530 74-790 58-116 88-238 70-430 86 164 86 322 18 472-82 180-34 488-10 748z"/>
+ <path d="M1880 1536c24-250-36-466 58-710 54-140 82-288 72-468 84 170 70 340 16 490-66 184-16 448 6 688z"/>
+</g>
+<g fill="#4f795f" opacity=".52">
+ <ellipse cx="160" cy="480" rx="190" ry="105"/><ellipse cx="390" cy="370" rx="240" ry="128"/><ellipse cx="720" cy="455" rx="250" ry="120"/>
+ <ellipse cx="1050" cy="330" rx="280" ry="145"/><ellipse cx="1380" cy="455" rx="260" ry="132"/><ellipse cx="1730" cy="350" rx="290" ry="146"/><ellipse cx="2000" cy="480" rx="190" ry="110"/>
+</g>
+<path d="M0 770C240 620 360 745 520 665s300-176 520-52 300 88 510 6 330-14 498 92v825H0z" fill="#315846" opacity=".42"/>
+<rect width="2048" height="1536" fill="url(#flecks)"/>
+</svg>
