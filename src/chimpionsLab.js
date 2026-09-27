@@ -528,6 +528,7 @@ function jump(held=true){
   if(!run||state!=='running'||run.dead)return;
   if(run.y===0||run.coyote>0){
     run.slideHeld=false;run.slideTime=0;run.slideMin=0;run.slideBlocked=false;
+    window.dispatchEvent(new CustomEvent('chimpions-dash-animation-event',{detail:{type:'jumpAnticipation',held:!!held,speed:run.speed/BASE_SPEED,y:run.y}}));
     run.vy=JUMP_IMPULSE;run.jumpHeld=held;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;run.coyote=0;run.grounded=false;voice.play('jump');dashGraphics.emit('takeoff',{x:runnerWorldX,y:groundWorldY+.08});
     emitDashEvent(DASH_EVENTS.jump,dashMeta({held,y:run.y,vy:run.vy}));return;
   }
