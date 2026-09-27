@@ -24,6 +24,14 @@ export const DASH_SCENERY=Object.freeze({
 // the 4.5 MiB source track can be migrated without changing the audio master.
 export const DASH_MUSIC_URL='https://raw.githubusercontent.com/CyberArtsBR/chimpions-dash/62a6f4a95cf729b535d7fb04d3c0265a7104f4aa/dist/assets/chimpions-army.mp3';
 
+// Authored audio is optional. Asset/performance work can populate these local URLs
+// without changing gameplay code; GameAudio keeps its synthesized layer as fallback.
+export const DASH_AUDIO_SAMPLE_SLOTS=Object.freeze({
+  footstepLeft:null,footstepRight:null,jump:null,land:null,slide:null,'near-miss':null,
+  banana:null,golden:null,'perfect-jump':null,'perfect-slide':null,flow:null,multiplier:null,
+  stage:null,hit:null,dead:null,record:null
+});
+
 export function dashSpriteUrl(id){
   const key=id==='log-pile'?'log':id;
   const file=SPRITE_FILES[key];
