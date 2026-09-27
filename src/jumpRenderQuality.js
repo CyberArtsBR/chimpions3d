@@ -68,7 +68,7 @@ const HIGH=Object.freeze({
   shadowBias:-.00042,
   shadowNormalBias:.032,
   highScenery:true,
-  backgroundMode:'layered-forest',
+  backgroundMode:'authored-tree',
   backgroundTextureScale:1.5,
   maxAnisotropy:8,
   ambientOcclusion:true,
@@ -107,9 +107,9 @@ const ULTRA=Object.freeze({
   shadowBias:-.00042,
   shadowNormalBias:.032,
   highScenery:true,
-  // Keep the same gameplay-readable forest composition as High. Ultra spends
-  // its extra budget on lighting, atmosphere and image finishing instead.
-  backgroundMode:'layered-forest',
+  // Ultra uses the authored orientation-specific premium canopy plate and
+  // spends its extra budget on lighting, atmosphere and image finishing.
+  backgroundMode:'authored-tree',
   backgroundTextureScale:1.5,
   maxAnisotropy:8,
   ambientOcclusion:true,
