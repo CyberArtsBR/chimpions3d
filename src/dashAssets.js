@@ -21,8 +21,7 @@ export const DASH_SCENERY=Object.freeze({
   ground:ROOT+'ground-green.5163bede.png'
 });
 
-// The Dash music master is owned by this repository. The revision query makes
-// caches safe across releases without putting a network dependency on GitHub Raw.
+// Repository-owned music master. The revision query keeps caches safe across releases.
 export const DASH_MUSIC_URL=BASE+'audio/music-full.mp3?v=9606f223';
 
 export function dashSpriteUrl(id){
