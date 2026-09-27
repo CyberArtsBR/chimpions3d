@@ -4,7 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
-import {DASH_MUSIC_URL,dashSpriteUrl,warmDashFallbackAssets} from './dashAssets.js';
+import {DASH_MUSIC_URL,dashSpriteUrl} from './dashAssets.js';
 import {createDashPerformanceController} from './dashPerformance.js';
 import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
@@ -191,12 +191,6 @@ function resize3D(){
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-let fallbackAssetsWarmed=false;
-function warmFallbackAssetsOnce(){
-  if(fallbackAssetsWarmed)return;
-  fallbackAssetsWarmed=true;warmDashFallbackAssets();
-}
-
 let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
 async function loadAvatar(entry,{timeoutMs=15000}={}){
   if(!entry?.url&&!entry?.buffer)throw new Error('Invalid Chimpion asset');
@@ -256,7 +250,7 @@ function showRenderRecovery(message,fatal=false){
 }
 function hideRenderRecovery(){if(recoveryPanel){recoveryPanel.hidden=true;delete recoveryPanel.dataset.fatal;}}
 function failRenderRecovery(message){
-  renderBlocked=true;warmFallbackAssetsOnce();showRenderRecovery(message||'Graphics could not be restored. Refresh the page to retry safely.',true);
+  renderBlocked=true;showRenderRecovery(message||'Graphics could not be restored. Refresh the page to retry safely.',true);
   voice.setDash(false);voice.suspendMusic();voice.stopAmbience();
 }
 function onWebGLContextLost(event){
