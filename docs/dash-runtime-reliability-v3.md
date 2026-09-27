@@ -50,7 +50,7 @@ Largest Dash-relevant images/audio:
 
 Exact duplicate found: `public/screens/chimp-dash-start.png` and `public/screens/chimp-dash-start-853ee5d1.png` are both 2,713,903 bytes with Git blob SHA `853ee5d1bc2189662ff178b980904e7f1915a0a5`. They are documented rather than deleted because launcher/start-screen references must be audited before removing either public URL.
 
-The active GPU Dash renderer does not use the legacy DOM jungle, ground or obstacle sprites. Previously these were eagerly warmed at startup. That warming is now removed entirely from the GPU runtime path. The fallback assets, sprite URL mapping and DOM renderer are retained, so an intentionally activated DOM fallback can still load its assets lazily by hazard type without charging every GPU session for them.
+The active GPU Dash renderer does not use the legacy DOM jungle, ground or obstacle sprites. Previously these were eagerly warmed at startup, and the legacy jungle/ground URLs also remained unconditional CSS backgrounds. JavaScript warming is removed and those CSS URLs are now gated behind the explicit `.dash-dom-world` fallback class. The fallback assets, sprite URL mapping and DOM renderer are retained, so an intentionally activated DOM fallback can still load its assets lazily without charging GPU sessions for them.
 
 ## Music migration
 
