@@ -262,10 +262,7 @@ export async function createLabRunnerCharacter(source){
       const speedT=smooth01((speedRatio-.72)/1.75);
 
       if(!wasGrounded&&grounded)lastHalfStep=Math.floor((gaitPhase+.0001)/Math.PI);
-      if(wasGrounded&& !grounded){
-        dispatchPresentation('jumpAnticipation',{speed:speedRatio,held:!!jumpHeld});
-        lastAirPhase='anticipation';
-      }
+      if(wasGrounded&&!grounded)lastAirPhase='anticipation';
       if(!wasSliding&&sliding){slideBlend=Math.max(slideBlend,.82);slideEntryPulse=1;}
       else if(wasSliding&&!sliding)slideExitPulse=1;
       wasGrounded=grounded;wasSliding=sliding;
