@@ -21,7 +21,7 @@ function moveCollection(dx,dy){
   const index=grid.indexOf(active),firstTop=grid[0].offsetTop,nextRow=grid.findIndex((el,i)=>i>0&&el.offsetTop!==firstTop),columns=nextRow>0?nextRow:grid.length,target=index+(dx||dy*columns);
   if(target>=0&&target<grid.length)return focusElement(grid[target]);
   if(dy<0)return focusElement(dialog.querySelector('#avatar-list input[type="search"]'))||focusElement(dialog.querySelector('#random-chimpion'));
-  if(dy>0)return focusElement([...dialog.querySelectorAll('.collection-nav button:not(:disabled)')][0]||dialog.querySelector('#confirm-chimpion'));
+  if(dy>0)return focusElement([...dialog.querySelectorAll('.collection-nav button:not(:disabled)')][0]||dialog.querySelector('#random-chimpion'));
   return false;
  }
  const items=focusables(dialog);if(!items.length)return false;
@@ -71,7 +71,13 @@ function activateFocused(){
 }
 
 inputManager.subscribe(({menuX,menuY,confirmPressed,cancelPressed,pausePressed,source,connected})=>{
- if(source==='gamepad'&&connected)document.body.dataset.inputMode='controller';
+ if(source==='gamepad'&&connected){
+  document.body.dataset.inputMode='controller';
+  const overlay=document.querySelector('#overlay'),active=document.activeElement,play=document.querySelector('#play');
+  if(document.body?.dataset?.mode==='menu'&&!openDialog()&&(!active||active===document.body||!overlay?.contains(active))&&isVisible(play)){
+   focusElement(play);
+  }
+ }
  const mode=document.body?.dataset?.mode||'',dialog=openDialog(),navigating=dialog||mode==='menu'||mode==='paused';
 
  if(pausePressed&&!dialog){

@@ -109,6 +109,14 @@ body[data-mode=playing] #background-style{display:none}
 .pixel-mode .touch{border-radius:4px;border:2px solid #b6d69a;box-shadow:3px 3px 0 #132638}
 #world>.sun{transition:opacity 4s ease,filter 4s ease}
 #world>.rays{transition:opacity 4s ease}
+body[data-jump-quality="high"] #world>.sun,
+body[data-jump-quality="high"] #world>.rays,
+body[data-jump-quality="high"] #world>.hill,
+body[data-jump-quality="high"] #world>.mist,
+body[data-jump-quality="ultra"] #world>.sun,
+body[data-jump-quality="ultra"] #world>.rays,
+body[data-jump-quality="ultra"] #world>.hill,
+body[data-jump-quality="ultra"] #world>.mist{display:none!important}
 .selection-actions{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin:18px 0;padding:14px;background:#ffffff0b;border:1px solid #b6cf8155;border-radius:14px}
 .selection-actions p{margin:0;font-weight:750;color:#ffe3a0}.selection-actions .primary{grid-column:1/-1}
 .selection-actions button:not(.primary){padding:10px 14px;border-radius:9px;background:#47614b;color:#fff2ce;border:1px solid #c9d68d}
@@ -186,7 +194,7 @@ body[data-mode='paused'] #canopy-event,body[data-mode='menu'] #canopy-event{disp
  #collection-dialog h2{font-size:28px;letter-spacing:-.02em}
  .selection-actions{
   grid-template-columns:180px minmax(0,1fr) 250px;grid-template-rows:auto auto;
-  grid-template-areas:"preview copy play" "preview copy random";
+  grid-template-areas:"preview copy random" "preview copy random";
   gap:18px;margin:18px 0;padding:18px;
   background:linear-gradient(135deg,#ffffff10,#5d7b4920);
   border:1px solid #d6d09352;border-radius:18px

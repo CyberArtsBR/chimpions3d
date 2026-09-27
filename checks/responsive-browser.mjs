@@ -28,10 +28,10 @@ try{
     await picker.waitFor({state:'visible'});
     const pickerBox=await picker.boundingBox();
     assert(pickerBox&&pickerBox.x>=-1&&pickerBox.y>=-1&&pickerBox.x+pickerBox.width<=viewport.width+1&&pickerBox.y+pickerBox.height<=viewport.height+1,viewport.name+': picker exceeds viewport');
-    assert(await page.locator('#confirm-chimpion').isVisible(),viewport.name+': picker play action hidden');
+    assert.equal(await page.locator('#confirm-chimpion').count(),0,viewport.name+': redundant picker confirmation must stay removed');
     await page.screenshot({path:`checks/responsive-${viewport.name}-picker.png`,animations:'disabled'});
 
-    await page.locator('#confirm-chimpion').click();
+    await page.locator('#collection-dialog .avatar-option:not(:disabled)').first().click();
     await page.waitForFunction(()=>window.chimpJump?.().mode==='starting');
     await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
     await page.waitForFunction(()=>window.chimpJump?.().mode==='playing');

@@ -465,7 +465,12 @@ export function createScenery(scene,renderer){
    treeScrollSpeedFactor,treeWrapEnabled:treeImageMesh?.material.map?.wrapT===THREE.RepeatWrapping,
    treeTextureKind:treeImageMesh?.material.map?'overlap-strip':'forest-fallback',
    treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
-   treeAuthoredVisible:!!treeImageMesh?.visible,treeTextureOffset:treeImageMesh?.material.map?.offset.y??0
+   treeAuthoredVisible:!!treeImageMesh?.visible,treeFallbackVisible:forest.some(m=>m.visible),
+   treeMistVisible:!!mistLayers.visible&&mistMaterial.opacity>.001,
+   treeMaterialOpacity:treeImageMesh?.material?.opacity??null,
+   treeMaterialTransparent:treeImageMesh?.material?.transparent??null,
+   treeAnisotropy:treeImageMesh?.material?.map?.anisotropy??0,
+   treeTextureOffset:treeImageMesh?.material.map?.offset.y??0
   };},
   get pooledBranches(){return pooledBranchCount;},
   prefetchRuntimeAssets,
@@ -502,7 +507,11 @@ export function createScenery(scene,renderer){
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
     if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xffffff);}
-    const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1);mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;mistMaterial.opacity=.12+mist*.46;mistLayers.visible=mistMaterial.opacity>.01;moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
+    const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1),authoredTreeOnly=highQuality&&!!treeImageMesh?.visible;
+    mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
+    mistMaterial.opacity=authoredTreeOnly?0:.12+mist*.46;
+    mistLayers.visible=!authoredTreeOnly&&mistMaterial.opacity>.01;
+    moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
    }else mistLayers.visible=false;
    wrapAge+=dt;if(wrapAge<.45){wrapCues.visible=true;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);}else{wrapCues.visible=false;cueMaterial.opacity=0;}
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}

@@ -79,6 +79,7 @@ function quality(){
  activeQualityName=mobileProfile()?'balanced':selectedQuality;
  activeQuality=getJumpQualityProfile(activeQualityName);
  highDetail=!!activeQuality.highScenery;
+ document.body.dataset.jumpQuality=activeQualityName;
  renderPipeline.applyQuality(activeQuality);
  scenery.setQuality(activeQuality,{constrained:mobileProfile()});
  $('quality').textContent='Detail: '+(mobileProfile()?'Balanced · Mobile':activeQuality.label+' · Desktop');

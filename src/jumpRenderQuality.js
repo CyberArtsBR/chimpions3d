@@ -3,6 +3,7 @@ const NAMES=Object.freeze(['balanced','high','ultra']);
 const BALANCED=Object.freeze({
   profile:'balanced',
   label:'Balanced',
+  dprFloor:1.00,
   dprCap:1.10,
   postProcessing:false,
   renderTargetType:'unsigned-byte',
@@ -27,6 +28,7 @@ const BALANCED=Object.freeze({
 const HIGH=Object.freeze({
   profile:'high',
   label:'High',
+  dprFloor:1.00,
   dprCap:1.50,
   postProcessing:false,
   renderTargetType:'unsigned-byte',
@@ -51,6 +53,7 @@ const HIGH=Object.freeze({
 const ULTRA=Object.freeze({
   profile:'ultra',
   label:'Ultra',
+  dprFloor:1.60,
   dprCap:1.60,
   postProcessing:true,
   renderTargetType:'half-float',
