@@ -27,9 +27,9 @@ export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>directedWrappedDistance(a,b,WRAP_SPAN);
 
-// Preserve deterministic physics while progressively compressing simulation time.
-// The director owns the curve so the run gets faster without changing jump geometry.
-export const paceAt=time=>directedPaceAt(time);
+// Pace now advances only at deterministic 200m altitude milestones.
+// Jump geometry stays unchanged; only simulation pace increases in modest steps.
+export const paceAt=height=>directedPaceAt(height);
 
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
 export const platformTravelFor=type=>type==='moving'?PLATFORM_TRAVEL:type==='leaf'?1.05:type==='swing'?1.35:0;
@@ -305,7 +305,7 @@ export class Game {
   const events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
   this.hazardCooldown=Math.max(0,this.hazardCooldown-realDt);
 
-  dt*=paceAt(this.time);this.bounceAge+=dt;
+  dt*=paceAt(this.height);this.bounceAge+=dt;
   this.previousCamera=this.camera;
   const target=input*SPEED,amount=24*dt;
   this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
@@ -317,7 +317,7 @@ export class Game {
   else this.x=nextX;
 
   if(this.jetRemaining>0){
-   const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
+   const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.height);
    if(this.jetRemaining===0){
     this.vy=JUMP;
     for(const h of this.hazards)if(h.type!=='thorn-pod'){h.createdAt=this.time;h.telegraphCycle=-1;h.activeCycle=-1;}
