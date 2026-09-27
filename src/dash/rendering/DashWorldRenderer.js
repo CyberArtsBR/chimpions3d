@@ -156,7 +156,18 @@ class DashWorldRenderer{
       stats:()=>this.stats(),_owner:this
     };globalThis.chimpionsDashGraphics=api;
   }
-  setVisibility(options={}
+  setVisibility(options={}){
+    this.visibility={...this.visibility,...options};const high=!!this.visibility.highVisibility,contrast=clamp(Number(this.visibility.hazardContrast)||1,.7,2),rim=clamp(Number(this.visibility.rimStrength)||1,0,2.5),collect=clamp(Number(this.visibility.collectibleVisibility)||1,.65,2);
+    this.mat.hazardWood.color.setHex(high?0x825736:0x6f4b2e);this.mat.hazardWood.emissiveIntensity=.04*contrast;
+    this.mat.hazardWoodDark.color.setHex(high?0x4b3121:0x3f2b1f);this.mat.hazardWoodDark.emissiveIntensity=.03*contrast;
+    this.mat.hazardPlant.color.setHex(high?0x4a873f:0x3d7138);this.mat.hazardPlant.emissiveIntensity=.035*contrast;
+    this.mat.hazardCap.color.setHex(high?0xeb7455:0xd9684e);this.mat.hazardCap.emissiveIntensity=.08*contrast;
+    this.mat.hazardWet.color.setHex(high?0x388c86:0x2e716d);this.mat.hazardWet.emissiveIntensity=.08*contrast;
+    this.mat.hazardRim.emissiveIntensity=.18*rim*(high?1.55:1);this.mat.hazardSlide.emissiveIntensity=.22*rim*(high?1.5:1);this.mat.hazardRisk.emissiveIntensity=.24*rim*(high?1.5:1);
+    this.mat.banana.emissiveIntensity=.42*collect*(high?1.25:1);this.mat.golden.emissiveIntensity=1.05*collect*(high?1.18:1);
+    this.mat.bananaGlow.opacity=.13*collect*(high?1.35:1);this.mat.goldenGlow.opacity=.38*collect*(high?1.2:1);this.mat.goldenGlint.opacity=.62*collect;
+    return{...this.visibility};
+  }
   setAccessibility({highVisibility=this.highVisibility,reducedMotion=this.reducedMotion,screenShake=this.screenShake}={}){
     this.highVisibility=!!highVisibility;this.reducedMotion=!!reducedMotion;this.screenShake=!!screenShake;
     this.setVisibility({highVisibility:this.highVisibility,rimStrength:this.highVisibility?1.55:1,hazardContrast:this.highVisibility?1.35:1,collectibleVisibility:this.highVisibility?1.28:1});
@@ -176,6 +187,9 @@ class DashWorldRenderer{
       farCount:Math.max(8,Math.round(base.farCount*vegetation)),
       midCount:Math.max(6,Math.round(base.midCount*vegetation)),
       detailCount:Math.max(8,Math.round(base.detailCount*vegetation)),
+      heroCount:Math.max(3,Math.round((base.heroCount||8)*vegetation)),
+      structureCount:Math.max(2,Math.round((base.structureCount||5)*vegetation)),
+      sceneryDetail:Math.max(3,Math.round((base.sceneryDetail||8)*vegetation)),
       foregroundCount:Math.max(0,Math.round(base.foregroundCount*foreground)),
       particleCount:Math.max(12,Math.round(base.particleCount*particles)),
       streakCount:reducedMotion?0:Math.max(0,Math.round(base.streakCount*particles)),
@@ -183,7 +197,7 @@ class DashWorldRenderer{
       mistCount:reducedMotion?0:Math.max(0,Math.round(base.mistCount*foreground))
     };
     this.lastQualityState={...state,tier:name};
-    this.vfx?.setQuality(this.quality);
+    this.vfx?.setQuality(this.quality);this.vfx?.setReducedMotion(reducedMotion);this.environmentArt?.setQuality(this.quality);
     for(const entry of this.hazardMap.values())entry.group.traverse(o=>{if(o.isMesh)o.castShadow=this.quality.shadows;});
     return this.quality;
   }
@@ -193,6 +207,7 @@ class DashWorldRenderer{
     const depth=Math.max(2.3,viewH*.22);this.ground.scale.set(viewW*1.15,depth,1);this.ground.position.set(0,groundY-depth*.5,-.55);
     this.groundLip.scale.set(viewW*1.15,.22,1);this.groundLip.position.set(0,groundY-.06,-.3);
     this.moon.position.set(viewW*.32,viewH*.27,-14);this.moon.scale.setScalar(Math.max(.65,viewH*.075));
+    this.environmentArt?.resize({viewW,viewH,groundY});
     this.keyLight.shadow.camera.left=-viewW*.56;this.keyLight.shadow.camera.right=viewW*.56;this.keyLight.shadow.camera.top=viewH*.55;this.keyLight.shadow.camera.bottom=-viewH*.55;this.keyLight.shadow.camera.updateProjectionMatrix();
   }
   interpolateBiome(stage,time){
@@ -331,16 +346,16 @@ class DashWorldRenderer{
     let regular=0,golden=0;
     for(let i=0;i<bananas.length;i++){
       const b=bananas[i];if(b.collected)continue;const x=-this.viewW/2+(b.x-scroll)*this.unit;if(x<-this.viewW*.62||x>this.viewW*.65)continue;
-      const bob=.045*Math.sin(time*5+i*.7),y=this.groundY+b.y*this.unit+bob;
+      const bob=this.reducedMotion?0:.045*Math.sin(time*5+i*.7),y=this.groundY+b.y*this.unit+bob;
       if(b.golden){
         if(golden>=this.goldenMesh.instanceMatrix.count)continue;
-        const pulse=1+.07*Math.sin(time*6.4+i*.9),scale=.76*pulse,rot=time*4.5+i*.73+.18*Math.sin(time*2.8+i);
+        const pulse=this.reducedMotion?1:1+.07*Math.sin(time*6.4+i*.9),scale=.76*pulse,rot=this.reducedMotion?0:time*4.5+i*.73+.18*Math.sin(time*2.8+i);
         applyMatrix(this.goldenMesh,golden,x,y,.34,scale,scale,scale,rot);
         applyMatrix(this.goldenGlow,golden,x,y,.12,.92*pulse,.92*pulse,1,0);
         applyMatrix(this.goldenGlint,golden,x,y,.15,1.08*pulse,.095,1,time*2.35+i*.41);golden++;
       }else{
         if(regular>=this.bananaMesh.instanceMatrix.count)continue;
-        const pulse=1+.025*Math.sin(time*5.2+i),scale=.64*pulse,rot=time*3.25+i*.73;
+        const pulse=this.reducedMotion?1:1+.025*Math.sin(time*5.2+i),scale=.64*pulse,rot=this.reducedMotion?0:time*3.25+i*.73;
         applyMatrix(this.bananaMesh,regular,x,y,.32,scale,scale,scale,rot);
         applyMatrix(this.bananaGlow,regular,x,y,.11,.5*pulse,.5*pulse,1,0);regular++;
       }
@@ -350,16 +365,15 @@ class DashWorldRenderer{
   }
   emit(type,payload={}){
     if(this.screenShake&&!this.reducedMotion&&['land','nearMiss','stage','death','record'].includes(type)){
-      const amount=(type==='death'||type==='record')?.18:type==='stage'?.11:.065;this.shakeAmount=Math.max(this.shakeAmount,amount);
+      const amount=(type==='death'||type==='record') ? .18 : type==='stage' ? .11 : .065;
+      this.shakeAmount=Math.max(this.shakeAmount,amount);
     }
     this.vfx.emit(type,payload);
-  }){this.vfx.emit(type,payload);}
+  }
   consumeGameplayEvent(detail={}){
     const type=detail.type||detail.name;if(!type)return;
     const aliases={'golden-banana':'goldenBanana','perfect-jump':'perfectJump','perfect-slide':'perfectSlide','near-miss':'nearMiss','stage-change':'stage','perfect-chain':'multiplier','risk-line':'nearMiss'};
     this.emit(aliases[type]||type,detail);
-  }){
-    const type=detail.type||detail.name;if(!type)return;const aliases={'golden-banana':'goldenBanana','perfect-jump':'perfectJump','perfect-slide':'perfectSlide','near-miss':'nearMiss','stage-change':'stage'};this.emit(aliases[type]||type,detail);
   }
   reset(){this.vfx.reset();this.shakeAmount=0;this.camera.position.x=0;this.camera.position.y=0;}
   update({dt=0,time=0,scroll=0,stage=1,speed=1,baseSpeed=1,obstacles=[],bananas=[],playerX=0,playerY=0,sliding=false,state='menu',flow=0}={}){
@@ -371,17 +385,11 @@ class DashWorldRenderer{
     if(!this.safeMode)this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH,flow});
     if(this.screenShake&&!this.reducedMotion&&this.shakeAmount>0){this.camera.position.x=Math.sin(time*67)*this.shakeAmount;this.camera.position.y=Math.cos(time*53)*this.shakeAmount*.65;this.shakeAmount=Math.max(0,this.shakeAmount-dt*1.8);}else{this.camera.position.x=0;this.camera.position.y=0;}
     this.foregroundLeaves.visible=!this.safeMode&&!(this.reducedMotion||this.highVisibility)&&(state!=='menu'||this.qualityName!=='LOW');
-    const collect=clamp(Number(this.visibility.collectibleVisibility)||1,.65,2),pulse=this.reducedMotion?0:Math.sin(time*5.3);this.mat.goldenGlow.opacity=(this.highVisibility?.48:.34)+.08*pulse;this.mat.goldenGlow.opacity*=collect;this.mat.goldenGlint.opacity=.52*collect+(this.reducedMotion?0:.12*Math.sin(time*7.1));this.mat.golden.emissiveIntensity=(this.highVisibility?1.45:1.0)+(this.reducedMotion?0:.28*Math.sin(time*4.7));this.mat.banana.emissiveIntensity=(this.highVisibility?.72:.42)*collect;
-    this.renderer.domElement.style.setProperty('--dash-speed-grade',String(clamp((speedRatio-1)*.08,0,.12)));
-    if(!this.safeMode&&flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
-  }={}){
-    this.time=time;this.scroll=scroll;this.stage=stage;const speedRatio=Math.max(.2,speed/Math.max(1,baseSpeed));
-    const features=this.safeMode?this.biomeFeatures:this.applyBiome(stage,time);
-    if(!this.safeMode)this.updateEnvironment(scroll,time,speedRatio,features);
-    this.syncHazards(obstacles,scroll);this.syncBananas(bananas,scroll,time);
-    const jumpWorld=Math.max(0,playerY),shadowScale=clamp(1-jumpWorld/4.2,.46,1),shadowOpacity=clamp(.72-jumpWorld*.12,.16,.72);this.contactShadow.position.set(playerX,this.groundY+.02,-.04);this.contactShadow.scale.set(2.35*shadowScale,.5*shadowScale,1);this.contactShadowMaterial.opacity=shadowOpacity;
-    if(!this.safeMode)this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH});
-    this.foregroundLeaves.visible=!this.safeMode&&(state!=='menu'||this.qualityName!=='LOW');this.goldenGlow.material.opacity=.22+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=.75+.35*Math.sin(time*4.7);
+    const collect=clamp(Number(this.visibility.collectibleVisibility)||1,.65,2),pulse=this.reducedMotion?0:Math.sin(time*5.3);
+    this.mat.goldenGlow.opacity=((this.highVisibility?.48:.34)+.08*pulse)*collect;
+    this.mat.goldenGlint.opacity=.52*collect+(this.reducedMotion?0:.12*Math.sin(time*7.1));
+    this.mat.golden.emissiveIntensity=(this.highVisibility?1.45:1)+(this.reducedMotion?0:.28*Math.sin(time*4.7));
+    this.mat.banana.emissiveIntensity=(this.highVisibility?.72:.42)*collect;
     this.renderer.domElement.style.setProperty('--dash-speed-grade',String(clamp((speedRatio-1)*.08,0,.12)));
     if(!this.safeMode&&flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
   }
