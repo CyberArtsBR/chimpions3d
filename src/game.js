@@ -3,7 +3,7 @@ import {loadCharacter} from './character.js';
 import {createScenery} from './scenery.js';
 import {readLocalGLB} from './upload.js';
 import {disposeCharacter} from './character.js';
-import {Game,STEP,WIDTH,VIEW_HEIGHT,ITEM_SCALE,BANANA_HEIGHT,paceAt} from './physics.js';
+import {Game,STEP,WIDTH,VIEW_HEIGHT,ITEM_SCALE,BANANA_HEIGHT} from './physics.js';
 import './game.css';
 import {createPixelBackdrop} from './pixelBackdrop.js';
 import {inputManager} from './InputManager.js';
