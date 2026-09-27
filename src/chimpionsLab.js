@@ -126,7 +126,7 @@ document.body.innerHTML=`
     <button id="touch-jump" type="button" aria-label="Jump"><span aria-hidden="true">↥</span><small>JUMP</small></button>
   </div>
   <div id="dash-stage-flash" aria-hidden="true"></div>
-  <div id="dash-render-recovery" hidden role="alert" aria-live="assertive">
+  <div id="dash-render-recovery" class="dash-panel modal" hidden role="alert" aria-live="assertive">
     <strong>GRAPHICS RECOVERY</strong>
     <span id="dash-render-recovery-message">Restoring the graphics device…</span>
   </div>
