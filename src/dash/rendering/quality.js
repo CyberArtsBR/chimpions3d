@@ -1,8 +1,8 @@
 export const DASH_QUALITY_PRESETS={
-  LOW:{name:'LOW',pixelRatio:1,shadowMap:512,shadows:false,farCount:18,midCount:12,detailCount:18,foregroundCount:0,particleCount:36,streakCount:4,lightShafts:0},
-  BALANCED:{name:'BALANCED',pixelRatio:1.25,shadowMap:1024,shadows:true,farCount:28,midCount:20,detailCount:28,foregroundCount:8,particleCount:64,streakCount:8,lightShafts:1},
-  HIGH:{name:'HIGH',pixelRatio:1.6,shadowMap:1024,shadows:true,farCount:40,midCount:30,detailCount:42,foregroundCount:16,particleCount:104,streakCount:12,lightShafts:3},
-  ULTRA:{name:'ULTRA',pixelRatio:2,shadowMap:2048,shadows:true,farCount:56,midCount:42,detailCount:58,foregroundCount:24,particleCount:160,streakCount:18,lightShafts:5}
+  LOW:{name:'LOW',pixelRatio:1,shadowMap:512,shadows:false,farCount:18,midCount:12,detailCount:18,foregroundCount:4,particleCount:36,streakCount:4,lightShafts:0,heroCount:7,structureCount:4,sceneryDetail:6},
+  BALANCED:{name:'BALANCED',pixelRatio:1.25,shadowMap:1024,shadows:true,farCount:28,midCount:20,detailCount:28,foregroundCount:8,particleCount:64,streakCount:8,lightShafts:1,heroCount:11,structureCount:7,sceneryDetail:10},
+  HIGH:{name:'HIGH',pixelRatio:1.6,shadowMap:1024,shadows:true,farCount:40,midCount:30,detailCount:42,foregroundCount:16,particleCount:104,streakCount:12,lightShafts:3,heroCount:14,structureCount:10,sceneryDetail:14},
+  ULTRA:{name:'ULTRA',pixelRatio:2,shadowMap:2048,shadows:true,farCount:56,midCount:42,detailCount:58,foregroundCount:24,particleCount:160,streakCount:18,lightShafts:5,heroCount:18,structureCount:14,sceneryDetail:18}
 };
 
 const valid=name=>Object.prototype.hasOwnProperty.call(DASH_QUALITY_PRESETS,String(name||'').toUpperCase());
