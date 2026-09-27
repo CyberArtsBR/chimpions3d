@@ -3,6 +3,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
 import {createTrackedLoadingManager,prefetchVisualAsset,versionedAssetUrl} from './assetRuntime.js';
+import {rainProfileAt} from './jumpWeather.js';
 
 export const TREE_SCROLL_PER_SCREEN=.32;
 export const wrap01=value=>((value%1)+1)%1;
@@ -455,10 +456,8 @@ export function createScenery(scene,renderer){
  const rainLines=new THREE.LineSegments(rainGeometry,rainMaterial);rainLines.frustumCulled=false;rainLines.visible=false;rainLines.renderOrder=40;scene.add(rainLines);
  let rainIntensity=0,rainLevel=-1,rainActive=false,rainDropCount=0;
  function updateRain(cameraY,time,dt,biome,blend){
-  const level=Math.max(0,Math.floor(Math.max(0,cameraY)/220)),levelWet=level%5===1||level%5===4;
-  const previous=(biome+3)%4,wetness=[.38,1,.24,.72],themeWet=wetness[biome]*blend+wetness[previous]*(1-blend);
-  const target=background.visible&&levelWet?themeWet:0,reduced=document.body?.dataset?.reducedMotion==='true',response=1-Math.exp(-dt*2.8);
-  rainIntensity+=(target-rainIntensity)*response;rainLevel=level;rainActive=rainIntensity>.035;
+  const profile=rainProfileAt(cameraY,biome,blend),target=background.visible?profile.intensity:0,reduced=document.body?.dataset?.reducedMotion==='true',response=1-Math.exp(-dt*2.8);
+  rainIntensity+=(target-rainIntensity)*response;rainLevel=profile.level;rainActive=rainIntensity>.035;
   rainDropCount=Math.max(0,Math.min(MAX_RAIN,Math.round(Number(activeVisualProfile.rainDensity)||0)));
   rainGeometry.setDrawRange(0,rainDropCount*2);rainLines.visible=rainActive&&rainDropCount>0;
   if(!rainLines.visible){rainMaterial.opacity=0;return;}
