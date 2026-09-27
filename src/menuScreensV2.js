@@ -52,7 +52,6 @@ export function setupDashMenu(){
   // after an avatar is explicitly ready.
   const start=document.querySelector('#dash-start');
   if(start){
-    start.disabled=false;
     start.classList.remove('primary','original-dash-start');
     start.classList.add('screen-primary');
     start.textContent='START GAME';
@@ -122,53 +121,31 @@ export function setupDashMenu(){
     else preview.hidden=true;
   }
 
-  const FLOW=Object.freeze({MENU:'menu',PICKER:'picker',LOADING:'loading',READY:'ready',LAUNCHING:'launching'});
-  let flowState=FLOW.MENU;
-  function setFlowState(next,message=''){
-    flowState=next;dialog.dataset.flowState=next;
-    if(message)status.textContent=message;
-  }
-  function avatarReady(entry){
-    if(!entry)return false;
-    if(entry.localReady)return true;
-    const current=window.chimpionsDash?.();
-    return String(current?.selectedId||'')===String(entry.id);
-  }
-  async function preloadSelected(entry=selected){
+  async function launchSelected(entry=selected){
     if(!entry||busy)return false;
     const api=dashApi();
-    if(!api){setFlowState(FLOW.PICKER,'Dash runtime is not ready.');return false}
-    selected=entry;showSelected();
-    if(avatarReady(entry)){setFlowState(FLOW.READY,entry.name+' ready · press Play');return true}
-    api.audioGesture?.();
-    setFlowState(FLOW.LOADING,'Loading '+entry.name+'…');setBusy(true);
+    if(!api){status.textContent='Dash runtime is not ready.';return false}
+    selected=entry;
+    api.audioGesture?.();api.playUi?.('confirm');
+    setBusy(true,'Loading '+entry.name+'…');
     try{
-      await api.selectAvatar(entry.id,{timeoutMs:15000});
-      entry.localReady=entry.localReady||entry.id==='local-custom';
-      setBusy(false);setFlowState(FLOW.READY,entry.name+' ready · press Play');showSelected();
-      return true;
-    }catch(error){
-      setBusy(false);setFlowState(FLOW.PICKER,'Could not load Chimpion: '+(error?.message||String(error)));showSelected();
-      return false;
-    }
-  }
-  async function launchSelected(entry=selected){
-    if(!entry||flowState===FLOW.LAUNCHING)return false;
-    const api=dashApi();
-    if(!api){setFlowState(FLOW.PICKER,'Dash runtime is not ready.');return false}
-    selected=entry;api.audioGesture?.();
-    if(!avatarReady(entry)&&!(await preloadSelected(entry)))return false;
-    api.playUi?.('confirm');setFlowState(FLOW.LAUNCHING,'Starting as '+entry.name+'…');setBusy(true);
-    try{
+      if(!entry.localReady)await api.selectAvatar(entry.id,{timeoutMs:15000});
+
+      // Close the modal BEFORE asking the runtime to enter gameplay. This makes
+      // it impossible for a successful run to remain visually trapped behind
+      // the character picker.
       if(dialog.open)dialog.close();
+
       const started=api.startRun();
       if(started===false)throw new Error('Dash runtime rejected the start request');
+
       const state=window.chimpionsDash?.().state;
       if(state&&state!=='running')throw new Error('Dash did not enter gameplay');
+
       return true;
     }catch(error){
       if(!dialog.open)dialog.showModal();
-      setBusy(false);setFlowState(FLOW.READY,'Could not start: '+(error?.message||String(error)));showSelected();
+      setBusy(false,'Could not start: '+(error?.message||String(error)));
       return false;
     }
   }
@@ -188,9 +165,10 @@ export function setupDashMenu(){
       const label=document.createElement('strong');label.textContent=entry.name;button.append(label);
       button.onclick=()=>{
         if(busy)return;
-        selected=entry;setFlowState(FLOW.PICKER,entry.name+' selected · preparing preview');
+        selected=entry;
+        status.textContent=entry.name+' selected';
         showSelected();render();
-        void preloadSelected(entry);
+        void launchSelected(entry);
       };
       grid.append(button);
     }
@@ -222,18 +200,15 @@ export function setupDashMenu(){
     }
   }
 
-  function openPicker(){
-    const api=dashApi();api?.audioGesture?.();api?.playUi?.('click');
-    setFlowState(avatarReady(selected)?FLOW.READY:FLOW.PICKER,selected?(avatarReady(selected)?selected.name+' ready · press Play':selected.name+' selected'):'Choose a Chimpion');
+  start.onclick=()=>{
+    dashApi()?.audioGesture?.();dashApi()?.playUi?.('click');
     if(!dialog.open)dialog.showModal();
-    requestAnimationFrame(()=>{const chosen=grid.querySelector('.picker-option[aria-pressed="true"]');(chosen||search).focus()});
-  }
-  start.onclick=openPicker;
-  window.addEventListener('chimpions-dash-request-start-flow',openPicker);
+    requestAnimationFrame(()=>search.focus());
+  };
   back.onclick=()=>{dashApi()?.playUi?.('back');launcher()};
   dialog.querySelector('.picker-close').onclick=()=>{dashApi()?.playUi?.('back');if(busy)dashApi()?.cancelAvatarLoad?.();dialog.close()};
   dialog.addEventListener('cancel',()=>{if(busy)dashApi()?.cancelAvatarLoad?.()});
-  dialog.addEventListener('close',()=>{if(flowState!==FLOW.LAUNCHING)setFlowState(FLOW.MENU);start.focus()});
+  dialog.addEventListener('close',()=>start.focus());
   search.oninput=()=>{page=0;render()};
   grid.addEventListener('keydown',event=>{
     if(['ArrowRight','ArrowLeft','ArrowDown','ArrowUp','Home','End'].includes(event.key)&&movePickerFocus(grid,event.key))event.preventDefault();
@@ -244,8 +219,8 @@ export function setupDashMenu(){
     if(!entries.length||busy)return;dashApi()?.playUi?.('click');
     selected=entries[Math.floor(Math.random()*entries.length)];
     search.value='';page=Math.max(0,Math.floor(entries.findIndex(e=>e.id===selected.id)/perPage));
-    setFlowState(FLOW.PICKER,'Random pick: '+selected.name+' · preparing preview');render();
-    void preloadSelected(selected);
+    status.textContent='Random pick: '+selected.name;render();
+    void launchSelected(selected);
   };
   upload.onclick=()=>{dashApi()?.audioGesture?.();dashApi()?.playUi?.('click');document.querySelector('#dash-upload')?.click()};
 
@@ -260,9 +235,9 @@ export function setupDashMenu(){
       status.textContent=selected.name+' · local GLB ready';
     }else if(event.detail?.id){
       selected=entries.find(e=>String(e.id)===String(event.detail.id))||selected;
-      status.textContent=(event.detail.name||'Chimpion')+' ready · press Play';
+      status.textContent=(event.detail.name||'Chimpion')+' ready';
     }
-    setBusy(false);setFlowState(FLOW.READY);showSelected();render();
+    setBusy(false);showSelected();render();
   });
   window.addEventListener('chimpions-dash-avatar-error',event=>{
     if(!dialog.open)return;

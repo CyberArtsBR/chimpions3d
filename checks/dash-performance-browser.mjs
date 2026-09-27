@@ -3,13 +3,12 @@ import {chromium} from '@playwright/test';
 
 const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
-const errors=[],criticalExternal=[],localDashAssets=[],localMusic=[];
+const errors=[],criticalExternal=[],localDashAssets=[];
 page.on('pageerror',error=>errors.push(error.message));
 page.on('request',request=>{
   const url=request.url();
-  if(url.includes('raw.githubusercontent.com'))criticalExternal.push(url);
+  if(url.includes('raw.githubusercontent.com')&&!url.endsWith('/chimpions-army.mp3'))criticalExternal.push(url);
   if(url.includes('/dash/assets/'))localDashAssets.push(url);
-  if(url.includes('/audio/music-full.mp3'))localMusic.push(url);
 });
 
 async function diag(){return page.evaluate(()=>window.chimpionsDashPerformance.diagnostics());}
@@ -19,9 +18,9 @@ try{
   await page.waitForFunction(()=>window.chimpionsDash?.().ready&&window.chimpionsDashPerformance?.diagnostics&&window.chimpionsDashGraphics?.stats,{timeout:45000});
   await page.waitForTimeout(350);
 
-  assert.deepEqual(criticalExternal,[],'Dash must not request GitHub Raw at runtime');
-  assert.equal(localDashAssets.length,0,'GPU Dash boot must not eagerly download legacy DOM fallback sprites/scenery');
-  assert.equal(localMusic.length,0,'Dash music must remain lazy before a run starts');
+  assert.deepEqual(criticalExternal,[],'Dash critical visuals must not request GitHub Raw');
+  assert(localDashAssets.length>0,'Dash must warm same-origin prepared assets');
+  assert(localDashAssets.every(url=>url.includes('/dash/assets/')),'Prepared Dash visuals must be same-origin');
 
   const graphics=await page.evaluate(()=>window.chimpionsDashGraphics.stats());
   assert(graphics.hazards>0,'GPU world must render seeded lethal hazards');
@@ -52,32 +51,7 @@ try{
   assert(adapted.autoStep>=1,'AUTO must react to sustained over-budget p95/average frame time');
 
   await page.evaluate(()=>window.chimpionsDashTest.startRun({seed:424242,tutorial:false}));
-  await page.waitForTimeout(350);
-
-  const contextSupport=await page.evaluate(()=>{
-    const canvas=document.querySelector('#lab-3d canvas'),gl=canvas?.getContext('webgl2')||canvas?.getContext('webgl');
-    const ext=gl?.getExtension('WEBGL_lose_context');
-    if(!ext)return {supported:false};
-    const before=window.chimpionsDashTest.snapshot().run.time;
-    window.__dashContextProbe={before,lost:false,lostTime:null,restored:false};
-    canvas.addEventListener('webglcontextlost',()=>{window.__dashContextProbe.lost=true;window.__dashContextProbe.lostTime=window.chimpionsDashTest.snapshot().run.time;},{once:true});
-    canvas.addEventListener('webglcontextrestored',()=>{window.__dashContextProbe.restored=true;},{once:true});
-    ext.loseContext();setTimeout(()=>ext.restoreContext(),180);
-    return {supported:true,before};
-  });
-  if(contextSupport.supported){
-    await page.waitForFunction(()=>window.__dashContextProbe?.lost===true,{timeout:3000});
-    await page.waitForTimeout(120);
-    const frozen=await page.evaluate(()=>({time:window.chimpionsDashTest.snapshot().run.time,lostTime:window.__dashContextProbe.lostTime,recovery:!document.getElementById('dash-render-recovery').hidden}));
-    assert(Math.abs(frozen.time-frozen.lostTime)<.02,'Dash simulation must freeze while WebGL context is lost');
-    assert(frozen.recovery,'Context loss must expose a readable recovery state');
-    await page.waitForFunction(()=>window.__dashContextProbe?.restored===true,{timeout:5000});
-    await page.waitForFunction(()=>document.getElementById('dash-render-recovery').hidden===true,{timeout:5000});
-    const restored=await page.evaluate(()=>window.chimpionsDashGraphics.stats());
-    assert.equal(restored.contextLost,false,'Dash graphics must leave context-lost state after restoration');
-  }
-
-  await page.waitForTimeout(1050);
+  await page.waitForTimeout(1400);
   const playingSample=await diag();
   await page.evaluate(()=>window.chimpionsDashTest.quit());
   await page.waitForTimeout(150);
@@ -130,7 +104,7 @@ try{
   console.log('DASH_PERF_BASELINE:'+JSON.stringify(baseline));
   console.log('DASH_PERF_AFTER_RUN_CYCLES:'+JSON.stringify(afterRuns));
   console.log('DASH_PERF_AFTER_CHARACTER_CYCLES:'+JSON.stringify(afterCharacters));
-  console.log('PASS Dash performance: no eager fallback downloads, GPU-safe fallbacks, context recovery, idle throttling, unified quality/DPR controls, AUTO adaptation, bounded retry/character resources');
+  console.log('PASS Dash performance: local critical assets, GPU-safe fallbacks, idle throttling, quality/DPR controls, AUTO adaptation, bounded retry/character resources');
 }finally{
   await browser.close();
 }

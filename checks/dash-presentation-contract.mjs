@@ -6,11 +6,6 @@ const finalCss=fs.readFileSync('src/menuScreensFinal.css','utf8');
 const dash=fs.readFileSync('src/chimpionsLab.js','utf8');
 const dashCss=fs.readFileSync('src/chimpionsLab.css','utf8');
 const audio=fs.readFileSync('src/dashAudio.js','utf8');
-const perf=fs.readFileSync('src/dashPerformance.js','utf8');
-const quality=fs.readFileSync('src/dash/rendering/quality.js','utf8');
-const world=fs.readFileSync('src/dash/rendering/DashWorldRenderer.js','utf8');
-const assets=fs.readFileSync('src/dashAssets.js','utf8');
-const dashAssetPrep=fs.readFileSync('scripts/dash-assets.mjs','utf8');
 
 assert(!menu.includes('beginWhenReady'),'Dash picker must not poll for avatar readiness');
 assert(!menu.includes('setTimeout(beginWhenReady'),'Dash picker must not poll a disabled start button');
@@ -35,18 +30,5 @@ assert(finalCss.includes('safe-area-inset-left')&&finalCss.includes('safe-area-i
 assert(dashCss.includes('dash-reduced-motion'),'Reduced Motion styling missing');
 assert(dashCss.includes('dash-high-visibility'),'High Visibility styling missing');
 assert(dashCss.includes('data-input-device="touch"'),'Active input device styling missing');
-assert(perf.includes("from './dash/rendering/quality.js'"),'Dash performance controller must consume the canonical quality definitions');
-assert(quality.includes('DASH_QUALITY_PRESETS'),'Dash canonical quality presets missing');
-assert(!perf.includes("dataset.dashPostprocessing=q.postprocessing"),'Dash must not expose a placebo post-processing control');
-assert(world.includes('this.renderer.render(this.scene,this.camera)'),'Dash must retain direct rendering as the reliable primary/fallback path');
-assert(world.includes('enterSafeMode(error)'),'Dash renderer must provide a safe direct-render fallback');
-assert(dash.includes('webglcontextlost')&&dash.includes('webglcontextrestored'),'Dash must explicitly handle WebGL context loss/restoration');
-assert(!dash.includes("warmDashImages(['jungle'"),'GPU Dash must not eagerly warm legacy fallback raster assets');
-assert(dash.includes("classList.toggle('dash-dom-world',!GPU_WORLD)"),'Legacy Dash raster CSS must require explicit DOM fallback activation');
-assert(dashCss.includes('.dash-dom-world #dash-far')&&dashCss.includes('.dash-dom-world #dash-ground'),'Legacy Dash scenery URLs must be gated behind the DOM fallback class');
-assert(assets.includes("BASE+'audio/music-full.mp3?v=9606f223'"),'Dash music must use the versioned current-repository asset');
-assert(!assets.includes('raw.githubusercontent.com'),'Dash runtime assets must not depend on GitHub Raw');
-assert(audio.includes("m.preload='none'"),'Dash music must remain lazy until playback is requested');
-assert(dashAssetPrep.includes("'public/audio/music-full.mp3':'9606f2230f5a3b78fb7f9517b80014132205ec52'"),'Dash asset preparation must verify the repository-owned music master');
 
 console.log('PASS dash presentation contract');

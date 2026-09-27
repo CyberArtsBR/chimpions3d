@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 const EXPECTED=Object.freeze({
-  'public/audio/music-full.mp3':'9606f2230f5a3b78fb7f9517b80014132205ec52',
   'public/dash/assets/jungle-v2.1f8e991e.webp':'1f8e991ee9a8c21fd65b337d14b46d21d7d0aa55',
   'public/dash/assets/ground-green.5163bede.png':'5163bedeef55b416fc3b1d438178d458befe3f64',
   'public/dash/assets/sprites/log.bdc546a2.png':'bdc546a23cf992d20f157a76f11a9554bda8ade6',
@@ -31,4 +30,4 @@ for(const [file,expected] of Object.entries(EXPECTED)){
   if(actual!==expected)throw new Error(`Dash asset integrity mismatch for ${file}: ${actual} != ${expected}`);
   totalBytes+=bytes.length;
 }
-console.log(`Dash prepared runtime assets: ${Object.keys(EXPECTED).length} files · ${totalBytes} bytes · content-addressed and runtime-ready`);
+console.log(`Dash prepared visual assets: ${Object.keys(EXPECTED).length} files · ${totalBytes} bytes · content-addressed and runtime-ready`);
