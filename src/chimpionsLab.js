@@ -4,7 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
-import {DASH_MUSIC_URL,DASH_AUDIO_SAMPLE_SLOTS,dashSpriteUrl,warmDashImages} from './dashAssets.js';
+import {DASH_MUSIC_URL,DASH_AUDIO_SAMPLE_SLOTS,dashSpriteUrl} from './dashAssets.js';
 import {createDashPerformanceController} from './dashPerformance.js';
 import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
@@ -38,7 +38,7 @@ document.body.dataset.mode='lab';
 document.body.innerHTML=`
 <main id="dash-stage" aria-label="Chimpions Dash">
   <div id="dash-sky"></div><div id="dash-far"></div><div id="dash-mid"></div><div id="dash-light"></div>
-  <div id="dash-objects"></div><div id="dash-ground"></div><div id="dash-shadow"></div><div id="lab-3d"></div>
+  <div id="dash-objects"></div><div id="dash-ground"></div><div id="dash-shadow"></div><div id="dash-player-fallback" hidden aria-hidden="true"></div><div id="lab-3d"></div>
 
   <header id="dash-hud" aria-label="Run status">
     <div class="brand"><small>CHIMPIONS</small><strong>DASH</strong></div>
@@ -250,30 +250,55 @@ const applyDashQuality=detail=>{if(detail?.tier)dashGraphics.applyQualityState(d
 window.addEventListener('chimpions-dash-quality-change',event=>applyDashQuality(event.detail||{}));
 applyDashQuality(performanceController.qualityState());
 
-let webglContextLost=false,renderBlocked=false;
+let webglContextLost=false,renderBlocked=false,contextRecoveryTimer=0;
 const recoveryPanel=$('dash-render-recovery'),recoveryMessage=$('dash-render-recovery-message');
 function showRenderRecovery(message,fatal=false){
   if(recoveryMessage)recoveryMessage.textContent=message;
   if(recoveryPanel){recoveryPanel.hidden=false;recoveryPanel.dataset.fatal=fatal?'true':'false';}
 }
 function hideRenderRecovery(){if(recoveryPanel){recoveryPanel.hidden=true;delete recoveryPanel.dataset.fatal;}}
+function populateDomFallback(){
+  document.documentElement.classList.add('dash-dom-world');
+  renderer.domElement.style.visibility='hidden';
+  const player=$('dash-player-fallback');if(player)player.hidden=false;
+  for(const o of obstacles)if(!o.el)o.el=acquire('hazard',o.id,o.w,o.visualHeight||o.h);
+  for(const b of bananas)if(!b.el){const id=b.golden?'golden':'banana',size=b.golden?38:34;b.el=acquire('banana',id,size,size);}
+  renderObjects();
+}
+function clearDomFallback(){
+  document.documentElement.classList.toggle('dash-dom-world',!GPU_WORLD);
+  renderer.domElement.style.removeProperty('visibility');
+  const player=$('dash-player-fallback');if(player)player.hidden=true;
+  for(const o of obstacles){if(o.el){recycle(o.el);o.el=null;}}
+  for(const b of bananas){if(b.el){recycle(b.el);b.el=null;}}
+}
 function failRenderRecovery(message){
-  renderBlocked=true;showRenderRecovery(message||'Graphics could not be restored. Refresh the page to retry safely.',true);
-  voice.setDash(false);voice.suspendMusic();voice.stopAmbience();
+  renderBlocked=true;webglContextLost=false;accumulator=0;last=performance.now();populateDomFallback();
+  showRenderRecovery(message||'Graphics switched to compatibility mode. Your run can continue.',true);
+  if(state==='running'){voice.resumeMusic();voice.startAmbience();voice.setDash(true);}
+  performanceController.invalidate();
+  setTimeout(()=>{if(renderBlocked)hideRenderRecovery();},2600);
 }
 function onWebGLContextLost(event){
   event.preventDefault();webglContextLost=true;dashGraphics.setContextLost(true);accumulator=0;
   voice.setDash(false);voice.suspendMusic();voice.stopAmbience();
   showRenderRecovery('Graphics device lost. Restoring your current run…');performanceController.invalidate();
+  clearTimeout(contextRecoveryTimer);
+  contextRecoveryTimer=setTimeout(()=>{
+    if(!webglContextLost)return;
+    console.warn('Dash WebGL restore timed out; continuing with DOM compatibility rendering.');
+    failRenderRecovery('Graphics device unavailable. Compatibility mode active; your run continues.');
+  },2200);
 }
 function onWebGLContextRestored(){
+  clearTimeout(contextRecoveryTimer);contextRecoveryTimer=0;
   try{
-    dashGraphics.restoreContextState();performanceController.reapply('context-restored');resize3D();
+    dashGraphics.restoreContextState();performanceController.reapply('context-restored');resize3D();clearDomFallback();
     webglContextLost=false;renderBlocked=false;last=performance.now();accumulator=0;hideRenderRecovery();performanceController.invalidate();
-    if(state==='running'){voice.resumeMusic();voice.startAmbience();}
+    if(state==='running'){voice.resumeMusic();voice.startAmbience();voice.setDash(true);}
   }catch(error){
     console.error('Dash WebGL restoration failed.',error);
-    webglContextLost=false;failRenderRecovery('Graphics restoration failed. Refresh the page to retry safely.');
+    failRenderRecovery('Graphics restoration failed. Compatibility mode active; your run continues.');
   }
 }
 renderer.domElement.addEventListener('webglcontextlost',onWebGLContextLost,false);
@@ -441,7 +466,7 @@ function overheadBlocksStand(){
 
 const sweptContact=sweptDashContact;
 function acquire(kind,id,w,h){
-  if(GPU_WORLD)return null;
+  if(GPU_WORLD&&!renderBlocked)return null;
   const el=pools[kind].pop()||document.createElement('img');
   el.hidden=false;el.className=kind+' '+(id||'');el.alt='';el.draggable=false;
   const request=String(Number(el.dataset.request||0)+1);el.dataset.request=request;
@@ -595,9 +620,10 @@ function maintainWorld(){
   }
 }
 function renderObjects(){
-  if(GPU_WORLD||!run)return;
+  if((GPU_WORLD&&!renderBlocked)||!run)return;
   const m=metrics();
   for(const o of obstacles){
+    if(!o.el)continue;
     const x=(o.x-run.scroll)*m.scale;
     o.el.style.width=Math.round(o.w*m.scale)+'px';
     o.el.style.height=Math.round(o.visualHeight*m.scale)+'px';
@@ -605,10 +631,20 @@ function renderObjects(){
     o.el.style.bottom=Math.round(m.groundBottom+o.visualY*m.scale)+'px';
   }
   for(const b of bananas){
+    if(!b.el)continue;
     const size=(b.golden?38:34)*m.scale,x=(b.x-run.scroll)*m.scale;
     b.el.style.width=Math.round(size)+'px';b.el.style.height=Math.round(size)+'px';
     b.el.style.bottom=Math.round(m.groundBottom)+'px';
     b.el.style.transform=`translate3d(${Math.round(x)}px,${Math.round(-b.y*m.scale)}px,0) rotate(${run.time*100%360}deg)`;
+  }
+  const fallbackPlayer=$('dash-player-fallback');
+  if(fallbackPlayer){
+    const sliding=run.grounded&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked);
+    const width=Math.max(28,COLLIDER_WIDTH*m.scale*(sliding?1.35:1)),height=Math.max(36,(sliding?SLIDING_HEIGHT:STANDING_HEIGHT)*m.scale);
+    fallbackPlayer.hidden=false;fallbackPlayer.style.width=Math.round(width)+'px';fallbackPlayer.style.height=Math.round(height)+'px';
+    fallbackPlayer.style.left=Math.round(PLAYER_X*m.scale-width*.5)+'px';
+    fallbackPlayer.style.bottom=Math.round(m.groundBottom+(run.y+COLLIDER_BOTTOM)*m.scale)+'px';
+    fallbackPlayer.style.transform=sliding?'scaleX(1.14) scaleY(.72)':'none';
   }
 }
 
@@ -854,7 +890,7 @@ function renderUI(dt){
   }
   if(active.landed)landingVisualSpeed=0;active.landed=false;
   const shadow=$('dash-shadow');
-  if(shadow&&!GPU_WORLD){
+  if(shadow&&(!GPU_WORLD||renderBlocked)){
     const jump=active.y*m.scale;
     shadow.style.left=Math.round(PLAYER_X*m.scale)+'px';
     shadow.style.width=Math.round(104*m.scale)+'px';
@@ -950,6 +986,7 @@ addEventListener('pagehide',()=>{
   renderer.setAnimationLoop(null);
   renderer.domElement.removeEventListener('webglcontextlost',onWebGLContextLost,false);
   renderer.domElement.removeEventListener('webglcontextrestored',onWebGLContextRestored,false);
+  clearTimeout(contextRecoveryTimer);
   voice.destroy();character?.dispose?.();dashGraphics.dispose();renderer.dispose();
 },{once:true});
 if(new URLSearchParams(location.search).has('test')){
@@ -968,7 +1005,7 @@ setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
-  if(webglContextLost||renderBlocked){accumulator=0;return;}
+  if(webglContextLost){accumulator=0;return;}
   if(elapsedFrame>.3&&state==='running'&&!suppressLongFramePause)pause();pollGamepad();
   performanceController.observeFrame(elapsedFrame*1000,state,now);
   if(state==='running'){
@@ -978,8 +1015,9 @@ renderer.setAnimationLoop(now=>{
   }else accumulator=0;
   if(performanceController.shouldRender(now,state)){
     renderUI(frameDt);
-    if(dashGraphics.render())performanceController.markRendered(now);
-    else failRenderRecovery('Graphics could not render safely. Refresh the page to retry.');
+    if(renderBlocked)performanceController.markRendered(now);
+    else if(dashGraphics.render())performanceController.markRendered(now);
+    else failRenderRecovery('Graphics could not render safely. Compatibility mode active; your run continues.');
   }
 });
 
