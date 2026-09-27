@@ -49,6 +49,17 @@ try{
   assert.equal(high.bloomEnabled,false,'HIGH must not reintroduce glow/bloom');
   assert.equal(high.lightShaftsEnabled,false,'HIGH must not reintroduce light shafts');
 
+  await page.waitForFunction(()=>window.chimpJump?.().forestLoadedTextureScale>=2,null,{timeout:15000});
+  const highEnhanced=await page.evaluate(()=>window.chimpJump());
+  assert(highEnhanced.forestLoadedTextureScale>=2,'HIGH must replace all preview layers with the 2048x1536 enhanced vector canopy');
+
+  await page.evaluate(()=>window.chimpJumpTest.setQuality('balanced'));
+  await page.evaluate(()=>window.chimpJumpTest.render());
+  const balancedEnhanced=await page.evaluate(()=>window.chimpJump());
+  assert(balancedEnhanced.forestLoadedTextureScale>=2,'BALANCED must use the same enhanced vector canopy assets');
+  await page.evaluate(()=>window.chimpJumpTest.setQuality('high'));
+  await page.evaluate(()=>window.chimpJumpTest.render());
+
   await page.evaluate(()=>{window.chimpJumpTest.startRun();window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();});
   await page.evaluate(()=>{const g=window.chimpJumpTest.game();g.camera=250;g.previousCamera=250;g.height=250;g.y=250;g.time=34;g.paceClock=34;});
   for(let i=0;i<24;i++)await page.evaluate(()=>window.chimpJumpTest.renderStep(.05));
@@ -66,10 +77,11 @@ try{
 
   console.log(JSON.stringify({
     status:'PASS',
-    balanced:{forestVisibleLayers:balanced.forestVisibleLayers,forestTextureScale:balanced.forestTextureScale,rainDensity:balanced.qualitySettings.rainDensity,dom:balancedDom},
+    balanced:{forestVisibleLayers:balanced.forestVisibleLayers,forestTextureScale:balanced.forestTextureScale,forestLoadedTextureScale:balancedEnhanced.forestLoadedTextureScale,rainDensity:balanced.qualitySettings.rainDensity,dom:balancedDom},
     high:{
       forestVisibleLayers:high.forestVisibleLayers,
       forestTextureScale:high.forestTextureScale,
+      forestLoadedTextureScale:highEnhanced.forestLoadedTextureScale,
       rendererDpr:high.rendererDpr,
       shadowMapSize:high.shadowMapSize,
       anisotropyRequested:high.anisotropyRequested,
