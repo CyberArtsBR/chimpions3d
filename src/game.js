@@ -37,7 +37,7 @@ document.querySelector('.gamepad-callout span').textContent='Play with a control
 const pixelBackdrop=createPixelBackdrop($('world'));
 let pixelMode=new URLSearchParams(location.search).get('background')==='pixel';
 const backdropButton=document.createElement('button');backdropButton.id='background-style';document.body.append(backdropButton);
-function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel expedition':'Scenery: Golden forest';}
+function applyBackdrop(){document.body.classList.toggle('pixel-mode',pixelMode);pixelBackdrop.canvas.hidden=!pixelMode;scenery.setPixelMode(pixelMode);backdropButton.textContent=pixelMode?'Scenery: Pixel expedition':'Scenery: Golden forest';window.dispatchEvent(new CustomEvent('chimp-scenery-style-change',{detail:{pixelMode,label:backdropButton.textContent}}));}
 backdropButton.onclick=()=>{pixelMode=!pixelMode;applyBackdrop();};
 const collectionDialog=document.createElement('dialog');collectionDialog.id='collection-dialog';
 collectionDialog.setAttribute('aria-label','Choose your chimp');
@@ -69,21 +69,23 @@ const scenery=createScenery(scene,renderer),fallSplash=createFallSplash(scene),d
 const renderPipeline=createJumpRenderPipeline({renderer,scene,camera,sun,width:innerWidth,height:innerHeight});
 function removeBranch(m){world.remove(m);m.traverse(o=>{if(o.isInstancedMesh)o.dispose();});}
 function removeHazard(m){world.remove(m);m.userData.telegraph?.material?.dispose?.();}
-const mobileProfile=()=>matchMedia('(pointer: coarse)').matches||innerWidth<=600;
 let selectedQuality='high';
 try{selectedQuality=resolveJumpQualityProfile(localStorage.getItem('chimp-jump-detail')||'high');}catch{}
-let activeQualityName=mobileProfile()?'balanced':selectedQuality;
+let activeQualityName=selectedQuality;
 let activeQuality=getJumpQualityProfile(activeQualityName);
 let highDetail=!!activeQuality.highScenery;
 function quality(){
- activeQualityName=mobileProfile()?'balanced':selectedQuality;
+ activeQualityName=selectedQuality;
  activeQuality=getJumpQualityProfile(activeQualityName);
  highDetail=!!activeQuality.highScenery;
  document.body.dataset.jumpQuality=activeQualityName;
  renderPipeline.applyQuality(activeQuality);
- scenery.setQuality(activeQuality,{constrained:mobileProfile()});
- $('quality').textContent='Detail: '+(mobileProfile()?'Balanced · Mobile':activeQuality.label+' · Desktop');
- $('quality').disabled=mobileProfile();
+ // Quality is user-selected on both desktop and mobile. Lower presets remain
+ // available for thermal/battery limits instead of silently forcing Balanced.
+ scenery.setQuality(activeQuality,{constrained:false});
+ $('quality').textContent='Graphics: '+activeQuality.label;
+ $('quality').disabled=false;
+ window.dispatchEvent(new CustomEvent('chimp-graphics-quality-change',{detail:{profile:activeQualityName,label:activeQuality.label}}));
  resize();
 }
 $('quality').onclick=()=>{

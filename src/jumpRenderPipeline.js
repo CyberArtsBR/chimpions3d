@@ -171,7 +171,7 @@ function targetTypeLabel(type){
 
 export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerWidth,height=innerHeight}={}){
   let settings=null,composer=null,rootTarget=null,renderPass=null,ssaoPass=null,bloomPass=null,lutPass=null,atmospherePass=null,dofPass=null,sharpenPass=null,outputPass=null;
-  let viewportWidth=Math.max(1,width|0),viewportHeight=Math.max(1,height|0),activeTheme=0,builds=0,prewarms=0;
+  let viewportWidth=Math.max(1,width|0),viewportHeight=Math.max(1,height|0),activeTheme=0,builds=0,prewarms=0,fallbackReason='';
   const luts=[0,1,2,3].map(index=>makeLut(16,index));
   const contactShadow=makeContactShadow();scene.add(contactShadow);
 
@@ -291,8 +291,14 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
     const dprCap=Math.max(dprFloor,Number(settings.dprCap)||dprFloor);
     renderer.setPixelRatio(Math.min(Math.max(deviceDpr,dprFloor),dprCap));
     applyShadows();
-    if(previous!==settings.profile||!!composer!==!!settings.postProcessing)buildComposer();
-    else{
+    if(previous!==settings.profile||!!composer!==!!settings.postProcessing){
+      try{buildComposer();fallbackReason='';}
+      catch(error){
+        fallbackReason=error?.message||'post pipeline unavailable';
+        console.warn('Jump post pipeline unavailable; using direct rendering.',error);
+        disposeComposer();
+      }
+    }else{
       if(bloomPass){
         bloomPass.strength=settings.bloomStrength||0;
         bloomPass.radius=settings.bloomRadius||0;
@@ -347,8 +353,14 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
   }
 
   function render(dt=0){
-    if(composer)composer.render(dt);
-    else renderer.render(scene,camera);
+    if(!composer){renderer.render(scene,camera);return;}
+    try{composer.render(dt);}
+    catch(error){
+      fallbackReason=error?.message||'post render failed';
+      console.warn('Jump post render failed; falling back to direct rendering.',error);
+      disposeComposer();
+      renderer.render(scene,camera);
+    }
   }
 
   function getDiagnostics(){
@@ -374,6 +386,8 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
       atmosphereResolutionScale:settings?.atmosphereResolutionScale||0,
       lightShaftsEnabled:!!atmospherePass&&!!settings?.lightShafts,
       depthOfFieldEnabled:!!dofPass?.enabled,
+      directRenderFallback:!composer&&!!settings?.postProcessing,
+      fallbackReason,
       pipelineBuilds:builds,
       pipelinePrewarms:prewarms
     };
