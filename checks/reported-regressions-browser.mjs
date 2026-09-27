@@ -62,18 +62,27 @@ try{
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   await page.evaluate(()=>window.chimpJumpTest.render());
 
+  await page.evaluate(()=>window.chimpJumpTest.setQuality('balanced'));
+  await page.evaluate(()=>window.chimpJumpTest.render());
+  const balanced=await snapshot('balanced');
+  const balancedDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
+
+  await page.evaluate(()=>window.chimpJumpTest.setQuality('high'));
+  await page.evaluate(()=>window.chimpJumpTest.render());
   const high=await snapshot('high');
   assert.equal(high.quality,'high');
   assert.equal(high.backgroundMode,'layered-forest','HIGH must use the Balanced layered-forest background style');
   assert.equal(high.treeAuthoredVisible,false,'HIGH must not show the authored tree plate');
   assert.equal(high.treeFallbackVisible,true,'HIGH must render the layered forest');
+  assert.equal(high.forestVisibleLayers,balanced.forestVisibleLayers,'HIGH must use the same forest-layer composition as Balanced');
   assert(high.forestTextureScale>=1.5,'HIGH layered forest must use the high-density texture set');
   assert(Math.abs(high.rendererDpr-1.6)<.01,'HIGH must render at true 1.6 DPR');
   assert.equal(high.ambientOcclusionEnabled,true,'HIGH must retain max-quality ambient occlusion');
   assert.equal(high.sharpenEnabled,true,'HIGH must retain sharpening');
   assert.equal(high.colorGradingEnabled,true,'HIGH must retain color grading');
   const highDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
-  assert(highDom.every(item=>item.display!=='none'),'HIGH must preserve the Balanced presentation-layer background composition');
+  assert.deepEqual(highDom,balancedDom,'HIGH must preserve the exact Balanced DOM background composition');
+  report.balancedDom=balancedDom;
   report.highDom=highDom;
 
   // The historical arcade ramp was roughly .92x -> 3.0x by five minutes.
