@@ -83,6 +83,7 @@ jobs:
           node --check checks/dash-accessibility-browser.mjs
           node --check checks/dash-runtime-determinism-browser.mjs
           node --check checks/dash-gamepad-flow-browser.mjs
+          node --check checks/dash-runtime-reliability-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
