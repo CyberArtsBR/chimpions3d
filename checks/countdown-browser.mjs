@@ -13,10 +13,10 @@ try{
   await gotoJump(page,{test:true});
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
-  await page.locator('#confirm-chimpion').focus();
+  await page.locator('#collection-dialog .avatar-option:not(:disabled)').first().focus();
   await page.evaluate(()=>{
     window.__qaCountdownPad.buttons[0].pressed=true;
-    document.getElementById('confirm-chimpion').click();
+    document.activeElement?.click();
   });
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting'&&window.chimpJump().countdown===3,{timeout:5000});
   const seedAfterConfirm=await page.evaluate(()=>window.chimpJump().runSeed);
