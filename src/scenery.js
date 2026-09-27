@@ -688,7 +688,7 @@ export function createScenery(scene,renderer){
      treeImageMesh.material.color.set(0xffffff);
     }
     const phaseFrom=Number.isFinite(weather.from)?weather.from:biome,phaseTo=Number.isFinite(weather.to)?weather.to:biome;
-    applyPhaseBackgroundBlend(phaseFrom,phaseTo,blend);refreshBackground();
+    applyPhaseBackgroundBlend(phaseFrom,phaseTo,blend);
     for(const mesh of phaseBackgroundMeshes)if(mesh?.visible){mesh.position.x=0;mesh.position.y=currentCamera;}
     goldenWash.visible=false;goldenWash.material.opacity=0;
     neonWash.visible=false;neonWash.material.opacity=0;
