@@ -59,8 +59,8 @@ try{
     const ext=gl?.getExtension('WEBGL_lose_context');
     if(!ext)return {supported:false};
     const before=window.chimpionsDashTest.snapshot().run.time;
-    window.__dashContextProbe={before,lost:false,restored:false};
-    canvas.addEventListener('webglcontextlost',()=>{window.__dashContextProbe.lost=true;},{once:true});
+    window.__dashContextProbe={before,lost:false,lostTime:null,restored:false};
+    canvas.addEventListener('webglcontextlost',()=>{window.__dashContextProbe.lost=true;window.__dashContextProbe.lostTime=window.chimpionsDashTest.snapshot().run.time;},{once:true});
     canvas.addEventListener('webglcontextrestored',()=>{window.__dashContextProbe.restored=true;},{once:true});
     ext.loseContext();setTimeout(()=>ext.restoreContext(),180);
     return {supported:true,before};
@@ -68,8 +68,8 @@ try{
   if(contextSupport.supported){
     await page.waitForFunction(()=>window.__dashContextProbe?.lost===true,{timeout:3000});
     await page.waitForTimeout(120);
-    const frozen=await page.evaluate(()=>({time:window.chimpionsDashTest.snapshot().run.time,recovery:!document.getElementById('dash-render-recovery').hidden}));
-    assert(Math.abs(frozen.time-contextSupport.before)<.02,'Dash simulation must freeze while WebGL context is lost');
+    const frozen=await page.evaluate(()=>({time:window.chimpionsDashTest.snapshot().run.time,lostTime:window.__dashContextProbe.lostTime,recovery:!document.getElementById('dash-render-recovery').hidden}));
+    assert(Math.abs(frozen.time-frozen.lostTime)<.02,'Dash simulation must freeze while WebGL context is lost');
     assert(frozen.recovery,'Context loss must expose a readable recovery state');
     await page.waitForFunction(()=>window.__dashContextProbe?.restored===true,{timeout:5000});
     await page.waitForFunction(()=>document.getElementById('dash-render-recovery').hidden===true,{timeout:5000});
