@@ -21,7 +21,7 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v9-higher-lateral-routes';
+export const RULESET='2026-09-expedition-v11-hard-zigzag-routes';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
@@ -64,7 +64,7 @@ export class Game {
   this.bounceAge=0;this.bounces=0;this.bananas=0;this.dead=false;
   this.event=null;this.eventIndex=0;this.nextEventAt=firstEventTime(this.runSeed);this.specialBlockedUntil=0;
   this.lastMilestone=0;this.hazardCooldown=0;this.hazards=[];this.nextHazardId=0;
-  this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;
+  this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;this.lastRouteDirection=0;
   this.encounterIndex=0;this.encounter=null;this.lastEncounterId='';this.extraRecoveryPending=false;
   this.add(0,0,2.8,'solid',false,'safe',{encounterType:'start',encounterPhase:ENCOUNTER_PHASES.READ});
   this.generate();
@@ -182,32 +182,39 @@ export class Game {
    const recovery=step.recovery||step.phase===ENCOUNTER_PHASES.READ||step.phase===ENCOUNTER_PHASES.RELEASE;
    const rise=difficulty.rise+(this.random()-.5)*JUMP_DIFFICULTY.rise.jitter*(recovery ? .65 : 1);
    const y=this.nextY+rise;
-   const width=Math.min(2.58,difficulty.routeWidth+(recovery ? .18 : 0));
-   const limit=WIDTH/2-VINE_INSET-.35-width*PLATFORM_LENGTH/2;
-   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.92:recovery?.76:.84;
+   const width=Math.min(2.35,difficulty.routeWidth+(recovery ? .08 : 0));
+   const targetWidth=width*PLATFORM_LENGTH;
+   const limit=WIDTH/2-VINE_INSET-.35-targetWidth/2;
+   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.98:recovery?.94:.96;
    const reach=Math.min(difficulty.routeShift*phaseShift,WIDTH/2);
-   const minShiftFactor=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.92:recovery?.72:.86;
-   const minShift=Math.min(reach*.78,Math.max(.78,difficulty.routeMinShift*minShiftFactor));
-   const candidates=[],emergency=[];
+   const minShiftFactor=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.98:recovery?.90:.95;
+   const edgeGap=difficulty.routeEdgeGap*(recovery?.58:1);
+   const footprintShift=(this.nextWidth+targetWidth)/2+edgeGap;
+   const minShift=Math.min(reach*.97,Math.max(2.35,difficulty.routeMinShift*minShiftFactor,footprintShift));
+   const candidates=[],viable=[];
    for(let x=-limit;x<=limit+.001;x+=.2){
+    if(!this.canPlace(x,y,targetWidth,'solid')||!this.requiredTransferViable(x,y,width))continue;
+    viable.push(x);
     const distance=wrappedDistance(x,this.nextX);
-    if(distance<=reach&&this.canPlace(x,y,width*PLATFORM_LENGTH,'solid')&&this.requiredTransferViable(x,y,width)){
-     if(distance>=minShift)candidates.push(x);
-     else if(distance>.58)emergency.push(x);
-    }
+    if(distance>=minShift&&distance<=reach)candidates.push(x);
    }
    let x;
-   if(candidates.length){
-    const centered=candidates.filter(value=>Math.abs(value)<=limit*.88);
-    const pool=centered.length?centered:candidates;
-    x=pool[Math.floor(this.random()*pool.length)];
-   }else if(emergency.length){
-    emergency.sort((a,b)=>wrappedDistance(b,this.nextX)-wrappedDistance(a,this.nextX));
-    const pool=emergency.slice(0,Math.min(4,emergency.length));
-    x=pool[Math.floor(this.random()*pool.length)];
+   const source=candidates.length?candidates:viable;
+   if(source.length){
+    const ranked=[...source].sort((a,b)=>wrappedDistance(b,this.nextX)-wrappedDistance(a,this.nextX));
+    const opposite=ranked.filter(value=>{
+     if(!this.lastRouteDirection)return true;
+     const direction=Math.sign(wrapX(value-this.nextX));
+     return direction&&direction!==this.lastRouteDirection;
+    });
+    const useOpposite=opposite.length&&this.lastRouteDirection&&this.random()<.72;
+    const directionalPool=useOpposite?opposite:ranked;
+    const hardFraction=step.phase===ENCOUNTER_PHASES.CHALLENGE?.18:recovery?.42:.28;
+    const hardPool=directionalPool.slice(0,Math.max(1,Math.ceil(directionalPool.length*hardFraction)));
+    x=hardPool[Math.floor(this.random()*hardPool.length)];
    }else{
-    // Preserve a guaranteed route only as a last resort. Normal generation now
-    // strongly avoids near-vertical "minimal side adjustment" safety chains.
+    // Absolute emergency only: normal generation should always find a deliberate
+    // lateral transfer. Keep this only to avoid terminating an otherwise valid run.
     x=Math.max(-limit,Math.min(limit,this.nextX));
     if(!this.requiredTransferViable(x,y,width))break;
    }
@@ -217,6 +224,8 @@ export class Game {
     required:true,recovery,extendedRecovery:!!step.extendedRecovery
    }))break;
    const safePlatform=this.platforms.at(-1);
+   const chosenDirection=Math.sign(wrapX(x-this.nextX));
+   if(chosenDirection)this.lastRouteDirection=chosenDirection;
    this.nextX=x;this.nextY=y;this.nextWidth=safePlatform.width;
 
    const optional=this.addOptional(step,safePlatform,difficulty);

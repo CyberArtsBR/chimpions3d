@@ -27,17 +27,18 @@ export const JUMP_DIFFICULTY=Object.freeze({
   Object.freeze([240,2.584]),
   Object.freeze([300,3.00])
  ]),
- routeWidth:Object.freeze({start:2.34,end:1.72}),
- rise:Object.freeze({start:3.92,end:4.32,jitter:.22}),
- routeShift:Object.freeze({start:2.35,end:3.65}),
- routeMinShift:Object.freeze({start:1.10,end:1.82}),
+ routeWidth:Object.freeze({start:2.00,end:1.34}),
+ rise:Object.freeze({start:4.08,end:4.48,jitter:.26}),
+ routeShift:Object.freeze({start:4.20,end:5.50}),
+ routeMinShift:Object.freeze({start:3.00,end:4.10}),
+ routeEdgeGap:Object.freeze({start:.65,end:1.15}),
  optionalWidth:Object.freeze({start:1.85,end:1.12}),
  optionalRewardDistance:Object.freeze({start:1.2,end:3.0}),
  movingFrequency:Object.freeze({start:.08,end:.25}),
  hazardDensity:Object.freeze({start:.03,end:.22}),
- recoveryFrequency:Object.freeze({start:.20,end:.12}),
+ recoveryFrequency:Object.freeze({start:.10,end:.04}),
  maxEncounterComplexity:5,
- safeLandingMargin:.30,
+ safeLandingMargin:.36,
  hazardSafeMargin:.65,
  dynamicHazardTelegraphMin:.85
 });
@@ -153,6 +154,7 @@ export function difficultyAt(height=0,time=0){
   rise:lerp(JUMP_DIFFICULTY.rise.start,JUMP_DIFFICULTY.rise.end,intensity),
   routeShift:lerp(JUMP_DIFFICULTY.routeShift.start,JUMP_DIFFICULTY.routeShift.end,intensity),
   routeMinShift:lerp(JUMP_DIFFICULTY.routeMinShift.start,JUMP_DIFFICULTY.routeMinShift.end,intensity),
+  routeEdgeGap:lerp(JUMP_DIFFICULTY.routeEdgeGap.start,JUMP_DIFFICULTY.routeEdgeGap.end,intensity),
   optionalWidth:lerp(JUMP_DIFFICULTY.optionalWidth.start,JUMP_DIFFICULTY.optionalWidth.end,intensity),
   optionalRewardDistance:lerp(JUMP_DIFFICULTY.optionalRewardDistance.start,JUMP_DIFFICULTY.optionalRewardDistance.end,intensity),
   movingFrequency:lerp(JUMP_DIFFICULTY.movingFrequency.start,JUMP_DIFFICULTY.movingFrequency.end,intensity),
@@ -229,7 +231,9 @@ export function validateRequiredTransfer({
 }){
  const acceptance=Math.max(.16,targetWidth/2-landingMargin);
  const direction=Math.sign(wrappedDelta(fromX,toX,wrapSpan))||1;
- const initialVelocities=[0,-direction*speed,direction*speed*.55];
+ // The required route is guaranteed from neutral or modestly-wrong momentum, not
+ // from a full-speed wrong-way entry. Players now need to plan the next landing.
+ const initialVelocities=[0,-direction*speed*.38,direction*speed*.72];
  const results=initialVelocities.map(initialVx=>simulateHorizontalTransfer({
   fromX,toX,flightTime,initialVx,speed,acceleration,step,wrapSpan,targetAt
  }));
