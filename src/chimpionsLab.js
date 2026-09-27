@@ -233,7 +233,7 @@ const randomValue=nextDashRandom;
 const multiplier=dashMultiplier;
 
 function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
-let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
+let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false,landingVisualSpeed=0;
 let suppressLongFramePause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 const performanceController=createDashPerformanceController({renderer,scene,keyLight:key,getRuntimeStats:()=>({hazards:obstacles.length,bananas:bananas.length,poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},domGameplayNodes:objectLayer.childElementCount})});
@@ -308,7 +308,13 @@ window.addEventListener('chimpions-dash-feedback',event=>{
   showFeedback(label,event.detail?.kind||'');
   if(feedbackSound[label])voice.play(feedbackSound[label],{gain:.72});
 });
-window.addEventListener('chimpions-dash-foot-contact',()=>{if(state==='running')voice.play('footstep',{gain:.42,pitch:.96+Math.random()*.08})});
+window.addEventListener('chimpions-dash-foot-contact',event=>{
+  if(state!=='running'||!run?.grounded||(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked))return;
+  const detail=event.detail||{},side=detail.side==='right'?'right':'left',intensity=clamp(Number(detail.intensity)||.65,.25,1.2);
+  const speedRatio=clamp(Number(detail.speed)||run.speed/BASE_SPEED,.5,3);
+  voice.play('footstep',{gain:.28+intensity*.16,pitch:.91+clamp((speedRatio-1)*.055,-.03,.1)+(side==='left'?-0.012:.012)});
+  dashGraphics.emit('footContact',{x:runnerWorldX+(side==='left'?-.055:.055),y:groundWorldY+.035,direction:-1,intensity:.34+intensity*.22});
+});
 
 
 
@@ -555,7 +561,8 @@ function movePlayer(dt){
   run.jumpAge+=dt;run.y+=run.vy*dt-gravity*dt*dt/2;run.vy-=gravity*dt;
   if(previousVy>0&&run.vy<=0)emitDashEvent(DASH_EVENTS.apex,dashMeta({y:run.y}));
   if(run.y<=0){
-    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');dashGraphics.emit('land',{x:runnerWorldX,y:groundWorldY+.06});
+    landingVisualSpeed=Math.abs(run.vy);
+    run.y=0;run.vy=0;run.jumpHeld=false;run.grounded=true;run.landing=.095;run.landed=true;voice.play('land');dashGraphics.emit('land',{x:runnerWorldX,y:groundWorldY+.06,intensity:clamp(landingVisualSpeed/720,.55,1.2)});
     emitDashEvent(DASH_EVENTS.land,dashMeta({}));
     if(run.jumpBuffer>0)jump(run.jumpBufferHeld);
   }else run.grounded=false;
@@ -576,7 +583,7 @@ function startRun(options={}){
   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
   const seed=Number.isInteger(options?.seed)?options.seed:null;
   const tutorial=typeof options?.tutorial==='boolean'?options.tutorial:shouldRunDashTutorial();
-  clearInputs();clearWorld();dashGraphics.reset();run=makeRun({seed,tutorial});seedWorld();
+  clearInputs();clearWorld();dashGraphics.reset();landingVisualSpeed=0;run=makeRun({seed,tutorial});seedWorld();
   // Hide the illustrated entry screen before starting gameplay audio. This
   // makes the visual transition synchronous with the click that starts the run.
   setState('running');accumulator=0;performanceController.resetFrameWindow();
@@ -604,7 +611,7 @@ function finishRun(){
 }
 function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();voice.stopAmbience();setState('paused');performanceController.invalidate();requestAnimationFrame(()=>$('dash-resume')?.focus());}
 function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0;performanceController.invalidate();}
-function quit(){clearInputs();voice.setDash(false);voice.stopMusic();voice.stopAmbience();clearWorld();dashGraphics.reset();run=makeRun();setState('menu');accumulator=0;performanceController.invalidate();}
+function quit(){clearInputs();voice.setDash(false);voice.stopMusic();voice.stopAmbience();clearWorld();dashGraphics.reset();landingVisualSpeed=0;run=makeRun();setState('menu');accumulator=0;performanceController.invalidate();}
 
 function updatePhysics(dt){
   if(state!=='running'||!run||run.dead)return;
@@ -704,12 +711,16 @@ function renderUI(dt){
   dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
   if(character){
     const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
-    character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
+    character.update(dt,{
+      state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),
+      jumpHeight:active.y,vy:active.vy,grounded:active.grounded,jumpHeld:active.jumpHeld,jumpAge:active.jumpAge,
+      sliding,landed:active.landed,landingVelocity:active.landed?landingVisualSpeed:0,paused:state==='paused'
+    });
     character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
     const jumpWorld=active.y*WORLD_UNIT;
     character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
   }
-  active.landed=false;
+  if(active.landed)landingVisualSpeed=0;active.landed=false;
   const shadow=$('dash-shadow');
   if(shadow&&!GPU_WORLD){
     const jump=active.y*m.scale;
