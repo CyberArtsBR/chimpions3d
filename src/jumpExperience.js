@@ -1,5 +1,6 @@
 import './jumpExperience.css';
 import './jumpPresentationV2.css';
+import './canopyPresentation.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
@@ -72,11 +73,16 @@ export function setupJumpExperience(){
     </div>`;
 
   const settings=document.createElement('dialog');settings.id='jump-settings-dialog';settings.setAttribute('aria-labelledby','jump-settings-title');
-  settings.innerHTML=`<header><div><small>ACCESSIBILITY</small><h2 id="jump-settings-title">Options</h2></div><button class="settings-close" aria-label="Close Options">×</button></header>
+  settings.innerHTML=`<header><div><small>PRESENTATION</small><h2 id="jump-settings-title">Options</h2></div><button class="settings-close" aria-label="Close Options">×</button></header>
     <p class="settings-intro">Presentation preferences apply immediately and are remembered on this device.</p>
     <div class="settings-list">
       <label for="jump-reduced-motion"><span><b>Reduced Motion</b><small>Minimizes zoom, pulses, parallax and large UI movement while keeping essential feedback.</small></span><input id="jump-reduced-motion" type="checkbox"></label>
       <label for="jump-high-visibility"><span><b>High Visibility</b><small>Strengthens HUD, focus and critical interface contrast without turning the entire game neon.</small></span><input id="jump-high-visibility" type="checkbox"></label>
+    </div>
+    <h3 class="settings-section-title">Graphics</h3>
+    <div class="settings-list">
+      <div class="settings-control"><span><b>Graphics Quality</b><small>Low, Balanced, High and Ultra share the same readable canopy composition while scaling lighting and image finishing.</small></span><button id="jump-graphics-quality" type="button">High</button></div>
+      <div class="settings-control"><span><b>Scenery Style</b><small>Switch between the premium canopy presentation and the optional pixel expedition backdrop.</small></span><button id="jump-scenery-style" type="button">Golden forest</button></div>
     </div>`;
 
   const pauseActions=document.createElement('nav');pauseActions.id='jump-pause-actions';pauseActions.setAttribute('aria-label','Pause menu actions');
@@ -85,7 +91,7 @@ export function setupJumpExperience(){
   document.body.append(toolDock,hint,status,goalToast,loader,dialog,settings);
   document.querySelector('#overlay .card')?.append(pauseActions);
 
-  const reduced=settings.querySelector('#jump-reduced-motion'),visibility=settings.querySelector('#jump-high-visibility'),list=dialog.querySelector('#jump-goals');
+  const reduced=settings.querySelector('#jump-reduced-motion'),visibility=settings.querySelector('#jump-high-visibility'),graphicsQuality=settings.querySelector('#jump-graphics-quality'),sceneryStyle=settings.querySelector('#jump-scenery-style'),list=dialog.querySelector('#jump-goals');
   const gameplayToast=document.getElementById('toast');
   gameplayToast?.setAttribute('aria-live','polite');gameplayToast?.setAttribute('aria-atomic','true');
 
@@ -127,8 +133,14 @@ export function setupJumpExperience(){
     renderGoals();dialog.dataset.opener=opener.id||'';openDialog(dialog,'.guide-close');
   }
 
+  function syncGraphicsSettings(){
+    const qualitySource=document.getElementById('quality'),scenerySource=document.getElementById('background-style');
+    graphicsQuality.textContent=(qualitySource?.textContent||'Graphics: High').replace(/^Graphics:\s*/,'').replace(/^Detail:\s*/,'');
+    sceneryStyle.textContent=(scenerySource?.textContent||'Scenery: Golden forest').replace(/^Scenery:\s*/,'');
+  }
+
   function openSettings(opener=optionsButton){
-    settings.dataset.opener=opener.id||'';openDialog(settings,'.settings-close');
+    syncGraphicsSettings();settings.dataset.opener=opener.id||'';openDialog(settings,'.settings-close');
   }
 
   function restoreFocus(source){
@@ -224,6 +236,10 @@ export function setupJumpExperience(){
   settings.addEventListener('close',()=>restoreFocus(settings));
   reduced.onchange=()=>{prefs.reducedMotion=reduced.checked;applyPrefs();};
   visibility.onchange=()=>{prefs.highVisibility=visibility.checked;applyPrefs();};
+  graphicsQuality.onclick=()=>{document.getElementById('quality')?.click();syncGraphicsSettings();};
+  sceneryStyle.onclick=()=>{document.getElementById('background-style')?.click();syncGraphicsSettings();};
+  window.addEventListener('chimp-graphics-quality-change',syncGraphicsSettings);
+  window.addEventListener('chimp-scenery-style-change',syncGraphicsSettings);
 
   pauseActions.querySelector('#jump-resume').onclick=()=>document.getElementById('play')?.click();
   pauseActions.querySelector('#jump-restart').onclick=()=>{
