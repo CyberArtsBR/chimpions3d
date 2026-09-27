@@ -135,7 +135,7 @@ export class GameAudio {
     if(this.music)return this.music;
     if(typeof window.Audio!=='function')return null;
     const m=new window.Audio(this.musicSrc);
-    m.loop=true;m.preload='auto';m.setAttribute?.('playsinline','');
+    m.loop=true;m.preload='none';m.setAttribute?.('playsinline','');
     m.addEventListener('error',()=>{this.musicError=true},{once:true});
     this.music=m;this.applyMix();return m;
   }
@@ -362,6 +362,16 @@ export class GameAudio {
     }
     for(const node of this.ambienceNodes){try{node.stop?.(now+tail+.02)}catch{}}
     this.ambienceNodes=[];this.windGain=null;this.windFilter=null;this.leavesGain=null;this.insectGain=null;this.birdGain=null;this.waterGain=null;this.appliedSpeedNorm=-1;
+  }
+
+  diagnostics(){
+    return{
+      enabled:this.enabled,failed:this.failed,muted:this.muted,volumes:{...this.volumes},
+      musicWanted:this.musicWanted,musicBlocked:!!this.musicBlocked,musicError:!!this.musicError,
+      dashActive:this.dashActive,ambienceActive:this.ambienceNodes.length>0,
+      contextState:this.context?.state||'uninitialized',
+      authoredSamples:{configured:Object.keys(this.sampleManifest).length,loaded:this.sampleBuffers.size,failed:this.sampleFailures.size}
+    };
   }
 
   destroy(){
