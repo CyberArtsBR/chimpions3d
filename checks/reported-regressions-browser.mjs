@@ -64,13 +64,16 @@ try{
 
   const high=await snapshot('high');
   assert.equal(high.quality,'high');
-  assert.equal(high.treeAuthoredVisible,true,'HIGH must show the authored scrolling tree');
-  assert.equal(high.treeFallbackVisible,false,'HIGH must not overlay fallback forest behind the authored tree');
-  assert.equal(high.treeMistVisible,false,'HIGH must not put a transparent mist mask in front of the authored tree');
-  assert.equal(high.treeMaterialOpacity,1,'HIGH tree plate must be fully opaque');
-  assert.equal(high.treeMaterialTransparent,false,'HIGH tree plate must not use alpha blending');
+  assert.equal(high.backgroundMode,'layered-forest','HIGH must use the Balanced layered-forest background style');
+  assert.equal(high.treeAuthoredVisible,false,'HIGH must not show the authored tree plate');
+  assert.equal(high.treeFallbackVisible,true,'HIGH must render the layered forest');
+  assert(high.forestTextureScale>=1.5,'HIGH layered forest must use the high-density texture set');
+  assert(Math.abs(high.rendererDpr-1.6)<.01,'HIGH must render at true 1.6 DPR');
+  assert.equal(high.ambientOcclusionEnabled,true,'HIGH must retain max-quality ambient occlusion');
+  assert.equal(high.sharpenEnabled,true,'HIGH must retain sharpening');
+  assert.equal(high.colorGradingEnabled,true,'HIGH must retain color grading');
   const highDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
-  assert(highDom.every(item=>item.display==='none'),'HIGH must hide legacy DOM background layers');
+  assert(highDom.every(item=>item.display!=='none'),'HIGH must preserve the Balanced presentation-layer background composition');
   report.highDom=highDom;
 
   // The historical arcade ramp was roughly .92x -> 3.0x by five minutes.
@@ -102,7 +105,7 @@ try{
   assert.deepEqual(errors,[],'Targeted regression browser run must not emit runtime errors');
   fs.writeFileSync('checks/reported-regressions-report.json',JSON.stringify(report,null,2));
   await page.screenshot({path:'checks/reported-regressions-ultra.png',fullPage:false,animations:'disabled'});
-  console.log('PASS reported regressions: strong pace ramp, controller Start, one-press Chimpion launch, HIGH tree-only background, crisp no-glow ULTRA');
+  console.log('PASS reported regressions: strong pace ramp, controller Start, one-press Chimpion launch, max-quality HIGH layered forest, crisp no-glow ULTRA');
 }finally{
   await browser.close();
 }
