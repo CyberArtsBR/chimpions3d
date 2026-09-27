@@ -70,6 +70,7 @@ jobs:
           node --check checks/production-browser.mjs
           node --check checks/dash-production-browser.mjs
           node --check checks/dash-physics.mjs
+          node --check checks/dash-gameplay-director.mjs
           node --check checks/dash-patterns.mjs
           node --check checks/dash-browser.mjs
           node --check checks/dash-mobile-browser.mjs
