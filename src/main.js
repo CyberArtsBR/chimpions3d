@@ -34,9 +34,7 @@ if(params.has('lab')){
   import('./polish.css');
   if(params.has('dev'))document.body.dataset.devTools='true';
   Promise.all([
-    import('./runtimeEnhancements.js'),
-    import('./visualCompletion.js'),
-    import('./noBiomeBands.js')
+    import('./runtimeEnhancements.js')
   ]).then(async()=>{
     const [{setupBiomePolish},{setupMenuExtras}]=await Promise.all([
       import('./biome-polish.js'),
