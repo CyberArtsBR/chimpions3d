@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './dashWorld.css';
 import {DASH_BIOMES,biomeForStage} from '../biomes/biomeProfiles.js';
-import {DASH_QUALITY_PRESETS,getDashQualityPreset,resolveDashQuality,storeDashQuality} from './quality.js';
+import {DASH_QUALITY_PRESETS,getDashQualityPreset,resolveDashQuality} from './quality.js';
 import {DashVFX} from '../vfx/DashVFX.js';
 
 export {DASH_BIOMES,resolveDashQuality,DASH_QUALITY_PRESETS};
@@ -10,6 +10,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 const wrap=(v,span)=>{const half=span/2;return((v+half)%span+span)%span-half;};
 const TMP_COLOR_A=new THREE.Color(),TMP_COLOR_B=new THREE.Color();
+const TMP_OUTPUT_TOP=new THREE.Color(),TMP_OUTPUT_BOTTOM=new THREE.Color(),TMP_OUTPUT_FOG=new THREE.Color();
 const TMP_MATRIX=new THREE.Matrix4(),TMP_POS=new THREE.Vector3(),TMP_QUAT=new THREE.Quaternion(),TMP_SCALE=new THREE.Vector3();
 const Z_AXIS=new THREE.Vector3(0,0,1);
 
@@ -54,10 +55,12 @@ class DashWorldRenderer{
     this.scene=scene;this.camera=camera;this.renderer=renderer;this.hemisphere=hemisphere;this.keyLight=keyLight;this.rimLight=rimLight;this.unit=pixelsToWorld;
     this.viewW=20;this.viewH=12;this.groundY=-4;this.scroll=0;this.stage=1;this.time=0;this.environmentRoot=new THREE.Group();this.environmentRoot.name='dash-gpu-environment';scene.add(this.environmentRoot);
     this.gameplayRoot=new THREE.Group();this.gameplayRoot.name='dash-gpu-gameplay';scene.add(this.gameplayRoot);
-    this.random=seeded(0x43a991);this.profile=DASH_BIOMES[0];this.qualityName=resolveDashQuality();this.quality=getDashQualityPreset(this.qualityName);
-    this.hazardMap=new Map();this.hazardPools=new Map();this.hazardMaterials=[];this.disposables=[];
+    this.random=seeded(0x43a991);this.profile=DASH_BIOMES[0];this.qualityName='BALANCED';this.quality=getDashQualityPreset(this.qualityName);
+    this.hazardMap=new Map();this.hazardPools=new Map();this.hazardMaterials=[];this.disposables=[];this.liveHazards=new Set();
+    this.biomeBlend={from:this.profile,to:this.profile,t:1};this.biomeFeatures={canopyDensity:1,foreground:1,waterfall:0,ruins:0,moon:0,storm:0,pollen:1,accent:0xffffff};
+    this.safeMode=false;this.contextLost=false;this.lastRenderError='';this.lastQualityState={tier:this.qualityName,shadowEnabled:this.quality.shadows};this.fallbackBackground=new THREE.Color(0x173b31);
     this.buildMaterials();this.buildEnvironment();this.buildGameplay();this.vfx=new DashVFX(scene,this.quality);
-    this.applyQuality(this.qualityName,false);this.installEvents();document.documentElement.classList.add('dash-gpu-world');
+    this.applyQualityState(this.lastQualityState);this.installEvents();document.documentElement.classList.add('dash-gpu-world');
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
   }
   buildMaterials(){
@@ -120,17 +123,36 @@ class DashWorldRenderer{
     this.eventListener=e=>this.consumeGameplayEvent(e.detail||{});globalThis.addEventListener?.('chimpions-dash-event',this.eventListener);
     const api={
       get quality(){return this._owner.qualityName;},
-      setQuality:name=>this.setQuality(name),
+      setQuality:name=>{
+        const controller=globalThis.chimpionsDashPerformance;
+        if(!controller?.setQuality)throw new Error('Dash quality controller is not ready.');
+        return controller.setQuality(name);
+      },
       stats:()=>this.stats(),_owner:this
     };globalThis.chimpionsDashGraphics=api;
   }
-  setQuality(name){const key=String(name||'').toUpperCase();if(!DASH_QUALITY_PRESETS[key])throw new Error('Dash quality must be LOW, BALANCED, HIGH, or ULTRA.');storeDashQuality(key);this.applyQuality(key,true);return key;}
-  applyQuality(name,persisted){
-    this.qualityName=name;this.quality=getDashQualityPreset(name);this.pixelRatioCap=this.quality.pixelRatio;this.vfx?.setQuality(this.quality);
-    this.renderer.shadowMap.enabled=this.quality.shadows;this.keyLight.castShadow=this.quality.shadows;const map=this.quality.shadowMap;this.keyLight.shadow.mapSize.set(map,map);if(this.keyLight.shadow.map){this.keyLight.shadow.map.dispose();this.keyLight.shadow.map=null;}
-    this.renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,this.pixelRatioCap));
+  applyQualityState(state={}){
+    const name=String(state.tier||'BALANCED').toUpperCase();
+    if(!DASH_QUALITY_PRESETS[name])throw new Error('Dash quality must resolve to LOW, BALANCED, HIGH, or ULTRA.');
+    const base=getDashQualityPreset(name),vegetation=clamp(Number(state.vegetationDensity??1),.25,1),particles=clamp(Number(state.particleDensity??1),.2,1),foreground=clamp(Number(state.foregroundDensity??1),0,1),shafts=clamp(Number(state.lightShaftDensity??1),0,1);
+    const reducedMotion=!!state.accessibility?.reducedMotion;
+    this.qualityName=name;
+    this.quality={
+      ...base,
+      shadows:state.shadowEnabled==null?base.shadows:!!state.shadowEnabled,
+      farCount:Math.max(8,Math.round(base.farCount*vegetation)),
+      midCount:Math.max(6,Math.round(base.midCount*vegetation)),
+      detailCount:Math.max(8,Math.round(base.detailCount*vegetation)),
+      foregroundCount:Math.max(0,Math.round(base.foregroundCount*foreground)),
+      particleCount:Math.max(12,Math.round(base.particleCount*particles)),
+      streakCount:reducedMotion?0:Math.max(0,Math.round(base.streakCount*particles)),
+      lightShafts:Math.max(0,Math.round(base.lightShafts*shafts)),
+      mistCount:reducedMotion?0:Math.max(0,Math.round(base.mistCount*foreground))
+    };
+    this.lastQualityState={...state,tier:name};
+    this.vfx?.setQuality(this.quality);
     for(const entry of this.hazardMap.values())entry.group.traverse(o=>{if(o.isMesh)o.castShadow=this.quality.shadows;});
-    if(persisted)this.resize({viewW:this.viewW,viewH:this.viewH,groundY:this.groundY});
+    return this.quality;
   }
   resize({viewW=this.viewW,viewH=this.viewH,groundY=this.groundY}={}){
     this.viewW=viewW;this.viewH=viewH;this.groundY=groundY;
@@ -141,22 +163,25 @@ class DashWorldRenderer{
     this.keyLight.shadow.camera.left=-viewW*.56;this.keyLight.shadow.camera.right=viewW*.56;this.keyLight.shadow.camera.top=viewH*.55;this.keyLight.shadow.camera.bottom=-viewH*.55;this.keyLight.shadow.camera.updateProjectionMatrix();
   }
   interpolateBiome(stage,time){
-    const current=biomeForStage(stage).profile;if(stage<=1)return{from:current,to:current,t:1};const previous=biomeForStage(stage-1).profile,within=((time%30)+30)%30,t=smooth(clamp(within/3.2,0,1));return{from:previous,to:current,t};
+    const out=this.biomeBlend,current=biomeForStage(stage).profile;
+    if(stage<=1){out.from=current;out.to=current;out.t=1;return out;}
+    const previous=biomeForStage(stage-1).profile,within=((time%30)+30)%30;
+    out.from=previous;out.to=current;out.t=smooth(clamp(within/3.2,0,1));return out;
   }
   applyBiome(stage,time){
     const {from,to,t}=this.interpolateBiome(stage,time);this.profile=to;
-    const top=lerpColor(new THREE.Color(),from.skyTop,to.skyTop,t),bottom=lerpColor(new THREE.Color(),from.skyBottom,to.skyBottom,t),fog=lerpColor(new THREE.Color(),from.fog,to.fog,t);
+    const top=lerpColor(TMP_OUTPUT_TOP,from.skyTop,to.skyTop,t),bottom=lerpColor(TMP_OUTPUT_BOTTOM,from.skyBottom,to.skyBottom,t),fog=lerpColor(TMP_OUTPUT_FOG,from.fog,to.fog,t);
     this.skyMaterial.uniforms.top.value.copy(top);this.skyMaterial.uniforms.bottom.value.copy(bottom);lerpColor(this.skyMaterial.uniforms.sun.value,from.sun,to.sun,t);this.skyMaterial.uniforms.sunStrength.value=.12+.2*(1-(from.storm+(to.storm-from.storm)*t));
     this.scene.fog??=new THREE.FogExp2(fog,.02);this.scene.fog.color.copy(fog);this.scene.fog.density=from.fogDensity+(to.fogDensity-from.fogDensity)*t;
     lerpColor(this.mat.ground.color,from.dirt,to.dirt,t);lerpColor(this.mat.moss.color,from.ground,to.ground,t);lerpColor(this.mat.far.color,from.canopy,to.canopy,t);lerpColor(this.mat.mid.color,from.mid,to.mid,t);lerpColor(this.mat.foreground.color,from.canopy,to.canopy,t);lerpColor(this.mat.goldStone.color,0x74725a,to.accent,t*.35);
     lerpColor(this.hemisphere.color,from.ambient,to.ambient,t);this.hemisphere.groundColor.copy(bottom).multiplyScalar(.55);this.hemisphere.intensity=1.65+(1-(from.storm+(to.storm-from.storm)*t))*.55;
     lerpColor(this.keyLight.color,from.sun,to.sun,t);this.keyLight.intensity=2.3+(1-(from.storm+(to.storm-from.storm)*t))*.85;lerpColor(this.rimLight.color,from.rim,to.rim,t);this.rimLight.intensity=1.05+(to.moon*.35);
     this.renderer.toneMappingExposure=from.exposure+(to.exposure-from.exposure)*t;
-    return{
-      canopyDensity:from.canopyDensity+(to.canopyDensity-from.canopyDensity)*t,foreground:from.foreground+(to.foreground-from.foreground)*t,
-      waterfall:from.waterfall+(to.waterfall-from.waterfall)*t,ruins:from.ruins+(to.ruins-from.ruins)*t,moon:from.moon+(to.moon-from.moon)*t,
-      storm:from.storm+(to.storm-from.storm)*t,pollen:from.pollen+(to.pollen-from.pollen)*t,accent:to.accent
-    };
+    const features=this.biomeFeatures;
+    features.canopyDensity=from.canopyDensity+(to.canopyDensity-from.canopyDensity)*t;features.foreground=from.foreground+(to.foreground-from.foreground)*t;
+    features.waterfall=from.waterfall+(to.waterfall-from.waterfall)*t;features.ruins=from.ruins+(to.ruins-from.ruins)*t;features.moon=from.moon+(to.moon-from.moon)*t;
+    features.storm=from.storm+(to.storm-from.storm)*t;features.pollen=from.pollen+(to.pollen-from.pollen)*t;features.accent=to.accent;
+    return features;
   }
   updateEnvironment(scroll,time,speedRatio,features){
     const span=this.viewW*1.45,scrollWorld=scroll*this.unit;
@@ -188,7 +213,7 @@ class DashWorldRenderer{
     this.waterfalls.forEach((mesh,i)=>{mesh.visible=features.waterfall>.08&&i<Math.ceil(features.waterfall*3);const x=((i-1.5)*this.viewW*.2)+Math.sin(time*.18+i)*.08;mesh.position.set(x,this.groundY+this.viewH*.36,-8+i*.08);mesh.scale.set(.35+.2*(i%2),this.viewH*.62,1);});
     const shaftCount=Math.min(this.shafts.length,this.quality.lightShafts);this.shafts.forEach((mesh,i)=>{mesh.visible=i<shaftCount&&features.storm<.75;mesh.position.set((i-(shaftCount-1)/2)*this.viewW*.18+Math.sin(time*.08+i)*.18,this.groundY+this.viewH*.48,-3.4-i*.05);mesh.scale.set(.7+(.25*(i%2)),this.viewH*.7,1);mesh.material.opacity=.035+.04*(1-features.storm);});
     this.moon.visible=features.moon>.12;this.mat.moon.opacity=.4+.5*features.moon;this.moon.rotation.z=time*.008;
-    this.mistMaterial.opacity=.045+.16*features.waterfall+.05*features.storm;this.mist.forEach((mesh,i)=>{mesh.position.set(wrap((i-1)*this.viewW*.36-time*(.03+i*.012),this.viewW*1.4),this.groundY+.75+i*.52,-2.8-i*.25);mesh.scale.set(this.viewW*.58,1.4+i*.3,1);});
+    this.mistMaterial.opacity=.045+.16*features.waterfall+.05*features.storm;this.mist.forEach((mesh,i)=>{mesh.visible=i<this.quality.mistCount;if(!mesh.visible)return;mesh.position.set(wrap((i-1)*this.viewW*.36-time*(.03+i*.012),this.viewW*1.4),this.groundY+.75+i*.52,-2.8-i*.25);mesh.scale.set(this.viewW*.58,1.4+i*.3,1);});
   }
   createMesh(geometry,material,parent,{x=0,y=0,z=0,sx=1,sy=1,sz=1,rz=0,cast=true}={}){const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.rotation.z=rz;m.castShadow=cast&&this.quality.shadows;m.receiveShadow=false;parent.add(m);return m;}
   buildHazard(type){
@@ -215,7 +240,7 @@ class DashWorldRenderer{
   acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
   releaseHazard(entry){entry.group.visible=false;this.gameplayRoot.remove(entry.group);const pool=this.hazardPools.get(entry.typeId)||[];if(pool.length<10)pool.push(entry.group);this.hazardPools.set(entry.typeId,pool);}
   syncHazards(obstacles,scroll){
-    const live=new Set(obstacles);
+    const live=this.liveHazards;live.clear();for(const obstacle of obstacles)live.add(obstacle);
     for(const [obstacle,entry] of this.hazardMap)if(!live.has(obstacle)){this.releaseHazard(entry);this.hazardMap.delete(obstacle);}
     for(const o of obstacles){let entry=this.hazardMap.get(o);if(!entry){entry=this.acquireHazard(o);this.hazardMap.set(o,entry);}const x=-this.viewW/2+(o.x-scroll)*this.unit,y=this.groundY+(o.visualY||0)*this.unit;entry.group.position.set(x,y,.1);entry.group.visible=x>-this.viewW*.7&&x<this.viewW*.72;}
   }
@@ -234,18 +259,51 @@ class DashWorldRenderer{
   }
   reset(){this.vfx.reset();}
   update({dt=0,time=0,scroll=0,stage=1,speed=1,baseSpeed=1,obstacles=[],bananas=[],playerX=0,playerY=0,sliding=false,state='menu',flow=0}={}){
-    this.time=time;this.scroll=scroll;this.stage=stage;const speedRatio=Math.max(.2,speed/Math.max(1,baseSpeed)),features=this.applyBiome(stage,time);this.updateEnvironment(scroll,time,speedRatio,features);this.syncHazards(obstacles,scroll);this.syncBananas(bananas,scroll,time);
+    this.time=time;this.scroll=scroll;this.stage=stage;const speedRatio=Math.max(.2,speed/Math.max(1,baseSpeed));
+    const features=this.safeMode?this.biomeFeatures:this.applyBiome(stage,time);
+    if(!this.safeMode)this.updateEnvironment(scroll,time,speedRatio,features);
+    this.syncHazards(obstacles,scroll);this.syncBananas(bananas,scroll,time);
     const jumpWorld=Math.max(0,playerY),shadowScale=clamp(1-jumpWorld/4.2,.46,1),shadowOpacity=clamp(.72-jumpWorld*.12,.16,.72);this.contactShadow.position.set(playerX,this.groundY+.02,-.04);this.contactShadow.scale.set(2.35*shadowScale,.5*shadowScale,1);this.contactShadowMaterial.opacity=shadowOpacity;
-    this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH});
-    this.foregroundLeaves.visible=state!=='menu'||this.qualityName!=='LOW';this.goldenGlow.material.opacity=.22+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=.75+.35*Math.sin(time*4.7);
+    if(!this.safeMode)this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH});
+    this.foregroundLeaves.visible=!this.safeMode&&(state!=='menu'||this.qualityName!=='LOW');this.goldenGlow.material.opacity=.22+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=.75+.35*Math.sin(time*4.7);
     this.renderer.domElement.style.setProperty('--dash-speed-grade',String(clamp((speedRatio-1)*.08,0,.12)));
-    if(flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
+    if(!this.safeMode&&flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
   }
-  render(){this.renderer.render(this.scene,this.camera);}
-  stats(){return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count};}
+  enterSafeMode(error){
+    if(this.safeMode)return;
+    this.safeMode=true;this.lastRenderError=String(error?.message||error||'Dash render failure');
+    this.environmentRoot.visible=false;this.vfx.reset();this.vfx.points.visible=false;this.vfx.streaks.visible=false;
+    this.scene.background=this.fallbackBackground;
+    const low=getDashQualityPreset('LOW');this.quality={...low,shadows:false,particleCount:12,streakCount:0,lightShafts:0,mistCount:0};this.vfx.setQuality(this.quality);
+    for(const entry of this.hazardMap.values())entry.group.traverse(o=>{if(o.isMesh)o.castShadow=false;});
+    globalThis.dispatchEvent?.(new CustomEvent('chimpions-dash-render-fallback',{detail:{message:this.lastRenderError}}));
+  }
+  setContextLost(value=true){this.contextLost=!!value;}
+  restoreContextState(){
+    this.contextLost=false;this.safeMode=false;this.lastRenderError='';this.environmentRoot.visible=true;
+    if(this.scene.background===this.fallbackBackground)this.scene.background=null;
+    this.renderer.resetState?.();
+    this.scene.traverse(object=>{
+      if(object.isInstancedMesh)object.instanceMatrix.needsUpdate=true;
+      const materials=object.material?(Array.isArray(object.material)?object.material:[object.material]):[];
+      for(const material of materials){material.needsUpdate=true;for(const value of Object.values(material))if(value?.isTexture)value.needsUpdate=true;}
+    });
+    this.applyQualityState(this.lastQualityState);this.resize({viewW:this.viewW,viewH:this.viewH,groundY:this.groundY});
+  }
+  render(){
+    if(this.contextLost)return false;
+    try{this.renderer.render(this.scene,this.camera);return true;}
+    catch(error){
+      console.error('Dash direct render failed; entering safe presentation mode.',error);this.enterSafeMode(error);
+      try{this.renderer.render(this.scene,this.camera);return true;}
+      catch(fallbackError){this.lastRenderError=String(fallbackError?.message||fallbackError);console.error('Dash safe direct render failed.',fallbackError);return false;}
+    }
+  }
+  stats(){return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count,safeMode:this.safeMode,contextLost:this.contextLost,lastRenderError:this.lastRenderError};}
   dispose(){
     globalThis.removeEventListener?.('chimpions-dash-event',this.eventListener);document.documentElement.classList.remove('dash-gpu-world');this.vfx.dispose();
-    for(const entry of this.hazardMap.values())this.releaseHazard(entry);this.hazardMap.clear();this.scene.remove(this.environmentRoot,this.gameplayRoot);
+    for(const entry of this.hazardMap.values())this.releaseHazard(entry);this.hazardMap.clear();this.hazardPools.clear();this.liveHazards.clear();this.scene.remove(this.environmentRoot,this.gameplayRoot);
     for(const value of this.disposables)try{value?.dispose?.();}catch{}
+    if(globalThis.chimpionsDashGraphics?._owner===this)delete globalThis.chimpionsDashGraphics;
   }
 }
