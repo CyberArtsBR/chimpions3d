@@ -30,8 +30,11 @@ export class GameAudio {
     this.flowGain=null;
     this.flowLevel=0;
     this.flowMultiplier=1;
+    this.appliedFlowLevel=-1;
+    this.appliedFlowMultiplier=-1;
     this.biome='emerald-wilds';
     this.speedNorm=0;
+    this.appliedSpeedNorm=-1;
     this.footstepSide=0;
     this.sampleManifest={};
     this.sampleBuffers=new Map();
@@ -236,7 +239,7 @@ export class GameAudio {
     osc.type='sawtooth';osc.frequency.setValueAtTime(88,c.currentTime);
     lfo.type='sine';lfo.frequency.setValueAtTime(7.2,c.currentTime);lfoGain.gain.setValueAtTime(9,c.currentTime);
     filter.type='lowpass';filter.frequency.setValueAtTime(620,c.currentTime);filter.Q.value=.75;
-    gain.gain.setValueAtTime(.0001,c.currentTime);gain.gain.linearRampToValueAtTime(.035,c.currentTime+.035);
+    gain.gain.setValueAtTime(.0001,c.currentTime);gain.gain.linearRampToValueAtTime(.018,c.currentTime+.035);
     lfo.connect(lfoGain);lfoGain.connect(osc.frequency);osc.connect(filter);filter.connect(gain);gain.connect(this.target('sfx'));
     osc.start();lfo.start();
 
@@ -244,7 +247,7 @@ export class GameAudio {
     for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.14;
     const noise=c.createBufferSource(),noiseFilter=c.createBiquadFilter(),noiseGain=c.createGain();
     noise.buffer=buffer;noise.loop=true;noiseFilter.type='bandpass';noiseFilter.frequency.value=1200;noiseFilter.Q.value=.7;
-    noiseGain.gain.setValueAtTime(.0001,c.currentTime);noiseGain.gain.linearRampToValueAtTime(.012,c.currentTime+.035);
+    noiseGain.gain.setValueAtTime(.0001,c.currentTime);noiseGain.gain.linearRampToValueAtTime(.006,c.currentTime+.035);
     noise.connect(noiseFilter);noiseFilter.connect(noiseGain);noiseGain.connect(this.target('sfx'));noise.start();
 
     const flowOsc=c.createOscillator(),flowFilter=c.createBiquadFilter(),flowGain=c.createGain();
@@ -258,6 +261,8 @@ export class GameAudio {
   setFlow(flow=0,multiplier=1){
     this.flowLevel=Math.max(0,Number(flow)||0);this.flowMultiplier=Math.max(1,Number(multiplier)||1);
     if(!this.context||!this.flowOsc||!this.flowFilter||!this.flowGain)return;
+    if(Math.abs(this.flowLevel-this.appliedFlowLevel)<.65&&this.flowMultiplier===this.appliedFlowMultiplier)return;
+    this.appliedFlowLevel=this.flowLevel;this.appliedFlowMultiplier=this.flowMultiplier;
     const n=clamp(this.flowLevel/100),now=this.context.currentTime;
     this.flowOsc.frequency.setTargetAtTime(126+n*86+(this.flowMultiplier-1)*17,now,.12);
     this.flowFilter.frequency.setTargetAtTime(650+n*1550,now,.15);
@@ -275,7 +280,7 @@ export class GameAudio {
       }catch{}
     }
     for(const node of this.dashNodes){try{node.stop(now+tail+.02)}catch{}}
-    this.dashNodes=[];this.dashGain=null;this.dashNoiseGain=null;this.dashFilter=null;this.flowOsc=null;this.flowFilter=null;this.flowGain=null;
+    this.dashNodes=[];this.dashGain=null;this.dashNoiseGain=null;this.dashFilter=null;this.flowOsc=null;this.flowFilter=null;this.flowGain=null;this.appliedFlowLevel=-1;this.appliedFlowMultiplier=-1;
   }
 
   stopDashLoop(fade=true){this.dashActive=false;this.stopDashNodes(fade)}
@@ -304,8 +309,9 @@ export class GameAudio {
 
   setBiome(name=''){
     const next=String(name||'THE EMERALD WILDS');
-    const changed=next!==this.biome;this.biome=next;this.applyAmbienceMix();
-    if(changed&&this.dashActive&&next.toLowerCase().includes('storm'))this.play('stage',{gain:.22,pitch:.52});
+    const changed=next!==this.biome;if(!changed)return;
+    this.biome=next;this.applyAmbienceMix();
+    if(this.dashActive&&next.toLowerCase().includes('storm'))this.play('stage',{gain:.22,pitch:.52});
   }
 
   startAmbience(){
@@ -343,12 +349,13 @@ export class GameAudio {
 
   setSpeed(normalized=1){
     this.speedNorm=clamp((normalized-.7)/1.8,0,1);
-    this.applyAmbienceMix();
+    if(Math.abs(this.speedNorm-this.appliedSpeedNorm)<.018)return;
+    this.appliedSpeedNorm=this.speedNorm;this.applyAmbienceMix();
   }
 
   stopAmbience(){
     for(const node of this.ambienceNodes){try{node.stop?.()}catch{}}
-    this.ambienceNodes=[];this.windGain=null;this.windFilter=null;this.leavesGain=null;this.insectGain=null;this.birdGain=null;this.waterGain=null;
+    this.ambienceNodes=[];this.windGain=null;this.windFilter=null;this.leavesGain=null;this.insectGain=null;this.birdGain=null;this.waterGain=null;this.appliedSpeedNorm=-1;
   }
 
   destroy(){
