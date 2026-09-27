@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const EVENT_STYLE={
   takeoff:{color:0xb7d77a,count:8,life:.42,power:1.5},
+  footContact:{color:0xbda579,count:3,life:.28,power:.72},
   land:{color:0xc8a86b,count:14,life:.58,power:2.1},
   slide:{color:0xb99662,count:8,life:.45,power:1.3},
   banana:{color:0xffdf57,count:10,life:.46,power:1.8},
@@ -40,7 +41,8 @@ export class DashVFX{
     for(let i=0;i<count&&this.active.length<this.maxParticles;i++){
       const p=this.acquire(),a=this.random()*Math.PI*2,rad=this.random()*.16,power=style.power*(.45+this.random()*.75)*intensity;
       p.x=x+Math.cos(a)*rad;p.y=y+Math.sin(a)*rad;p.z=z+(this.random()-.5)*.16;
-      p.vx=(Math.cos(a)*power+direction*(type==='slide'?-1.5:0))*.55;p.vy=Math.abs(Math.sin(a))*power+(type==='land'?.35:.65);p.vz=(this.random()-.5)*.35;
+      const kick=type==='slide'?-1.5:type==='footContact'?-0.42:0,lift=type==='land'?.35:type==='footContact'?.12:.65;
+      p.vx=(Math.cos(a)*power+direction*kick)*.55;p.vy=Math.abs(Math.sin(a))*power*.72+lift;p.vz=(this.random()-.5)*.35;
       p.age=0;p.life=style.life*(.72+this.random()*.55);p.color.copy(tint).offsetHSL((this.random()-.5)*.025,(this.random()-.5)*.06,(this.random()-.5)*.08);this.active.push(p);
     }
   }
