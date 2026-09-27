@@ -21,7 +21,7 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v11-hard-zigzag-routes';
+export const RULESET='2026-09-expedition-v12-200m-pace';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
