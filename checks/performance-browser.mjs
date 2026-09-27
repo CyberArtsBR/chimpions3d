@@ -82,7 +82,7 @@ try{
   report.loading.afterRunStart=await resourceGraph();
   report.loading.deferred=report.loading.afterRunStart.filter(entry=>!initialUrls.has(entry.url));
   assert(report.loading.deferred.some(entry=>entry.url.includes('/environment/platforms/branch-moss.glb')),'Branch GLB should load after run commitment');
-  assert(report.loading.deferred.some(entry=>entry.url.includes('/environment/tree-wide-v2-')),'Authored tree plate should load after run commitment');
+  assert(!report.loading.deferred.some(entry=>entry.url.includes('/environment/tree-wide-v2-')),'HIGH should keep the Balanced layered forest and avoid the authored tree download');
 
   // Renderer ceilings are checked independently per visual quality. Gameplay state is untouched.
   for(const quality of ['balanced','high','ultra']){
@@ -92,6 +92,8 @@ try{
     report.samples[`quality_${quality}`]=state;
     enforceRendererBudget(quality,state);
   }
+  report.loading.afterUltra=await resourceGraph();
+  assert(report.loading.afterUltra.some(entry=>entry.url.includes('/environment/tree-wide-v2-')),'Authored tree plate should load only when Ultra is selected');
 
   // Frame percentiles: warm the renderer first, then collect a bounded rendered window.
   await page.evaluate(()=>window.chimpJumpTest.setQuality('high'));
