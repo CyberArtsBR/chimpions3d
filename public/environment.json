@@ -3,6 +3,28 @@
     "portrait": "environment/tropical-canyon-v1-9x16.webp",
     "landscape": "environment/tropical-canyon-v1-16x9.webp"
   },
+  "phaseBackgrounds": [
+    {
+      "name": "Canopy Morning",
+      "portrait": "environment/tropical-canyon-v1-9x16.webp",
+      "landscape": "environment/tropical-canyon-v1-16x9.webp"
+    },
+    {
+      "name": "Golden Canopy",
+      "portrait": "environment/cycle/golden-9x16.webp",
+      "landscape": "environment/cycle/golden-16x9.webp"
+    },
+    {
+      "name": "Neon Mist",
+      "portrait": "environment/cycle/neon-9x16.webp",
+      "landscape": "environment/cycle/neon-16x9.webp"
+    },
+    {
+      "name": "Moonstorm Jungle",
+      "portrait": "environment/cycle/night-9x16.webp",
+      "landscape": "environment/cycle/night-16x9.webp"
+    }
+  ],
   "treeImageMode": "cover",
   "platformModel": "environment/platforms/branch-moss.glb",
   "platformHeight": 0.42,
