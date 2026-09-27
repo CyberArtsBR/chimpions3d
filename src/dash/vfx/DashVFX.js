@@ -18,7 +18,7 @@ const EVENT_STYLE={
 
 export class DashVFX{
   constructor(scene,quality){
-    this.scene=scene;this.quality=quality;this.capacity=192;this.active=[];this.pool=[];this.seed=0x6d2b79f5;this.ambientAccumulator=0;
+    this.scene=scene;this.quality=quality;this.capacity=192;this.active=[];this.pool=[];this.seed=0x6d2b79f5;this.ambientAccumulator=0;this.reducedMotion=false;
     this.positions=new Float32Array(this.capacity*3);this.colors=new Float32Array(this.capacity*3);
     this.geometry=new THREE.BufferGeometry();
     this.geometry.setAttribute('position',new THREE.BufferAttribute(this.positions,3).setUsage(THREE.DynamicDrawUsage));
@@ -33,9 +33,13 @@ export class DashVFX{
   }
   random(){this.seed=(Math.imul(this.seed^this.seed>>>15,1|this.seed)+0x6d2b79f5)|0;return((this.seed^this.seed>>>14)>>>0)/4294967296;}
   setQuality(quality){this.quality=quality;this.maxParticles=Math.min(this.capacity,quality.particleCount||64);this.maxStreaks=Math.min(36,quality.streakCount||8);this.material.size=quality.name==='ULTRA'?.085:quality.name==='LOW'?.065:.075;}
+  setReducedMotion(enabled){
+    this.reducedMotion=!!enabled;
+    if(this.reducedMotion){this.ambientAccumulator=0;this.streakMaterial.opacity=0;this.streaks.visible=false;}
+  }
   acquire(){return this.pool.pop()||{x:0,y:0,z:0,vx:0,vy:0,vz:0,age:0,life:1,color:new THREE.Color()};}
   emit(type,{x=0,y=0,z=.7,direction=1,intensity=1,color=null}={}){
-    const style=EVENT_STYLE[type]||EVENT_STYLE.flow,count=Math.max(1,Math.round(style.count*intensity*(this.quality.name==='LOW'?.55:this.quality.name==='BALANCED'?.78:1)));
+    const style=EVENT_STYLE[type]||EVENT_STYLE.flow,motionScale=this.reducedMotion?.42:1,count=Math.max(1,Math.round(style.count*intensity*motionScale*(this.quality.name==='LOW'?.55:this.quality.name==='BALANCED'?.78:1)));
     const tint=new THREE.Color(color??style.color);
     for(let i=0;i<count&&this.active.length<this.maxParticles;i++){
       const p=this.acquire(),a=this.random()*Math.PI*2,rad=this.random()*.16,power=style.power*(.45+this.random()*.75)*intensity;
@@ -47,7 +51,7 @@ export class DashVFX{
   reset(){for(const p of this.active)this.pool.push(p);this.active.length=0;this.points.visible=false;this.streakMaterial.opacity=0;this.ambientAccumulator=0;}
   update(dt,{time=0,speedRatio=1,playerX=0,groundY=-4,state='menu',pollen=1,storm=0,viewW=20,viewH=12}={}){
     const activeState=state==='running'||state==='over';
-    if(activeState&&this.active.length<this.maxParticles){
+    if(activeState&&!this.reducedMotion&&this.active.length<this.maxParticles){
       this.ambientAccumulator+=dt*(1.2+pollen*2.4+Math.max(0,speedRatio-1)*1.4);
       while(this.ambientAccumulator>=1){
         this.ambientAccumulator-=1;const p=this.acquire();
@@ -69,8 +73,8 @@ export class DashVFX{
     for(let i=write;i<this.capacity;i++)this.positions[i*3+1]=-999;
     this.geometry.setDrawRange(0,write);this.geometry.attributes.position.needsUpdate=true;this.geometry.attributes.color.needsUpdate=true;this.points.visible=write>0;
 
-    const speed=Math.max(0,speedRatio-1.05),count=activeState?Math.min(this.maxStreaks,Math.round(speed*10)):0;
-    this.streakMaterial.opacity=Math.min(.17,speed*.055);
+    const speed=Math.max(0,speedRatio-1.05),count=activeState&&!this.reducedMotion?Math.min(this.maxStreaks,Math.round(speed*10)):0;
+    this.streakMaterial.opacity=this.reducedMotion?0:Math.min(.17,speed*.055);
     for(let i=0;i<count;i++){
       const phase=(time*(1.8+speedRatio*.7)+i*.618)%1,x=viewW*.6-phase*viewW*1.4,y=groundY+viewH*(.26+.68*((i*.371)%1)),len=.34+speed*.28;
       const o=i*6;this.streakPositions[o]=x;this.streakPositions[o+1]=y;this.streakPositions[o+2]=2.7;
