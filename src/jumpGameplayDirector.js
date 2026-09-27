@@ -20,14 +20,12 @@ export const JUMP_DIFFICULTY=Object.freeze({
  altitudeFull:900,
  timeFull:600,
  paceTimeline:Object.freeze([
-  Object.freeze([0,1.00]),
-  Object.freeze([30,1.08]),
-  Object.freeze([60,1.18]),
-  Object.freeze([120,1.34]),
-  Object.freeze([180,1.50]),
-  Object.freeze([300,1.78]),
-  Object.freeze([480,2.05]),
-  Object.freeze([720,2.25])
+  Object.freeze([0,.92]),
+  Object.freeze([60,1.336]),
+  Object.freeze([120,1.752]),
+  Object.freeze([180,2.168]),
+  Object.freeze([240,2.584]),
+  Object.freeze([300,3.00])
  ]),
  routeWidth:Object.freeze({start:2.45,end:1.82}),
  rise:Object.freeze({start:3.62,end:3.92,jitter:.18}),
