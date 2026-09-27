@@ -72,8 +72,18 @@ export function validateDashPlan(plan){
     if((entry.pattern.riskReward||entry.pattern.riskRoute)&&entry.pattern.safeRoute!==true){
       failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'mandatory-risk-route'});
     }
-    if(entry.pattern.setPiece&&(entry.pattern.setPiece.durationSeconds<10||entry.pattern.setPiece.durationSeconds>20)){
-      failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'set-piece-duration'});
+    if(entry.pattern.setPiece){
+      if(entry.pattern.setPiece.durationSeconds<10||entry.pattern.setPiece.durationSeconds>20){
+        failures.push({seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,kind:'set-piece-duration'});
+      }
+      const last=entry.obstacles.at(-1);
+      const playableSeconds=first&&last?(last.x+last.w-first.x)/Math.max(1,entry.snapshot.speed):0;
+      if(playableSeconds<10||playableSeconds>20.5){
+        failures.push({
+          seed:plan.seed,stage:entry.snapshot.stage,pattern:entry.pattern.id,
+          playableSeconds,kind:'set-piece-playable-duration'
+        });
+      }
     }
     for(const obstacle of entry.obstacles){
       if(!Number.isFinite(obstacle.x)||!Number.isFinite(obstacle.w)||obstacle.w<=0){
