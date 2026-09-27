@@ -479,7 +479,7 @@ function spawnPattern(){
     created.push(o);
     if(type.family==='flex'){
       lowTrail(x-38,x+type.w+28,3);
-      bananaArc(x-48,x+type.w+42,112,6,.12);
+      if(!def.riskRoute)bananaArc(x-48,x+type.w+42,112,6,.12);
     }else if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
