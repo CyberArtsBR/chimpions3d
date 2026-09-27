@@ -42,6 +42,8 @@ assert(world.includes('this.renderer.render(this.scene,this.camera)'),'Dash must
 assert(world.includes('enterSafeMode(error)'),'Dash renderer must provide a safe direct-render fallback');
 assert(dash.includes('webglcontextlost')&&dash.includes('webglcontextrestored'),'Dash must explicitly handle WebGL context loss/restoration');
 assert(!dash.includes("warmDashImages(['jungle'"),'GPU Dash must not eagerly warm legacy fallback raster assets');
+assert(dash.includes("classList.toggle('dash-dom-world',!GPU_WORLD)"),'Legacy Dash raster CSS must require explicit DOM fallback activation');
+assert(dashCss.includes('.dash-dom-world #dash-far')&&dashCss.includes('.dash-dom-world #dash-ground'),'Legacy Dash scenery URLs must be gated behind the DOM fallback class');
 assert(assets.includes("BASE+'audio/music-full.mp3?v=9606f223'"),'Dash music must use the versioned current-repository asset');
 assert(!assets.includes('raw.githubusercontent.com'),'Dash runtime assets must not depend on GitHub Raw');
 assert(audio.includes("m.preload='none'"),'Dash music must remain lazy until playback is requested');
