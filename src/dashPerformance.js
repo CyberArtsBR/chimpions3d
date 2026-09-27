@@ -1,21 +1,26 @@
-const ORDER=['LOW','BALANCED','HIGH','ULTRA'];
-export const DASH_QUALITY_PROFILES=Object.freeze({
-  LOW:Object.freeze({dprMin:.65,dprMax:1,shadowMap:512,idleFps:10,p95BudgetMs:28,avgBudgetMs:22}),
-  BALANCED:Object.freeze({dprMin:.7,dprMax:1.25,shadowMap:512,idleFps:12,p95BudgetMs:24,avgBudgetMs:19}),
-  HIGH:Object.freeze({dprMin:.8,dprMax:1.6,shadowMap:1024,idleFps:15,p95BudgetMs:21,avgBudgetMs:18}),
-  ULTRA:Object.freeze({dprMin:1,dprMax:2,shadowMap:2048,idleFps:18,p95BudgetMs:19,avgBudgetMs:17})
-});
+import {
+  DASH_QUALITY_PRESETS,
+  detectDashHardwareTier,
+  getDashQualityPreset,
+  normalizeDashQualityRequest,
+  readDashRequestedQuality,
+  storeDashQuality
+} from './dash/rendering/quality.js';
+
+export const DASH_QUALITY_PROFILES=DASH_QUALITY_PRESETS;
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const validQuality=value=>{
-  const q=String(value||'').toUpperCase();
-  return q==='AUTO'||ORDER.includes(q)?q:'AUTO';
-};
-const mobileBaseline=()=>matchMedia?.('(pointer: coarse)')?.matches||innerWidth<760?'BALANCED':'HIGH';
+const AUTO_DEGRADATION=Object.freeze([
+  Object.freeze({dpr:1,vegetation:1,particles:1,foreground:1,shafts:1,shadowScale:1,shadows:true}),
+  Object.freeze({dpr:1,vegetation:1,particles:.82,foreground:.9,shafts:1,shadowScale:1,shadows:true}),
+  Object.freeze({dpr:1,vegetation:.84,particles:.75,foreground:.72,shafts:.67,shadowScale:1,shadows:true}),
+  Object.freeze({dpr:1,vegetation:.84,particles:.72,foreground:.68,shafts:.67,shadowScale:.5,shadows:true}),
+  Object.freeze({dpr:.88,vegetation:.8,particles:.68,foreground:.62,shafts:.5,shadowScale:.5,shadows:true}),
+  Object.freeze({dpr:.84,vegetation:.7,particles:.6,foreground:.5,shafts:.34,shadowScale:.5,shadows:true}),
+  Object.freeze({dpr:.8,vegetation:.65,particles:.55,foreground:.42,shafts:.2,shadowScale:.5,shadows:false}),
+  Object.freeze({dpr:.72,vegetation:.58,particles:.5,foreground:.35,shafts:0,shadowScale:.5,shadows:false})
+]);
 
-function readSavedQuality(){
-  try{return validQuality(localStorage.getItem('chimpions-dash-quality')||'AUTO');}catch{return 'AUTO';}
-}
 function percentile(samples,count,p){
   if(!count)return 0;
   const values=new Array(count);
@@ -25,56 +30,81 @@ function percentile(samples,count,p){
 }
 
 export function createDashPerformanceController({renderer,scene,keyLight,getRuntimeStats}){
-  const queryQuality=new URLSearchParams(location.search).get('quality');
-  let requested=validQuality(queryQuality||readSavedQuality());
-  let autoTier=mobileBaseline();
+  let requested=readDashRequestedQuality();
+  const hardwareTier=detectDashHardwareTier();
   let autoStep=0;
+  let accessibility={reducedMotion:false,highVisibility:false};
   let lastEvaluation=0,lastAdjustment=0,badWindows=0,goodWindows=0;
   let invalidated=true,lastRenderAt=-Infinity,renderedFrames=0,skippedFrames=0;
   const samples=new Float32Array(240);
   let sampleCount=0,sampleIndex=0,averageMs=0,p95Ms=0;
   let appliedKey='';
 
-  function baseTier(){return requested==='AUTO'?autoTier:requested;}
+  function baseTier(){return requested==='AUTO'?hardwareTier:requested;}
   function effective(){
-    const tier=baseTier(),profile=DASH_QUALITY_PROFILES[tier];
-    const auto=requested==='AUTO';
-    const step=auto?autoStep:0;
-    const secondaryParticles=auto?step<1:tier!=='LOW';
-    const vegetation=auto?(step<2?'full':'reduced'):(tier==='LOW'?'reduced':'full');
-    const shadowMap=auto&&step>=3?Math.max(256,profile.shadowMap>>1):profile.shadowMap;
-    const postprocessing=auto?step<4:!['LOW','BALANCED'].includes(tier);
-    const dprScale=auto&&step>=5?clamp(1-.12*(step-4),.64,1):1;
+    const tier=baseTier(),profile=getDashQualityPreset(tier);
+    const auto=requested==='AUTO',step=auto?autoStep:0,degrade=AUTO_DEGRADATION[step]||AUTO_DEGRADATION.at(-1);
+    let vegetationDensity=auto?degrade.vegetation:1;
+    let particleDensity=auto?degrade.particles:1;
+    let foregroundDensity=auto?degrade.foreground:1;
+    let lightShaftDensity=auto?degrade.shafts:1;
+    if(accessibility.reducedMotion){
+      particleDensity=Math.min(particleDensity,.42);
+      foregroundDensity=Math.min(foregroundDensity,.45);
+      lightShaftDensity=0;
+    }
+    if(accessibility.highVisibility){
+      foregroundDensity=Math.min(foregroundDensity,.38);
+      particleDensity=Math.min(particleDensity,.72);
+    }
+    const shadowEnabled=!!profile.shadows&&(!auto||degrade.shadows);
+    const rawShadow=shadowEnabled?Math.max(256,Math.round(profile.shadowMap*(auto?degrade.shadowScale:1)/256)*256):0;
+    const dprScale=auto?degrade.dpr:1;
     const dprMax=Math.max(profile.dprMin,profile.dprMax*dprScale);
-    return {tier,profile,secondaryParticles,vegetation,shadowMap,postprocessing,dprScale,dprMax};
+    const secondaryParticles=particleDensity>.58&&!accessibility.reducedMotion;
+    return {
+      requested,hardwareTier,tier,profile,autoStep:step,
+      dprScale,dprMax,shadowEnabled,shadowMap:rawShadow,
+      vegetationDensity,particleDensity,foregroundDensity,lightShaftDensity,
+      secondaryParticles,accessibility:{...accessibility}
+    };
   }
 
   function apply(reason='quality'){
     const q=effective();
-    const targetDpr=clamp(Math.min(devicePixelRatio||1,q.dprMax),q.profile.dprMin,q.dprMax);
-    const key=[q.tier,requested,autoStep,q.shadowMap,q.postprocessing,q.vegetation,q.secondaryParticles,targetDpr.toFixed(3)].join('|');
-    if(key===appliedKey)return;
+    const deviceDpr=Number(globalThis.devicePixelRatio)||1;
+    const targetDpr=clamp(Math.min(deviceDpr,q.dprMax),q.profile.dprMin,q.dprMax);
+    const key=[
+      q.requested,q.hardwareTier,q.tier,q.autoStep,targetDpr.toFixed(3),q.shadowEnabled?q.shadowMap:0,
+      q.vegetationDensity.toFixed(2),q.particleDensity.toFixed(2),q.foregroundDensity.toFixed(2),
+      q.lightShaftDensity.toFixed(2),q.accessibility.reducedMotion?1:0,q.accessibility.highVisibility?1:0
+    ].join('|');
+    if(key===appliedKey)return q;
     appliedKey=key;
+
     if(Math.abs(renderer.getPixelRatio()-targetDpr)>.01)renderer.setPixelRatio(targetDpr);
-    renderer.shadowMap.enabled=q.shadowMap>0;
+    renderer.shadowMap.enabled=q.shadowEnabled;
+    renderer.shadowMap.needsUpdate=true;
     if(keyLight){
-      keyLight.castShadow=q.shadowMap>0;
-      if(keyLight.shadow.mapSize.width!==q.shadowMap||keyLight.shadow.mapSize.height!==q.shadowMap){
+      keyLight.castShadow=q.shadowEnabled;
+      if(!q.shadowEnabled){
+        keyLight.shadow.map?.dispose?.();
+        keyLight.shadow.map=null;
+      }else if(keyLight.shadow.mapSize.width!==q.shadowMap||keyLight.shadow.mapSize.height!==q.shadowMap){
         keyLight.shadow.map?.dispose?.();
         keyLight.shadow.map=null;
         keyLight.shadow.mapSize.set(q.shadowMap,q.shadowMap);
       }
     }
+
     document.body.dataset.dashQuality=q.tier.toLowerCase();
     document.body.dataset.dashSecondaryParticles=q.secondaryParticles?'on':'off';
-    document.body.dataset.dashVegetation=q.vegetation;
-    document.body.dataset.dashPostprocessing=q.postprocessing?'on':'off';
+    document.body.dataset.dashVegetation=q.vegetationDensity<.8?'reduced':'full';
+    delete document.body.dataset.dashPostprocessing;
     invalidated=true;
-    window.dispatchEvent(new CustomEvent('chimpions-dash-quality-change',{detail:{
-      requested,tier:q.tier,autoStep,reason,dpr:targetDpr,
-      secondaryParticles:q.secondaryParticles,vegetation:q.vegetation,
-      shadowMap:q.shadowMap,postprocessing:q.postprocessing
-    }}));
+    const detail={...q,dpr:targetDpr,reason};
+    window.dispatchEvent(new CustomEvent('chimpions-dash-quality-change',{detail}));
+    return detail;
   }
 
   function recalcWindow(){
@@ -90,13 +120,13 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
     lastEvaluation=now;recalcWindow();
     const q=effective(),p=q.profile;
     const stressed=p95Ms>p.p95BudgetMs||averageMs>p.avgBudgetMs;
-    const healthy=p95Ms<p.p95BudgetMs*.74&&averageMs<p.avgBudgetMs*.78;
+    const healthy=p95Ms<p.p95BudgetMs*.72&&averageMs<p.avgBudgetMs*.76;
     badWindows=stressed?badWindows+1:0;
     goodWindows=healthy?goodWindows+1:0;
-    if(now-lastAdjustment<5000)return;
-    if(badWindows>=2&&autoStep<7){
+    const sinceAdjustment=now-lastAdjustment;
+    if(badWindows>=2&&autoStep<AUTO_DEGRADATION.length-1&&sinceAdjustment>=5000){
       autoStep++;badWindows=0;goodWindows=0;lastAdjustment=now;apply('adaptive-down');
-    }else if(goodWindows>=4&&autoStep>0){
+    }else if(goodWindows>=6&&autoStep>0&&sinceAdjustment>=10000){
       autoStep--;badWindows=0;goodWindows=0;lastAdjustment=now;apply('adaptive-up');
     }
   }
@@ -106,7 +136,6 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
     samples[sampleIndex]=frameMs;
     sampleIndex=(sampleIndex+1)%samples.length;
     sampleCount=Math.min(samples.length,sampleCount+1);
-    // Ring order is irrelevant to average/percentile calculations; never rotate/copy it per frame.
     evaluate(now);
   }
 
@@ -122,12 +151,22 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
   function resetFrameWindow(){sampleCount=0;sampleIndex=0;averageMs=0;p95Ms=0;badWindows=0;goodWindows=0;}
 
   function setQuality(value,{persist=true}={}){
-    requested=validQuality(value);
-    if(requested==='AUTO'){autoTier=mobileBaseline();autoStep=0;resetFrameWindow();}
-    if(persist)try{localStorage.setItem('chimpions-dash-quality',requested);}catch{}
-    apply('manual');
+    const next=normalizeDashQualityRequest(value);
+    if(persist)storeDashQuality(next);
+    if(next===requested)return requested;
+    requested=next;autoStep=0;resetFrameWindow();apply('manual');
     return requested;
   }
+
+  function setAccessibility(next={}){
+    const reducedMotion=!!next.reducedMotion,highVisibility=!!next.highVisibility;
+    if(reducedMotion===accessibility.reducedMotion&&highVisibility===accessibility.highVisibility)return effective();
+    accessibility={reducedMotion,highVisibility};
+    return apply('accessibility');
+  }
+
+  function reapply(reason='reapply'){appliedKey='';return apply(reason);}
+  function qualityState(){const q=effective();return {...q,dpr:renderer.getPixelRatio()};}
 
   function diagnostics(){
     recalcWindow();
@@ -135,24 +174,31 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
     scene.traverse(object=>{
       sceneObjects++;
       if(object.isInstancedMesh)instancedMeshes++;
-      if(object.isPoints)particles+=object.geometry?.attributes?.position?.count||0;
+      if(object.isPoints)particles+=object.geometry?.drawRange?.count||object.geometry?.attributes?.position?.count||0;
     });
-    const runtime=getRuntimeStats?.()||{};
-    const info=renderer.info;
-    const q=effective();
+    const runtime=getRuntimeStats?.()||{},info=renderer.info,q=effective(),caps=renderer.capabilities||{};
     return {
-      requestedQuality:requested,qualityTier:q.tier,autoStep,
+      requestedQuality:requested,resolvedHardwareTier:hardwareTier,qualityTier:q.tier,autoStep,
       dpr:renderer.getPixelRatio(),dprMax:q.dprMax,
       budget:{averageFrameMs:q.profile.avgBudgetMs,p95FrameMs:q.profile.p95BudgetMs,idleFps:q.profile.idleFps},
       averageFrameMs:Number(averageMs.toFixed(2)),p95FrameMs:Number(p95Ms.toFixed(2)),
       frameSamples:sampleCount,renderedFrames,skippedFrames,
-      renderer:{calls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures},
+      renderer:{
+        calls:info.render.calls,triangles:info.render.triangles,geometries:info.memory.geometries,textures:info.memory.textures,
+        webgl2:!!caps.isWebGL2,maxTextureSize:caps.maxTextureSize||0
+      },
       sceneObjects,instancedMeshes,particles,
-      secondaryParticles:q.secondaryParticles,vegetation:q.vegetation,shadowMap:q.shadowMap,postprocessing:q.postprocessing,
+      shadowEnabled:q.shadowEnabled,shadowMap:q.shadowMap,
+      vegetationDensity:q.vegetationDensity,particleDensity:q.particleDensity,foregroundDensity:q.foregroundDensity,
+      secondaryParticles:q.secondaryParticles,accessibility:{...q.accessibility},
+      postprocessing:'disabled-direct-render',
       ...runtime
     };
   }
 
   apply('startup');
-  return {observeFrame,shouldRender,markRendered,invalidate,setQuality,diagnostics,resetFrameWindow,get requestedQuality(){return requested;}};
+  return {
+    observeFrame,shouldRender,markRendered,invalidate,setQuality,setAccessibility,reapply,qualityState,diagnostics,resetFrameWindow,
+    get requestedQuality(){return requested;}
+  };
 }

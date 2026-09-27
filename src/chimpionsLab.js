@@ -4,7 +4,7 @@ import {readLocalGLB} from './upload.js';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 import './chimpionsLab.css';
 import {GameAudio} from './dashAudio.js';
-import {DASH_MUSIC_URL,dashSpriteUrl,warmDashImages} from './dashAssets.js';
+import {DASH_MUSIC_URL,dashSpriteUrl} from './dashAssets.js';
 import {createDashPerformanceController} from './dashPerformance.js';
 import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRenderer.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
@@ -126,6 +126,10 @@ document.body.innerHTML=`
     <button id="touch-jump" type="button" aria-label="Jump"><span aria-hidden="true">↥</span><small>JUMP</small></button>
   </div>
   <div id="dash-stage-flash" aria-hidden="true"></div>
+  <div id="dash-render-recovery" class="dash-panel modal" hidden role="alert" aria-live="assertive">
+    <strong>GRAPHICS RECOVERY</strong>
+    <span id="dash-render-recovery-message">Restoring the graphics device…</span>
+  </div>
 </main>`;
 
 const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-6,6,6,-6,.01,40);
@@ -146,6 +150,7 @@ key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
 const dashGraphics=createDashWorldRenderer({scene,camera,renderer,hemisphere:hemi,keyLight:key,rimLight:rim,pixelsToWorld:1/40});
 const GPU_WORLD=true;
+document.documentElement.classList.toggle('dash-dom-world',!GPU_WORLD);
 
 const {
   step:STEP,playerX:PLAYER_X,gravity:GRAVITY,jumpImpulse:JUMP_IMPULSE,lowHeight:LOW_HEIGHT,
@@ -186,10 +191,6 @@ function resize3D(){
 }
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
-
-warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
-const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
-if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
 let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
 async function loadAvatar(entry,{timeoutMs=15000}={}){
@@ -237,18 +238,39 @@ let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,bes
 let suppressLongFramePause=false;
 const keys=new Set(),obstacles=[],bananas=[];
 const performanceController=createDashPerformanceController({renderer,scene,keyLight:key,getRuntimeStats:()=>({hazards:obstacles.length,bananas:bananas.length,poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},domGameplayNodes:objectLayer.childElementCount})});
-window.chimpionsDashPerformance={setQuality:q=>performanceController.setQuality(q),diagnostics:()=>performanceController.diagnostics()};
-window.addEventListener('chimpions-dash-quality-change',event=>{
-  const detail=event.detail||{},tier=detail.tier;
-  if(tier&&dashGraphics.qualityName!==tier)dashGraphics.setQuality(tier);
-  if(Number.isFinite(detail.dpr))renderer.setPixelRatio(detail.dpr);
-  if(Number.isFinite(detail.shadowMap)&&key?.shadow){
-    key.castShadow=detail.shadowMap>0;
-    if(key.shadow.mapSize.width!==detail.shadowMap||key.shadow.mapSize.height!==detail.shadowMap){
-      key.shadow.map?.dispose?.();key.shadow.map=null;key.shadow.mapSize.set(detail.shadowMap,detail.shadowMap);
-    }
+window.chimpionsDashPerformance={setQuality:q=>performanceController.setQuality(q),diagnostics:()=>performanceController.diagnostics(),state:()=>performanceController.qualityState()};
+const applyDashQuality=detail=>{if(detail?.tier)dashGraphics.applyQualityState(detail);};
+window.addEventListener('chimpions-dash-quality-change',event=>applyDashQuality(event.detail||{}));
+applyDashQuality(performanceController.qualityState());
+
+let webglContextLost=false,renderBlocked=false;
+const recoveryPanel=$('dash-render-recovery'),recoveryMessage=$('dash-render-recovery-message');
+function showRenderRecovery(message,fatal=false){
+  if(recoveryMessage)recoveryMessage.textContent=message;
+  if(recoveryPanel){recoveryPanel.hidden=false;recoveryPanel.dataset.fatal=fatal?'true':'false';}
+}
+function hideRenderRecovery(){if(recoveryPanel){recoveryPanel.hidden=true;delete recoveryPanel.dataset.fatal;}}
+function failRenderRecovery(message){
+  renderBlocked=true;showRenderRecovery(message||'Graphics could not be restored. Refresh the page to retry safely.',true);
+  voice.setDash(false);voice.suspendMusic();voice.stopAmbience();
+}
+function onWebGLContextLost(event){
+  event.preventDefault();webglContextLost=true;dashGraphics.setContextLost(true);accumulator=0;
+  voice.setDash(false);voice.suspendMusic();voice.stopAmbience();
+  showRenderRecovery('Graphics device lost. Restoring your current run…');performanceController.invalidate();
+}
+function onWebGLContextRestored(){
+  try{
+    dashGraphics.restoreContextState();performanceController.reapply('context-restored');resize3D();
+    webglContextLost=false;renderBlocked=false;last=performance.now();accumulator=0;hideRenderRecovery();performanceController.invalidate();
+    if(state==='running'){voice.resumeMusic();voice.startAmbience();}
+  }catch(error){
+    console.error('Dash WebGL restoration failed.',error);
+    webglContextLost=false;failRenderRecovery('Graphics restoration failed. Refresh the page to retry safely.');
   }
-});
+}
+renderer.domElement.addEventListener('webglcontextlost',onWebGLContextLost,false);
+renderer.domElement.addEventListener('webglcontextrestored',onWebGLContextRestored,false);
 let feedbackTimer=0,activeInputDevice=matchMedia('(pointer:coarse)').matches?'touch':'keyboard';
 function setInputDevice(device){
   if(!['keyboard','mouse','touch','gamepad'].includes(device)||activeInputDevice===device)return;
@@ -267,7 +289,9 @@ function applySettings(){
   document.body.classList.toggle('dash-high-visibility',!!dashSettings.highVisibility);
   document.body.classList.toggle('dash-large-touch',!!dashSettings.largeTouch);
   voice.setVolumes({master:dashSettings.master/100,music:dashSettings.music/100,sfx:dashSettings.sfx/100,ui:dashSettings.ui/100,ambience:dashSettings.ambience/100});
-  voice.setMuted(dashSettings.mute);performanceController?.setQuality(dashSettings.graphics);
+  voice.setMuted(dashSettings.mute);
+  performanceController?.setAccessibility({reducedMotion:dashSettings.reducedMotion,highVisibility:dashSettings.highVisibility});
+  performanceController?.setQuality(dashSettings.graphics);
 }
 function bindSettings(){
   const dialog=$('dash-settings');
@@ -701,7 +725,14 @@ function renderUI(dt){
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
   const graphicsSliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked);
-  dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
+  const graphicsFrame={dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow};
+  if(!webglContextLost&&!renderBlocked){
+    try{dashGraphics.update(graphicsFrame);}
+    catch(error){
+      console.error('Dash world update failed; switching to safe presentation.',error);dashGraphics.enterSafeMode(error);
+      try{dashGraphics.update(graphicsFrame);}catch(fallbackError){console.error('Dash safe world update failed.',fallbackError);failRenderRecovery('Graphics could not continue safely. Refresh the page to retry.');}
+    }
+  }
   if(character){
     const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
     character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
@@ -796,7 +827,12 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 
 window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad,selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
 window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
-addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose();},{once:true});
+addEventListener('pagehide',()=>{
+  renderer.setAnimationLoop(null);
+  renderer.domElement.removeEventListener('webglcontextlost',onWebGLContextLost,false);
+  renderer.domElement.removeEventListener('webglcontextrestored',onWebGLContextRestored,false);
+  voice.destroy();character?.dispose?.();dashGraphics.dispose();renderer.dispose();
+},{once:true});
 if(new URLSearchParams(location.search).has('test')){
  const snapshot=()=>{let sceneObjects=0;scene.traverse(()=>sceneObjects++);return{state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score}:null,inputs:{jump:[...heldJump],slide:[...heldSlide]},obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),pools:{hazards:pools.hazard.length,bananas:pools.banana.length},renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},standBlocked:run?overheadBlocksStand():false};};
  const reset=(seed='dash-regression',time=0)=>{clearInputs();voice.stopMusic();clearWorld();dashGraphics.reset();run=makeRun({seed:hashSeed(seed),tutorial:false});run.time=Math.max(0,Number(time)||0);run.stage=dashStageForTime(run.time);run.speed=dashSpeedForTime(run.time);seedWorld();setState('running');accumulator=0;last=performance.now();renderUI(0);dashGraphics.render();return snapshot();};
@@ -813,6 +849,7 @@ setState('menu');run=makeRun();seedWorld();
 renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
+  if(webglContextLost||renderBlocked){accumulator=0;return;}
   if(elapsedFrame>.3&&state==='running'&&!suppressLongFramePause)pause();pollGamepad();
   performanceController.observeFrame(elapsedFrame*1000,state,now);
   if(state==='running'){
@@ -820,7 +857,11 @@ renderer.setAnimationLoop(now=>{
     let steps=0;
     while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
   }else accumulator=0;
-  if(performanceController.shouldRender(now,state)){renderUI(frameDt);dashGraphics.render();performanceController.markRendered(now);}
+  if(performanceController.shouldRender(now,state)){
+    renderUI(frameDt);
+    if(dashGraphics.render())performanceController.markRendered(now);
+    else failRenderRecovery('Graphics could not render safely. Refresh the page to retry.');
+  }
 });
 
 window.chimpionsLab=()=>({

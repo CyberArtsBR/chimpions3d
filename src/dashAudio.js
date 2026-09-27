@@ -73,7 +73,7 @@ export class GameAudio {
     if(this.music)return this.music;
     if(typeof window.Audio!=='function')return null;
     const m=new window.Audio(this.musicSrc);
-    m.loop=true;m.preload='auto';m.setAttribute?.('playsinline','');
+    m.loop=true;m.preload='none';m.setAttribute?.('playsinline','');
     m.addEventListener('error',()=>{this.musicError=true},{once:true});
     this.music=m;this.applyMix();return m;
   }
