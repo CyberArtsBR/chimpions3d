@@ -239,38 +239,52 @@ export function createScenery(scene,renderer){
   if(!forestTextureCache.has(key))forestTextureCache.set(key,forestTexture(26+index*16,normalized));
   return forestTextureCache.get(key);
  };
- const forestColors=[0xc8e0d1,0xa7cbbb,0x7caa93,0x466b56],forestOpacity=[.16,.27,.38,.50];
- for(let i=0;i<4;i++){
+ const forestColors=[0xa7cbbb,0x7caa93,0x466b56],forestOpacity=[.25,.38,.52];
+ for(let i=0;i<3;i++){
   const map=forestTextureFor(i,1),material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
-  const layer=new THREE.Mesh(new THREE.PlaneGeometry(43-i*5,35),material);layer.position.z=-28+i*5;layer.renderOrder=-11+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=1;background.add(layer);forest.push(layer);
+  const layer=new THREE.Mesh(new THREE.PlaneGeometry(40-i*5,34),material);layer.position.z=-24+i*6;layer.renderOrder=-10+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=1;background.add(layer);forest.push(layer);
  }
- let forestTextureRefreshToken=0;
+ let forestTextureRefreshToken=0,forestTextureWorker=null,forestTextureRequestId=0;
+ const forestTexturePending=new Map();
  function applyForestTexture(layer,map,scale,anisotropy){
   if(map.anisotropy!==anisotropy){map.anisotropy=anisotropy;map.needsUpdate=true;}
   if(layer.material.map!==map){layer.material.map=map;layer.material.needsUpdate=true;}
   layer.userData.forestTextureScale=scale;
  }
- function scheduleForestTextureUpgrade(targetScale,anisotropy,token){
+ function ensureForestTextureWorker(){
+  if(forestTextureWorker||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')return forestTextureWorker;
+  try{
+   forestTextureWorker=new Worker(new URL('./forestTextureWorker.js',import.meta.url),{type:'module'});
+   forestTextureWorker.onmessage=event=>{
+    const {id,index,scale,bitmap,error}=event.data||{},pending=forestTexturePending.get(id);forestTexturePending.delete(id);
+    if(!pending||error||!bitmap)return;
+    const key=`${index}:${scale}`,map=new THREE.Texture(bitmap);
+    map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;forestTextureCache.set(key,map);
+    if(pending.token!==forestTextureRefreshToken||activeVisualProfile.backgroundMode!=='layered-forest')return;
+    const layer=forest.find(item=>item.userData.forestIndex===index);if(!layer)return;
+    applyForestTexture(layer,map,scale,pending.anisotropy);invalidateStaticFrame();
+   };
+   forestTextureWorker.onerror=()=>{forestTextureWorker?.terminate?.();forestTextureWorker=null;forestTexturePending.clear();};
+  }catch{forestTextureWorker=null;}
+  return forestTextureWorker;
+ }
+ function requestForestTextureUpgrade(layer,targetScale,anisotropy,token){
   if(targetScale<=1.01)return;
-  const layers=forest.filter(layer=>layer.userData.forestIndex>0);
-  let cursor=0;
-  const buildNext=()=>{
-   if(token!==forestTextureRefreshToken||activeVisualProfile.backgroundMode!=='layered-forest')return;
-   const layer=layers[cursor++];if(!layer)return;
-   const map=forestTextureFor(layer.userData.forestIndex,targetScale);
-   applyForestTexture(layer,map,targetScale,anisotropy);
-   invalidateStaticFrame();
-   if(cursor<layers.length)setTimeout(buildNext,90);
-  };
-  setTimeout(buildNext,700);
+  const scale=Math.max(1,Math.min(1.6,Math.round(targetScale*100)/100)),key=`${layer.userData.forestIndex}:${scale}`;
+  if(forestTextureCache.has(key)){applyForestTexture(layer,forestTextureCache.get(key),scale,anisotropy);return;}
+  const worker=ensureForestTextureWorker();if(!worker)return;
+  const id=++forestTextureRequestId;forestTexturePending.set(id,{token,anisotropy});
+  worker.postMessage({id,index:layer.userData.forestIndex,scale,seed:26+layer.userData.forestIndex*16});
  }
  function refreshForestTextureQuality(){
   const targetScale=activeVisualProfile.backgroundMode==='layered-forest'?(activeVisualProfile.backgroundTextureScale||1):1;
   const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2)),token=++forestTextureRefreshToken;
-  // Always return to the already-cached base canopy immediately so quality changes never
-  // block menu/avatar startup. Higher desktop density is refined progressively afterward.
-  for(const layer of forest)applyForestTexture(layer,forestTextureFor(layer.userData.forestIndex,1),1,anisotropy);
-  scheduleForestTextureUpgrade(targetScale,anisotropy,token);
+  // Immediate enhanced base canopy keeps startup responsive. Higher-density versions
+  // are generated in a Web Worker so desktop quality upgrades never block input/rendering.
+  for(const layer of forest){
+   applyForestTexture(layer,forestTextureFor(layer.userData.forestIndex,1),1,anisotropy);
+   requestForestTextureUpgrade(layer,targetScale,anisotropy,token);
+  }
  }
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
  // Balanced and High use the layered forest; High renders it with maximum desktop quality.
@@ -321,7 +335,7 @@ export function createScenery(scene,renderer){
   const authoredTreeReady=wantsAuthoredTree&&!!treeImageMesh?.material.map;
   // Balanced and High use the exact same layered-forest composition. HIGH only
   // raises texture density/filtering/render quality; Ultra swaps to the authored tree.
-  forest.forEach((m,i)=>{m.visible=background.visible&&!authoredTreeReady&&i>0;});
+  forest.forEach(m=>{m.visible=background.visible&&!authoredTreeReady;});
   if(treeImageMesh)treeImageMesh.visible=background.visible&&authoredTreeReady;
   invalidateStaticFrame();
  }
