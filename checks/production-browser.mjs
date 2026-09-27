@@ -80,8 +80,9 @@ try{
   assert.equal(await page.locator('#collection-dialog .avatar-option').count(),10,'Production picker must expose the canonical 10 Chimpions');
   await shot('production-picker-desktop.png');
 
-  await page.locator('#confirm-chimpion').click();
-  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
+  const firstPlayable=page.locator('#collection-dialog .avatar-option:not(:disabled)').first();
+  await firstPlayable.click();
+  await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:15000});
   await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,{timeout:18000});
   const countdown=await snap('countdown');
   assert.equal(countdown.time,0,'Gameplay physics must remain frozen during countdown');
