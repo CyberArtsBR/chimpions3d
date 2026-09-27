@@ -326,7 +326,7 @@ export function createScenery(scene,renderer){
   if(!platformConfig)return;
   if(platformConfig.platformModel)prefetchVisualAsset(controlledAssetUrl(platformConfig.platformModel));
   const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages?.[kind];
-  if(url)prefetchVisualAsset(controlledAssetUrl(url));
+  if(activeVisualProfile.backgroundMode==='authored-tree'&&url)prefetchVisualAsset(controlledAssetUrl(url));
  }
  Promise.all([
   fetch(import.meta.env.BASE_URL+'environment.json').then(r=>r.ok?r.json():{}),
@@ -475,7 +475,7 @@ export function createScenery(scene,renderer){
   },
   setPixelMode(enabled){background.visible=!enabled;refreshBackground();},
   get platformReady(){return !!platformTemplate;},
-  get backgroundReady(){return !!treeImageMesh?.visible;},
+  get backgroundReady(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
   get treeClimbOffset(){return treeClimbOffset;},
   get treeScrollDiagnostics(){return {
