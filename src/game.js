@@ -142,11 +142,11 @@ const themes=[
  {name:'Moonstorm Jungle',top:'#102b62',bottom:'#315b91',light:0xaed5ff,fog:0x5579a9,fogNear:19,fogFar:45,sun:.78,hero:1.88,fill:1.38,mist:.42,rain:1,night:1}
 ];
 function themeAtHeight(height){
- const h=Math.max(0,Number(height)||0),half=THEME_TRANSITION_METERS/2;
+ const h=Math.max(0,Number(height)||0);
  for(let next=1;next<themes.length;next++){
   const boundary=next*THEME_METERS;
-  if(h<boundary-half)return {from:next-1,to:next-1,blend:1};
-  if(h<=boundary+half)return {from:next-1,to:next,blend:THREE.MathUtils.smoothstep(h,boundary-half,boundary+half)};
+  if(h<boundary)return {from:next-1,to:next-1,blend:1};
+  if(h<=boundary+THEME_TRANSITION_METERS)return {from:next-1,to:next,blend:THREE.MathUtils.smoothstep(h,boundary,boundary+THEME_TRANSITION_METERS)};
  }
  return {from:themes.length-1,to:themes.length-1,blend:1};
 }
