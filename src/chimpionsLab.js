@@ -160,7 +160,7 @@ const {
   colliderInsetX:COLLIDER_INSET_X,colliderBottom:COLLIDER_BOTTOM
 }=DASH_PHYSICS;
 const BASE_SPEED=dashSpeedForTime(0),DASH_RULES_VERSION=DASH_GAMEPLAY_VERSION;
-const DEFAULT_DASH_TIP='HOLD LEFT MOUSE / ↑ TO JUMP HIGHER · RIGHT MOUSE / ↓ TO DUCK';
+const DEFAULT_DASH_TIP='READ THE HAZARD · JUMP OR SLIDE · BUILD FLOW';
 const hexColor=value=>'#'+Number(value).toString(16).padStart(6,'0');
 const BIOMES=DASH_BIOMES.map(({name,skyTop,skyBottom})=>[name,hexColor(skyTop),hexColor(skyBottom)]);
 const TYPES=DASH_OBSTACLE_TYPES;
@@ -382,6 +382,8 @@ function emitFlowTransition(before,reason){
   emitDashEvent(DASH_EVENTS.flowChange,dashMeta({before,after:run.flow,delta:run.flow-before,reason}));
   const previousMultiplier=multiplier(before),nextMultiplier=multiplier(run.flow);
   voice.setFlow(run.flow,nextMultiplier);
+  const previousBand=Math.floor(Math.max(0,before)/25),nextBand=Math.floor(Math.max(0,run.flow)/25);
+  if(nextBand>previousBand)voice.play('flow',{gain:.38+Math.min(.2,nextBand*.035),pitch:1+nextBand*.035});
   if(previousMultiplier!==nextMultiplier)emitDashEvent(DASH_EVENTS.multiplierChange,dashMeta({before:previousMultiplier,after:nextMultiplier,reason}));
 }
 function handleTutorialEvent(type){
