@@ -1,43 +1,56 @@
 import {normalizeDashSeed,nextDashRandom} from './dashSeed.js';
 import {dashSpeedForTime,dashStageForTime} from './dashDifficulty.js';
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dashPhysics.js';
-import {planDashPattern,dashTransitionReport} from './dashPatterns.js';
+import {planDashPattern,dashTransitionReport,dashWarningReport} from './dashPatterns.js';
 
 export const DASH_GAMEPLAY_VERSION='dash-aaa-1';
 
-export function generateDashPlan({seed=1,time=0,count=20,startX=1200,currentScroll=0}={}){
+export function generateDashPlan({seed=1,time=0,count=20,startX=1200,currentScroll=0,visibility=1}={}){
   const normalized=normalizeDashSeed(seed);
   const holder={seedState:normalized};
   const patterns=[];
   let spawnX=startX,previousDifficulty=1,previousAction=null;
   for(let i=0;i<count;i++){
-    const planned=planDashPattern(holder,{time,spawnX,currentScroll,previousDifficulty,previousAction});
+    const planned=planDashPattern(holder,{time,spawnX,currentScroll,previousDifficulty,previousAction,visibility});
     const jitter=.18+nextDashRandom(holder)*.24;
     spawnX=planned.nextSpawn+planned.snapshot.speed*jitter;
     previousDifficulty=planned.pattern.difficulty;
     previousAction=planned.obstacles.at(-1)?.action||previousAction;
-    patterns.push(planned);
+    patterns.push({...planned,time});
     const travel=Math.max(0,spawnX-currentScroll-150);
     time+=travel/Math.max(1,dashSpeedForTime(time))*0.08;
   }
   return{seed:normalized,seedState:holder.seedState,patterns};
 }
 
-export function validateDashPlan(plan){
+export function validateDashPlan(plan,{viewportWidth=1080,playerX=DASH_PHYSICS.playerX}={}){
   const failures=[];
+  let previousAcrossPatterns=null,previousPattern=null;
+  const detail=(entry,next,previous,report,gap,kind)=>({
+    seed:plan.seed,gameplayVersion:DASH_GAMEPLAY_VERSION,gameTime:entry.time??0,stage:entry.snapshot.stage,speed:next.transitionSpeed||entry.snapshot.speed,
+    viewport:{width:viewportWidth,playerX},previousPattern:previousPattern||entry.pattern.id,nextPattern:entry.pattern.id,
+    previousAction:previous?.action||null,nextAction:next.action,obstacleIds:[previous?.id,next.id].filter(Boolean),
+    availableReactionTime:report.available,requiredReactionTime:report.required,calculatedGap:gap,kind
+  });
   for(const entry of plan.patterns){
+    const first=entry.obstacles[0];
+    if(first){
+      const warning=dashWarningReport(first,{speed:entry.snapshot.speed,viewportWidth,playerX,obstacleWidth:first.w});
+      if(!warning.ok)failures.push(detail(entry,first,previousAcrossPatterns,warning,warning.visibleDistance,'viewport-warning'));
+      if(previousAcrossPatterns){
+        const gap=first.x-(previousAcrossPatterns.x+previousAcrossPatterns.w);
+        const report=dashTransitionReport(previousAcrossPatterns,first,{gapDistance:gap,speed:entry.snapshot.speed,chainLength:1});
+        if(gap<0||!report.ok)failures.push(detail(entry,first,previousAcrossPatterns,report,gap,gap<0?'overlap':'pattern-transition'));
+      }
+    }
     for(let i=1;i<entry.obstacles.length;i++){
       const previous=entry.obstacles[i-1],next=entry.obstacles[i];
       const gap=next.x-(previous.x+previous.w);
       const speed=next.transitionSpeed||entry.snapshot.speed;
       const report=dashTransitionReport(previous,next,{gapDistance:gap,speed,chainLength:entry.obstacles.length,requested:entry.pattern.items[i][1]});
-      if(gap<0||!report.ok)failures.push({
-        seed:plan.seed,stage:entry.snapshot.stage,speed,pattern:entry.pattern.id,obstacle:next.id,
-        previousAction:previous.action,requiredAction:next.action,gap,
-        availableReactionTime:report.available,minimumReactionTime:report.required,
-        kind:gap<0?'overlap':'reaction-window'
-      });
+      if(gap<0||!report.ok)failures.push(detail(entry,next,previous,report,gap,gap<0?'overlap':'reaction-window'));
     }
+    if(entry.obstacles.length){previousAcrossPatterns=entry.obstacles.at(-1);previousPattern=entry.pattern.id;}
   }
   return failures;
 }
