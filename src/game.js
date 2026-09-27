@@ -44,7 +44,7 @@ collectionDialog.setAttribute('aria-label','Choose your chimp');
 collectionDialog.innerHTML='<header><h2>Choose your chimp</h2><button id="close-collection" aria-label="Close character selection">×</button></header>';
 collectionDialog.append($('avatar-list'));document.body.append(collectionDialog);
 const selectionActions=document.createElement('div');selectionActions.className='selection-actions';
-selectionActions.innerHTML='<button id="random-chimpion">↻ Random</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Ready for the canopy</small></div><button id="confirm-chimpion" class="primary">Play with selected Chimpion</button>';
+selectionActions.innerHTML='<button id="random-chimpion">↻ Random & Play</button><div class="selected-copy"><p id="selected-chimpion" role="status"></p><small id="selected-chimpion-meta">Choose once to start immediately</small></div>';
 collectionDialog.insertBefore(selectionActions,$('avatar-list'));
 $('close-collection').onclick=()=>collectionDialog.close();
 let collectionOpener=null;
@@ -239,11 +239,20 @@ function showPending(){
  if(!pendingEntry)return;const metadata=collection.find(e=>e.id===pendingEntry.id||e.name===pendingEntry.name)||pendingEntry;selectedPreview.replaceChildren();
  appendPortrait(selectedPreview,pendingEntry,metadata.image||pendingEntry.image);
  $('selected-chimpion').textContent=pendingEntry.name;
- const meta=[metadata.tribe,metadata.id?'#'+metadata.id:null,pendingEntry.url?'Playable now':'Preview only'].filter(Boolean).join(' · ');$('selected-chimpion-meta').textContent=meta||'Ready for the canopy';
- $('confirm-chimpion').textContent='Play with '+pendingEntry.name;
+ const meta=[metadata.tribe,metadata.id?'#'+metadata.id:null,pendingEntry.url?'Playable now':'Preview only'].filter(Boolean).join(' · ');$('selected-chimpion-meta').textContent=meta||'Choose once to start immediately';
 }
-$('random-chimpion').onclick=()=>{pendingEntry=randomEntry();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===pendingEntry?.id)/12));showPending();renderCollection();};
-$('confirm-chimpion').onclick=async()=>{if(!pendingEntry||$('confirm-chimpion').disabled)return;$('confirm-chimpion').disabled=$('random-chimpion').disabled=true;collectionDialog.close();const loaded=pendingEntry.id===selectedId&&ready||await selectAvatar(pendingEntry);$('confirm-chimpion').disabled=$('random-chimpion').disabled=false;if(loaded){selectionConfirmed=true;start();}else{selectionConfirmed=false;openSelection();}};
+let selectionLaunchBusy=false;
+async function launchPending(entry=pendingEntry){
+ if(!entry||selectionLaunchBusy||!entry.url)return;
+ selectionLaunchBusy=true;pendingEntry=entry;showPending();
+ $('random-chimpion').disabled=true;
+ collectionDialog.close();
+ const loaded=entry.id===selectedId&&ready||await selectAvatar(entry);
+ $('random-chimpion').disabled=false;selectionLaunchBusy=false;
+ if(loaded){selectionConfirmed=true;start();}
+ else{selectionConfirmed=false;openSelection();}
+}
+$('random-chimpion').onclick=()=>{const entry=randomEntry();collectionQuery='';collectionPage=Math.max(0,Math.floor(catalog.findIndex(e=>e.id===entry?.id)/12));launchPending(entry);};
 function renderCollection(){
  const list=$('avatar-list');list.replaceChildren();const search=document.createElement('input');search.type='search';search.placeholder='Search chimp name';search.setAttribute('aria-label','Search characters');search.value=collectionQuery;
  search.oninput=()=>{collectionQuery=search.value;collectionPage=0;renderCollection();const field=list.querySelector('input');field.focus();};list.append(search);
@@ -252,7 +261,7 @@ function renderCollection(){
   const button=document.createElement('button');button.className='avatar-option';button.disabled=!entry.url;button.setAttribute('aria-label',entry.name+(entry.url?'':entry.unavailable?' · Rig needs correction':' · GLB coming soon'));button.setAttribute('aria-pressed',String(pendingEntry?.id===entry.id));
   const portrait=document.createElement('span');portrait.className='avatar-portrait';appendPortrait(portrait,entry,entry.image);button.append(portrait);
   const name=document.createElement('strong');name.textContent=entry.name;button.append(name);const status=document.createElement('small');status.textContent=entry.url?(pendingEntry?.id===entry.id?'Selected':'Select'):(entry.unavailable?'Rig needs correction':'GLB coming soon');button.title=entry.unavailable||entry.name;button.append(status);
-  button.onclick=()=>{pendingEntry=entry;showPending();for(const option of grid.querySelectorAll('.avatar-option'))option.setAttribute('aria-pressed',String(option===button));};grid.append(button);
+  button.onclick=()=>{pendingEntry=entry;showPending();for(const option of grid.querySelectorAll('.avatar-option'))option.setAttribute('aria-pressed',String(option===button));launchPending(entry);};grid.append(button);
  }
  const uploadAction=document.createElement('button');uploadAction.type='button';uploadAction.className='avatar-upload-option';uploadAction.textContent='UPLOAD YOUR 3D CHARACTER (GLB)';uploadAction.setAttribute('aria-label','UPLOAD YOUR 3D CHARACTER (GLB)');uploadAction.onclick=chooseLocalAvatar;grid.append(uploadAction);
  list.append(grid);const nav=document.createElement('div');nav.className='collection-nav';
