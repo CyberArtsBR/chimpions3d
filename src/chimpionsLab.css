@@ -13,9 +13,9 @@ button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #f6e
 #dash-stage::after{content:"";position:absolute;inset:0;z-index:17;pointer-events:none;background:radial-gradient(ellipse at 46% 48%,transparent 35%,#03130f33 73%,#020d0a70 100%);box-shadow:inset 0 -90px 130px #03120d66}
 #dash-sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--biome-top) 0,var(--biome-bottom) 78%);transition:background 1.2s ease}
 #dash-far,#dash-mid{
-  position:absolute;pointer-events:none;background-image:url('/dash/assets/jungle-v2.1f8e991e.webp');
-  background-repeat:repeat-x;will-change:background-position
+  position:absolute;pointer-events:none;background-repeat:repeat-x;will-change:background-position
 }
+.dash-dom-world #dash-far,.dash-dom-world #dash-mid{background-image:url('/dash/assets/jungle-v2.1f8e991e.webp')}
 #dash-far{
   inset:-2% -12%;z-index:1;background-position:var(--far-x) center;background-size:auto 108%;
   opacity:.82;filter:saturate(.92) contrast(1.05) brightness(.82)
