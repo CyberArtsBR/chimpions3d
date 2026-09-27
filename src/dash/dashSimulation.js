@@ -36,7 +36,21 @@ export function generateDashPlan({seed=1,time=0,count=20,startX=1200,currentScro
     const travel=Math.max(0,spawnX-currentScroll-DASH_PHYSICS.playerX);
     time+=travel/Math.max(1,dashSpeedForTime(time))*0.08;
   }
-  return{seed:normalized,seedState:holder.seedState,viewportWidth,patterns,director};
+  return{
+    seed:normalized,
+    seedState:holder.seedState,
+    viewportWidth,
+    patterns,
+    director:{
+      pressure:directorState.pressure,
+      recovery:directorState.recovery,
+      actionVariety:directorState.actionVariety,
+      recentActions:[...directorState.recentActions],
+      recentPatterns:[...directorState.recentPatterns],
+      nextSetPieceAt:directorState.nextSetPieceAt,
+      setPieceCount:directorState.setPieceCount
+    }
+  };
 }
 
 export function validateDashPlan(plan){
