@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1536" viewBox="0 0 2048 1536">
+<defs>
+ <linearGradient id="tr" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#29493c"/><stop offset=".5" stop-color="#54755c"/><stop offset="1" stop-color="#203d34"/></linearGradient>
+ <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b2c67a"/><stop offset=".48" stop-color="#66895d"/><stop offset="1" stop-color="#294c3d"/></linearGradient>
+ <pattern id="leafp" width="130" height="105" patternUnits="userSpaceOnUse">
+  <ellipse cx="26" cy="30" rx="27" ry="10" transform="rotate(-28 26 30)" fill="url(#leaf)" opacity=".82"/>
+  <ellipse cx="80" cy="56" rx="34" ry="12" transform="rotate(24 80 56)" fill="#52775a" opacity=".78"/>
+  <ellipse cx="116" cy="16" rx="24" ry="9" transform="rotate(-10 116 16)" fill="#87a36c" opacity=".7"/>
+ </pattern>
+</defs>
+<g opacity=".9">
+ <path d="M120 1536c65-270 26-620 102-880 64-218 190-330 278-492-18 176-136 308-174 506-54 276-4 582 40 866z" fill="url(#tr)"/>
+ <path d="M530 1536c40-320 4-610 88-910 46-166 158-282 240-472-6 200-100 342-144 522-70 284-14 580 30 860z" fill="url(#tr)"/>
+ <path d="M1060 1536c-12-310-28-624 70-920 54-166 168-282 226-490 12 208-78 358-128 540-76 282-22 582 28 870z" fill="url(#tr)"/>
+ <path d="M1580 1536c-20-284-30-560 66-842 62-182 166-318 208-528 26 208-62 378-110 560-62 242-12 536 32 810z" fill="url(#tr)"/>
+</g>
+<g fill="none" stroke="#557a5f" stroke-width="12" stroke-linecap="round" opacity=".72">
+ <path d="M10 250c260 120 338 70 510-38s320-100 488 14"/><path d="M870 86c140 152 316 194 520 104s382-90 620 40"/>
+</g>
+<rect width="2048" height="930" fill="url(#leafp)" opacity=".76"/>
+<g fill="none" stroke="#436950" stroke-linecap="round" opacity=".7">
+ <path d="M300 0c-18 190 42 340-20 560s20 356-12 590" stroke-width="7"/>
+ <path d="M820 0c20 210-30 390 28 612 36 138-12 286-8 462" stroke-width="6"/>
+ <path d="M1460 0c-14 230 60 360 6 620-28 132 28 284-10 476" stroke-width="8"/>
+ <path d="M1880 0c28 180-30 350 8 536 30 146-20 302 12 460" stroke-width="5"/>
+</g>
+</svg>
