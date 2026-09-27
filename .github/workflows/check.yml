@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: false
+      run_release:
+        description: Run the full Dash release hardening tier
+        required: false
+        type: boolean
+        default: false
       production_url:
         description: Optional deployed URL for the public production audit
         required: false
@@ -47,10 +52,7 @@ jobs:
       - name: Build production bundle
         run: npm run build
       - name: Run fast deterministic gates
-        run: |
-          npm run qa:fast
-          node checks/dash-gameplay.mjs
-          node checks/dash-presentation-contract.mjs
+        run: npm run qa:fast
       - name: Syntax-check browser and production suites
         run: |
           node --check checks/game-browser.mjs
@@ -77,6 +79,9 @@ jobs:
           node --check checks/dash-performance-browser.mjs
           node --check checks/dash-presentation-contract.mjs
           node --check checks/dash-presentation-browser.mjs
+          node --check checks/dash-black-screen-browser.mjs
+          node --check checks/dash-accessibility-browser.mjs
+          node --check checks/dash-runtime-determinism-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -157,14 +162,6 @@ jobs:
           done
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:standard
-          node checks/dash-physics.mjs
-          node checks/dash-patterns.mjs
-          node checks/dash-browser.mjs
-          node checks/dash-mobile-browser.mjs
-          node checks/dash-resources.mjs
-          node checks/dash-rendering-browser.mjs
-          node checks/dash-performance-browser.mjs
-          node checks/dash-presentation-browser.mjs
       - name: Build network-failure QA bundle
         if: ${{ always() && !cancelled() }}
         run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
@@ -210,6 +207,45 @@ jobs:
             checks/*-report.json
             checks/*-manifest.json
             checks/acceptance-matrix.*
+
+  release:
+    name: RELEASE · Dash hardening gate
+    needs: fast
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') && github.event_name == 'workflow_dispatch' && github.event.inputs.run_release == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated release QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Dash release tier
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-release.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?dash=1&test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS 'http://127.0.0.1:4173/?dash=1&test=1' >/dev/null
+          npm run qa:release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-release-reports
+          if-no-files-found: ignore
+          path: |
+            checks/*.png
+            checks/*-report.json
+            checks/*-manifest.json
 
   extended:
     name: EXTENDED · Firefox and WebKit smoke
