@@ -109,10 +109,6 @@ body[data-mode=playing] #background-style{display:none}
 .pixel-mode .touch{border-radius:4px;border:2px solid #b6d69a;box-shadow:3px 3px 0 #132638}
 #world>.sun{transition:opacity 4s ease,filter 4s ease}
 #world>.rays{transition:opacity 4s ease}
-body[data-jump-quality="high"] #world>.sun,
-body[data-jump-quality="high"] #world>.rays,
-body[data-jump-quality="high"] #world>.hill,
-body[data-jump-quality="high"] #world>.mist,
 body[data-jump-quality="ultra"] #world>.sun,
 body[data-jump-quality="ultra"] #world>.rays,
 body[data-jump-quality="ultra"] #world>.hill,
