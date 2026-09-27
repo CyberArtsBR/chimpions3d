@@ -242,16 +242,35 @@ export function createScenery(scene,renderer){
  const forestColors=[0xc8e0d1,0xa7cbbb,0x7caa93,0x466b56],forestOpacity=[.16,.27,.38,.50];
  for(let i=0;i<4;i++){
   const map=forestTextureFor(i,1),material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
-  const layer=new THREE.Mesh(new THREE.PlaneGeometry(43-i*5,35),material);layer.position.z=-28+i*5;layer.renderOrder=-11+i;layer.userData.forestIndex=i;background.add(layer);forest.push(layer);
+  const layer=new THREE.Mesh(new THREE.PlaneGeometry(43-i*5,35),material);layer.position.z=-28+i*5;layer.renderOrder=-11+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=1;background.add(layer);forest.push(layer);
+ }
+ let forestTextureRefreshToken=0;
+ function applyForestTexture(layer,map,scale,anisotropy){
+  if(map.anisotropy!==anisotropy){map.anisotropy=anisotropy;map.needsUpdate=true;}
+  if(layer.material.map!==map){layer.material.map=map;layer.material.needsUpdate=true;}
+  layer.userData.forestTextureScale=scale;
+ }
+ function scheduleForestTextureUpgrade(targetScale,anisotropy,token){
+  if(targetScale<=1.01)return;
+  const layers=forest.filter(layer=>layer.userData.forestIndex>0);
+  let cursor=0;
+  const buildNext=()=>{
+   if(token!==forestTextureRefreshToken||activeVisualProfile.backgroundMode!=='layered-forest')return;
+   const layer=layers[cursor++];if(!layer)return;
+   const map=forestTextureFor(layer.userData.forestIndex,targetScale);
+   applyForestTexture(layer,map,targetScale,anisotropy);
+   invalidateStaticFrame();
+   if(cursor<layers.length)setTimeout(buildNext,90);
+  };
+  setTimeout(buildNext,700);
  }
  function refreshForestTextureQuality(){
-  const scale=activeVisualProfile.backgroundMode==='layered-forest'?(activeVisualProfile.backgroundTextureScale||1):1;
-  const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
-  for(const layer of forest){
-   const map=forestTextureFor(layer.userData.forestIndex,scale);
-   if(map.anisotropy!==anisotropy){map.anisotropy=anisotropy;map.needsUpdate=true;}
-   if(layer.material.map!==map){layer.material.map=map;layer.material.needsUpdate=true;}
-  }
+  const targetScale=activeVisualProfile.backgroundMode==='layered-forest'?(activeVisualProfile.backgroundTextureScale||1):1;
+  const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2)),token=++forestTextureRefreshToken;
+  // Always return to the already-cached base canopy immediately so quality changes never
+  // block menu/avatar startup. Higher desktop density is refined progressively afterward.
+  for(const layer of forest)applyForestTexture(layer,forestTextureFor(layer.userData.forestIndex,1),1,anisotropy);
+  scheduleForestTextureUpgrade(targetScale,anisotropy,token);
  }
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
  // Balanced and High use the layered forest; High renders it with maximum desktop quality.
@@ -515,6 +534,7 @@ export function createScenery(scene,renderer){
    treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
    backgroundMode:activeVisualProfile.backgroundMode||'layered-forest',
    forestTextureScale:activeVisualProfile.backgroundTextureScale||1,
+   forestLoadedTextureScale:forest.some(m=>m.visible)?Math.min(...forest.filter(m=>m.visible).map(m=>m.userData.forestTextureScale||1)):1,
    forestVisibleLayers:forest.filter(m=>m.visible).length,
    rainActive,rainLevel,rainIntensity:Number(rainIntensity.toFixed(3)),rainDropCount,
    treeAuthoredVisible:!!treeImageMesh?.visible,treeFallbackVisible:forest.some(m=>m.visible),
