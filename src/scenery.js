@@ -95,6 +95,23 @@ function forestTexture(seed,scale=1){
   c.clearRect(0,0,w,h);c.globalAlpha=.78;c.filter=`blur(${4.2*density}px)`;c.drawImage(sharp,0,0);c.filter='none';c.globalAlpha=.38;c.drawImage(sharp,0,0);c.globalAlpha=1;
  });
 }
+function forestPreviewTexture(seed){
+ return canvasTexture(384,576,(c,w,h)=>{
+  const r=rng(seed),haze=c.createLinearGradient(0,0,0,h);
+  haze.addColorStop(0,'#aacdbc55');haze.addColorStop(1,'#18382faa');c.fillStyle=haze;c.fillRect(0,0,w,h);
+  c.lineCap='round';
+  for(let i=0;i<7;i++){
+   const x=(i+.25+r()*.5)*w/7,lean=(r()-.5)*90;
+   c.strokeStyle=i%2?'#42675c':'#355d4c';c.lineWidth=6+r()*10;
+   c.beginPath();c.moveTo(x,h+20);c.quadraticCurveTo(x+lean*.35,h*.62,x+lean,h*.16+r()*h*.25);c.stroke();
+  }
+  for(let i=0;i<90;i++){
+   c.fillStyle=['#416c55','#638863','#88a371','#9fb879'][Math.floor(r()*4)];
+   c.globalAlpha=.34+r()*.45;c.beginPath();c.ellipse(r()*w,h*.08+r()*h*.78,8+r()*20,4+r()*9,r()*Math.PI,0,Math.PI*2);c.fill();
+  }
+  c.globalAlpha=1;
+ });
+}
 const logGeo=new THREE.CylinderGeometry(.19,.24,1,24,8);
 const logPositions=logGeo.attributes.position;
 for(let i=0;i<logPositions.count;i++){
@@ -233,16 +250,12 @@ export function createScenery(scene,renderer){
  }
 
  const background=new THREE.Group();scene.add(background);
- const forest=[],forestTextureCache=new Map();
- const forestTextureFor=(index,scale=1)=>{
-  const normalized=Math.max(1,Math.min(1.6,Math.round((Number(scale)||1)*100)/100)),key=`${index}:${normalized}`;
-  if(!forestTextureCache.has(key))forestTextureCache.set(key,forestTexture(26+index*16,normalized));
-  return forestTextureCache.get(key);
- };
+ const forest=[],forestTextureCache=new Map(),forestPreviewMaps=[];
  const forestColors=[0xa7cbbb,0x7caa93,0x466b56],forestOpacity=[.25,.38,.52];
  for(let i=0;i<3;i++){
-  const map=forestTextureFor(i,1),material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
-  const layer=new THREE.Mesh(new THREE.PlaneGeometry(40-i*5,34),material);layer.position.z=-24+i*6;layer.renderOrder=-10+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=1;background.add(layer);forest.push(layer);
+  const map=forestPreviewTexture(26+i*16);forestPreviewMaps.push(map);
+  const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
+  const layer=new THREE.Mesh(new THREE.PlaneGeometry(40-i*5,34),material);layer.position.z=-24+i*6;layer.renderOrder=-10+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=.375;background.add(layer);forest.push(layer);
  }
  let forestTextureRefreshToken=0,forestTextureWorker=null,forestTextureRequestId=0;
  const forestTexturePending=new Map();
@@ -279,10 +292,11 @@ export function createScenery(scene,renderer){
  function refreshForestTextureQuality(){
   const targetScale=activeVisualProfile.backgroundMode==='layered-forest'?(activeVisualProfile.backgroundTextureScale||1):1;
   const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2)),token=++forestTextureRefreshToken;
-  // Immediate enhanced base canopy keeps startup responsive. Higher-density versions
-  // are generated in a Web Worker so desktop quality upgrades never block input/rendering.
+  // Startup uses tiny but representative canopy previews. Full Balanced/High canvases
+  // are produced entirely off-thread and swapped in as soon as each layer is ready.
   for(const layer of forest){
-   applyForestTexture(layer,forestTextureFor(layer.userData.forestIndex,1),1,anisotropy);
+   const index=layer.userData.forestIndex;
+   applyForestTexture(layer,forestPreviewMaps[index],.375,anisotropy);
    requestForestTextureUpgrade(layer,targetScale,anisotropy,token);
   }
  }
