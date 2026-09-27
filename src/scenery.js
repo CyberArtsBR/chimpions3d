@@ -3,6 +3,9 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './physics.js';
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
 import {createTrackedLoadingManager,prefetchVisualAsset,versionedAssetUrl} from './assetRuntime.js';
+import {createCanopyArt} from './canopyArt.js';
+import {createCanopyPlatforms} from './canopyPlatforms.js';
+import {createCanopyVfx} from './canopyVfx.js';
 
 export const TREE_SCROLL_PER_SCREEN=.32;
 export const wrap01=value=>((value%1)+1)%1;
@@ -110,6 +113,7 @@ const arrowShape=new THREE.Shape();arrowShape.moveTo(-.7,-.25);arrowShape.lineTo
 const arrowGeo=new THREE.ExtrudeGeometry(arrowShape,{depth:.12,bevelEnabled:true,bevelSize:.04,bevelThickness:.04,bevelSegments:1,steps:1}),dummy=new THREE.Object3D();
 
 export function createScenery(scene,renderer){
+ const canopyArt=createCanopyArt(scene),canopyPlatforms=createCanopyPlatforms(),canopyVfx=createCanopyVfx(scene);
  const bark=new THREE.MeshStandardMaterial({color:0xc5a782,map:barkTexture,bumpMap:barkRelief,bumpScale:.055,roughness:.87});
  const moss=new THREE.MeshStandardMaterial({color:0xa8bd79,map:mossTexture,bumpMap:mossRelief,bumpScale:.045,roughness:.96});
  const leaf=new THREE.MeshStandardMaterial({map:leafTexture,alphaTest:.35,side:THREE.DoubleSide,roughness:.88});
@@ -405,7 +409,7 @@ export function createScenery(scene,renderer){
   instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);});
   const roots=new THREE.Group();group.add(roots);instances(logGeo,branchBark,roots,2+variant,(i,o)=>{o.position.set((i/(variant+1)-.5)*p.width*.7,-.48,.02);o.scale.set(.1,.45+((i+variant)%3)*.1,.1);o.rotation.z=Math.sin(i+variant)*.25;});
   const offshoots=new THREE.Group();group.add(offshoots);instances(logGeo,branchBark,offshoots,1+(variant%3),(i,o)=>{const side=i%2?1:-1;o.position.set(side*p.width*(.24+i*.07),-.43,-.08+i*.05);o.scale.set(.11,.34+variant*.055,.11);o.rotation.z=side*(.62+variant*.13+i*.16);});
-  group.userData.coin=coin;attachPlatform(group);armBranchPooling(group);return group;
+  group.userData.coin=coin;canopyPlatforms.decorate(group,p);attachPlatform(group);armBranchPooling(group);return group;
  }
 
  function hazard(h){
@@ -472,7 +476,7 @@ export function createScenery(scene,renderer){
     if(h.telegraphing&&!reducedMotion){const cuePulse=1+Math.sin(time*8)*.16;telegraph.scale.setScalar(cuePulse);}
    }
   },
-  setPixelMode(enabled){background.visible=!enabled;refreshBackground();},
+  setPixelMode(enabled){background.visible=!enabled;canopyArt.setVisible(!enabled);refreshBackground();},
   get platformReady(){return !!platformTemplate;},
   get backgroundReady(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
@@ -503,20 +507,16 @@ export function createScenery(scene,renderer){
   resize(width,height){const phase=treePhase();viewWidth=Math.max(.001,width);viewHeight=Math.max(.001,height);updateTreeScroll();treeScrollBias=wrap01(phase-treeClimbOffset*treeRepeatY);if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
    if(document.body?.dataset?.reducedMotion==='true')return;
+   canopyVfx.burst(event);
    const colors={spring:0xffb94f,leaf:0xaee77b,swing:0x77d9c7,vanish:0xb792ff,cracked:0xe8b271,hazard:0xff765f,jet:0x7cecff,milestone:0xffe47a,coin:0xffdf79};
    const key=event.type==='hazard'?'hazard':event.type==='jet'?'jet':event.type==='milestone'?'milestone':event.type==='coin'?'coin':event.platformType||'';
-   const color=colors[key]||0xd7eca6;particleMaterial.color.setHex(color);ring.material.color.setHex(color);
+   ring.material.color.setHex(colors[key]||0xd7eca6);
    if(event.type==='bounce'){ring.position.set(event.x,event.y+.08,.6);ringAge=0;ring.visible=true;}
    if(event.type==='wrap'){wrapAge=0;wrapCues.position.y=event.y+.7;wrapCues.visible=true;}
-   let count=(event.type==='wrap'||event.type==='bounce')?7:0;if(event.type==='coin'||event.spring)count+=12;if(['hazard','jet','milestone','vanish'].includes(event.type))count+=16;
-   for(let i=0;i<count;i++)sparks.push({x:event.x,y:event.y+.15,z:.6,vx:(r()-.5)*(event.type==='hazard'?4:3),vy:.7+r()*(event.spring?2.7:2),age:0});
-   if(sparks.length)particles.visible=true;
   },
   jetTrail(x,y,time){
    if(document.body?.dataset?.reducedMotion==='true'||time-lastJetTrailAt<.045)return;
-   lastJetTrailAt=time;particleMaterial.color.setHex(0x75eaff);
-   for(let i=0;i<2;i++)sparks.push({x:x+(r()-.5)*.2,y:y-.12,z:.55,vx:(r()-.5)*.7,vy:-.3-r()*.8,age:0});
-   particles.visible=true;
+   lastJetTrailAt=time;canopyVfx.jetTrail(x,y);
   },
   update(cameraY,time,dt,palette,night,biome=0,blend=1){
    const mode=document.body?.dataset?.mode||'',active=mode==='playing'||mode==='dying'||mode==='starting';
@@ -524,6 +524,8 @@ export function createScenery(scene,renderer){
    currentCamera=cameraY;
    if(treeCameraOrigin===null)treeCameraOrigin=cameraY;
    updateTreeScroll();
+   canopyArt.update(cameraY,time,palette,night,background.visible);
+   canopyVfx.update(dt);
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
     if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xffffff);}
@@ -537,11 +539,14 @@ export function createScenery(scene,renderer){
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;fitTree();invalidateStaticFrame();},
+  reset(){sparks.length=0;particles.visible=false;canopyVfx.reset();canopyArt.reset();ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;fitTree();invalidateStaticFrame();},
   setQuality(profile,options={}){
    activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
    visualConstraints={constrained:!!options.constrained};
    highQuality=!!activeVisualProfile.highScenery&&!visualConstraints.constrained;
+   canopyArt.setQuality(activeVisualProfile,visualConstraints);
+   canopyPlatforms.setQuality(activeVisualProfile);
+   canopyVfx.setQuality(activeVisualProfile);
    for(const texture of treeTextures.values()){
     const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));
     if(texture.anisotropy!==anisotropy){texture.anisotropy=anisotropy;texture.needsUpdate=true;}
