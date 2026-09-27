@@ -250,54 +250,42 @@ export function createScenery(scene,renderer){
  }
 
  const background=new THREE.Group();scene.add(background);
- const forest=[],forestTextureCache=new Map(),forestPreviewMaps=[];
+ const forest=[],forestTextureCache=new Map(),forestTextureRequests=new Set(),forestPreviewMaps=[];
+ const forestEnhancedUrls=[
+  'environment/forest-enhanced-far.svg',
+  'environment/forest-enhanced-mid.svg',
+  'environment/forest-enhanced-near.svg'
+ ];
  const forestColors=[0xa7cbbb,0x7caa93,0x466b56],forestOpacity=[.25,.38,.52];
  for(let i=0;i<3;i++){
   const map=forestPreviewTexture(26+i*16);forestPreviewMaps.push(map);
   const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
   const layer=new THREE.Mesh(new THREE.PlaneGeometry(40-i*5,34),material);layer.position.z=-24+i*6;layer.renderOrder=-10+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=.375;background.add(layer);forest.push(layer);
  }
- let forestTextureRefreshToken=0,forestTextureWorker=null,forestTextureRequestId=0;
- const forestTexturePending=new Map();
+ const forestTextureLoader=new THREE.TextureLoader(createTrackedLoadingManager('forest-background'));
  function applyForestTexture(layer,map,scale,anisotropy){
   if(map.anisotropy!==anisotropy){map.anisotropy=anisotropy;map.needsUpdate=true;}
   if(layer.material.map!==map){layer.material.map=map;layer.material.needsUpdate=true;}
   layer.userData.forestTextureScale=scale;
  }
- function ensureForestTextureWorker(){
-  if(forestTextureWorker||typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')return forestTextureWorker;
-  try{
-   forestTextureWorker=new Worker(new URL('./forestTextureWorker.js',import.meta.url),{type:'module'});
-   forestTextureWorker.onmessage=event=>{
-    const {id,index,scale,bitmap,error}=event.data||{},pending=forestTexturePending.get(id);forestTexturePending.delete(id);
-    if(!pending||error||!bitmap)return;
-    const key=`${index}:${scale}`,map=new THREE.Texture(bitmap);
-    map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;forestTextureCache.set(key,map);
-    if(pending.token!==forestTextureRefreshToken||activeVisualProfile.backgroundMode!=='layered-forest')return;
-    const layer=forest.find(item=>item.userData.forestIndex===index);if(!layer)return;
-    applyForestTexture(layer,map,scale,pending.anisotropy);invalidateStaticFrame();
-   };
-   forestTextureWorker.onerror=()=>{forestTextureWorker?.terminate?.();forestTextureWorker=null;forestTexturePending.clear();};
-  }catch{forestTextureWorker=null;}
-  return forestTextureWorker;
- }
- function requestForestTextureUpgrade(layer,targetScale,anisotropy,token){
-  if(targetScale<=1.01)return;
-  const scale=Math.max(1,Math.min(1.6,Math.round(targetScale*100)/100)),key=`${layer.userData.forestIndex}:${scale}`;
-  if(forestTextureCache.has(key)){applyForestTexture(layer,forestTextureCache.get(key),scale,anisotropy);return;}
-  const worker=ensureForestTextureWorker();if(!worker)return;
-  const id=++forestTextureRequestId;forestTexturePending.set(id,{token,anisotropy});
-  worker.postMessage({id,index:layer.userData.forestIndex,scale,seed:26+layer.userData.forestIndex*16});
+ function requestEnhancedForestTexture(index){
+  if(!desktopDetailAllowed()||activeVisualProfile.backgroundMode!=='layered-forest'||forestTextureCache.has(index)||forestTextureRequests.has(index))return;
+  const path=forestEnhancedUrls[index];if(!path)return;
+  forestTextureRequests.add(index);
+  forestTextureLoader.load(import.meta.env.BASE_URL+path,map=>{
+   forestTextureRequests.delete(index);map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;forestTextureCache.set(index,map);
+   if(activeVisualProfile.backgroundMode!=='layered-forest')return;
+   const layer=forest[index];if(!layer)return;
+   const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
+   applyForestTexture(layer,map,2,anisotropy);invalidateStaticFrame();
+  },undefined,()=>forestTextureRequests.delete(index));
  }
  function refreshForestTextureQuality(){
-  const targetScale=activeVisualProfile.backgroundMode==='layered-forest'?(activeVisualProfile.backgroundTextureScale||1):1;
-  const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2)),token=++forestTextureRefreshToken;
-  // Startup uses tiny but representative canopy previews. Full Balanced/High canvases
-  // are produced entirely off-thread and swapped in as soon as each layer is ready.
+  const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
   for(const layer of forest){
-   const index=layer.userData.forestIndex;
-   applyForestTexture(layer,forestPreviewMaps[index],.375,anisotropy);
-   requestForestTextureUpgrade(layer,targetScale,anisotropy,token);
+   const index=layer.userData.forestIndex,cached=forestTextureCache.get(index);
+   applyForestTexture(layer,cached||forestPreviewMaps[index],cached?2:.375,anisotropy);
+   requestEnhancedForestTexture(index);
   }
  }
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
