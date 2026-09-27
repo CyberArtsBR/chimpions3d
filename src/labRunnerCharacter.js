@@ -242,10 +242,13 @@ export async function createLabRunnerCharacter(source){
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});box.setFromObject(model,true);model.position.y-=box.min.y;model.updateWorldMatrix(true,true);root.rotation.y=Math.PI/2;model.visible=true;
 
   function footHeight(){
-    root.updateWorldMatrix(true,true);rootInverse.copy(root.matrixWorld).invert();
+    // Only update the two foot ancestry chains needed for grounding. The renderer
+    // will update the full hierarchy later; no per-frame skeleton traversal is needed here.
+    rig.leftFoot.updateWorldMatrix(true,false);rig.rightFoot.updateWorldMatrix(true,false);
+    rootInverse.copy(root.matrixWorld).invert();
     let min=Infinity;
-    rig.leftFoot.getWorldPosition(footPoint);footPoint.applyMatrix4(rootInverse);min=Math.min(min,footPoint.y);
-    rig.rightFoot.getWorldPosition(footPoint);footPoint.applyMatrix4(rootInverse);min=Math.min(min,footPoint.y);
+    footPoint.setFromMatrixPosition(rig.leftFoot.matrixWorld).applyMatrix4(rootInverse);min=Math.min(min,footPoint.y);
+    footPoint.setFromMatrixPosition(rig.rightFoot.matrixWorld).applyMatrix4(rootInverse);min=Math.min(min,footPoint.y);
     return min;
   }
   const restingFootHeight=footHeight();
@@ -297,10 +300,9 @@ export async function createLabRunnerCharacter(source){
 
       const alpha=1-Math.exp(-(sliding?24:17)*dt);
       applyPose(offset,alpha);
-      model.updateWorldMatrix(true,true);
 
       if(grounded){
-        const correction=clamp(restingFootHeight-footHeight(),-.16,.16);
+        const correction=clamp(groundCorrection+restingFootHeight-footHeight(),-.16,.16);
         const safeCorrection=sliding?Math.min(0,correction):correction;
         groundCorrection=THREE.MathUtils.damp(groundCorrection,safeCorrection,sliding?30:20,dt);
       }else groundCorrection=THREE.MathUtils.damp(groundCorrection,0,18,dt);
