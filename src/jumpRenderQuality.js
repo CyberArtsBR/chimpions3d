@@ -1,4 +1,31 @@
-const NAMES=Object.freeze(['balanced','high','ultra']);
+const NAMES=Object.freeze(['low','balanced','high','ultra']);
+
+const LOW=Object.freeze({
+  profile:'low',
+  label:'Low',
+  dprFloor:1.00,
+  dprCap:1.00,
+  postProcessing:false,
+  renderTargetType:'unsigned-byte',
+  msaaSamples:0,
+  shadows:false,
+  shadowMapSize:0,
+  shadowBias:-.0005,
+  shadowNormalBias:.04,
+  highScenery:false,
+  backgroundMode:'layered-forest',
+  backgroundTextureScale:.75,
+  maxAnisotropy:1,
+  ambientOcclusion:false,
+  aoResolutionScale:.5,
+  bloomEnabled:false,
+  colorGrading:false,
+  sharpenEnabled:false,
+  atmosphereEnabled:false,
+  lightShafts:false,
+  depthOfField:'off',
+  contactShadow:false
+});
 
 const BALANCED=Object.freeze({
   profile:'balanced',
@@ -52,12 +79,16 @@ const HIGH=Object.freeze({
   bloomEnabled:false,
   bloomStrength:0,
   bloomRadius:0,
+  bloomThreshold:1.72,
   colorGrading:true,
   colorGradeIntensity:.58,
   sharpenEnabled:true,
   sharpenStrength:.22,
   atmosphereEnabled:false,
+  atmosphereStrength:0,
+  atmosphereResolutionScale:.5,
   lightShafts:false,
+  lightShaftStrength:0,
   depthOfField:'off',
   contactShadow:true
 });
@@ -76,33 +107,36 @@ const ULTRA=Object.freeze({
   shadowBias:-.00042,
   shadowNormalBias:.032,
   highScenery:true,
-  backgroundMode:'authored-tree',
-  backgroundTextureScale:1,
+  // Keep the same gameplay-readable forest composition as High. Ultra spends
+  // its extra budget on lighting, atmosphere and image finishing instead.
+  backgroundMode:'layered-forest',
+  backgroundTextureScale:1.5,
   maxAnisotropy:8,
   ambientOcclusion:true,
   aoResolutionScale:.50,
   aoKernelRadius:6,
   aoMinDistance:.0025,
   aoMaxDistance:.085,
-  bloomEnabled:false,
-  bloomStrength:0,
-  bloomRadius:0,
-  bloomThreshold:1.65,
+  bloomEnabled:true,
+  bloomStrength:.30,
+  bloomRadius:.36,
+  bloomThreshold:1.72,
   colorGrading:true,
-  colorGradeIntensity:.58,
+  colorGradeIntensity:.62,
   sharpenEnabled:true,
   sharpenStrength:.22,
-  atmosphereEnabled:false,
-  atmosphereStrength:0,
+  atmosphereEnabled:true,
+  atmosphereStrength:.055,
   atmosphereResolutionScale:.5,
-  lightShafts:false,
-  lightShaftStrength:0,
+  lightShafts:true,
+  lightShaftStrength:.035,
   depthOfField:'cinematic-only',
-  dofStrength:.34,
+  dofStrength:.22,
   contactShadow:true
 });
 
 export const JUMP_QUALITY_PROFILES=Object.freeze({
+  low:LOW,
   balanced:BALANCED,
   high:HIGH,
   ultra:ULTRA
@@ -113,7 +147,6 @@ export const JUMP_QUALITY_NAMES=NAMES;
 // Compatibility aliases only affect visuals. Physics, collision, route generation,
 // scoring, input and leaderboard behavior never read this module.
 const LEGACY_ALIASES=Object.freeze({
-  low:'balanced',
   medium:'balanced',
   max:'ultra',
   cinematic:'ultra',
