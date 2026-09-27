@@ -2,22 +2,22 @@ export const DASH_QUALITY_ORDER=Object.freeze(['LOW','BALANCED','HIGH','ULTRA'])
 
 export const DASH_QUALITY_PRESETS=Object.freeze({
   LOW:Object.freeze({
-    name:'LOW',dprMin:.65,dprMax:1,shadowMap:512,shadows:false,
+    name:'LOW',pixelRatio:1,dprMin:.65,dprMax:1,shadowMap:512,shadows:false,
     farCount:18,midCount:12,detailCount:18,foregroundCount:0,particleCount:36,streakCount:4,lightShafts:0,mistCount:0,
     idleFps:10,p95BudgetMs:28,avgBudgetMs:22
   }),
   BALANCED:Object.freeze({
-    name:'BALANCED',dprMin:.7,dprMax:1.25,shadowMap:512,shadows:true,
+    name:'BALANCED',pixelRatio:1.25,dprMin:.7,dprMax:1.25,shadowMap:512,shadows:true,
     farCount:28,midCount:20,detailCount:28,foregroundCount:8,particleCount:64,streakCount:8,lightShafts:1,mistCount:1,
     idleFps:12,p95BudgetMs:24,avgBudgetMs:19
   }),
   HIGH:Object.freeze({
-    name:'HIGH',dprMin:.8,dprMax:1.6,shadowMap:1024,shadows:true,
+    name:'HIGH',pixelRatio:1.6,dprMin:.8,dprMax:1.6,shadowMap:1024,shadows:true,
     farCount:40,midCount:30,detailCount:42,foregroundCount:16,particleCount:104,streakCount:12,lightShafts:3,mistCount:2,
     idleFps:15,p95BudgetMs:21,avgBudgetMs:18
   }),
   ULTRA:Object.freeze({
-    name:'ULTRA',dprMin:1,dprMax:2,shadowMap:2048,shadows:true,
+    name:'ULTRA',pixelRatio:2,dprMin:1,dprMax:2,shadowMap:2048,shadows:true,
     farCount:56,midCount:42,detailCount:58,foregroundCount:24,particleCount:160,streakCount:18,lightShafts:5,mistCount:3,
     idleFps:18,p95BudgetMs:19,avgBudgetMs:17
   })
