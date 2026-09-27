@@ -129,6 +129,9 @@ const setPiecePlan=generateDashPlan({seed:'set-piece-contract',time:240,count:8,
 const setPiece=setPiecePlan.patterns.find(entry=>entry.pattern.setPiece);
 assert(setPiece,'late run should schedule a deterministic set piece');
 assert(setPiece.pattern.setPiece.durationSeconds>=10&&setPiece.pattern.setPiece.durationSeconds<=20);
+const setPieceFirst=setPiece.obstacles[0],setPieceLast=setPiece.obstacles.at(-1);
+const setPiecePlayable=(setPieceLast.x+setPieceLast.w-setPieceFirst.x)/setPiece.snapshot.speed;
+assert(setPiecePlayable>=10&&setPiecePlayable<=20.5,`set-piece playable span ${setPiecePlayable.toFixed(2)}s outside target`);
 
 const scoreRun={
   flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,
