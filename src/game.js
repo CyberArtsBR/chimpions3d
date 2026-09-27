@@ -143,12 +143,12 @@ const themes=[
 ];
 function themeAtHeight(height){
  const h=Math.max(0,Number(height)||0);
- for(let next=1;next<themes.length;next++){
-  const boundary=next*THEME_METERS;
-  if(h<boundary)return {from:next-1,to:next-1,blend:1};
-  if(h<=boundary+THEME_TRANSITION_METERS)return {from:next-1,to:next,blend:THREE.MathUtils.smoothstep(h,boundary,boundary+THEME_TRANSITION_METERS)};
- }
- return {from:themes.length-1,to:themes.length-1,blend:1};
+ const block=Math.floor(h/THEME_METERS),to=block%themes.length;
+ if(block===0)return {from:0,to:0,blend:1};
+ const from=(to+themes.length-1)%themes.length;
+ const local=h-block*THEME_METERS;
+ if(local>=THEME_TRANSITION_METERS)return {from:to,to,blend:1};
+ return {from,to,blend:THREE.MathUtils.smoothstep(local,0,THEME_TRANSITION_METERS)};
 }
 const color=new THREE.Color(),other=new THREE.Color();
 const eventLabels={
