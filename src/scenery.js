@@ -262,7 +262,7 @@ export function createScenery(scene,renderer){
   const material=new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,color:forestColors[i],opacity:forestOpacity[i],fog:false});
   const layer=new THREE.Mesh(new THREE.PlaneGeometry(40-i*5,34),material);layer.position.z=-24+i*6;layer.renderOrder=-10+i;layer.userData.forestIndex=i;layer.userData.forestTextureScale=.375;background.add(layer);forest.push(layer);
  }
- const forestTextureLoader=new THREE.TextureLoader(createTrackedLoadingManager('forest-background'));
+ const forestTextureLoader=new THREE.TextureLoader(createTrackedLoadingManager('forest-background')),forestDeferredRequests=new Set();
  function applyForestTexture(layer,map,scale,anisotropy){
   if(map.anisotropy!==anisotropy){map.anisotropy=anisotropy;map.needsUpdate=true;}
   if(layer.material.map!==map){layer.material.map=map;layer.material.needsUpdate=true;}
@@ -270,15 +270,27 @@ export function createScenery(scene,renderer){
  }
  function requestEnhancedForestTexture(index){
   if(!desktopDetailAllowed()||activeVisualProfile.backgroundMode!=='layered-forest'||forestTextureCache.has(index)||forestTextureRequests.has(index))return;
+  const menuReady=document.body?.dataset?.uiReady==='true'&&document.getElementById('play')?.disabled===false;
+  if(!menuReady){
+   if(!forestDeferredRequests.has(index)){
+    forestDeferredRequests.add(index);
+    setTimeout(()=>{forestDeferredRequests.delete(index);requestEnhancedForestTexture(index);},350);
+   }
+   return;
+  }
   const path=forestEnhancedUrls[index];if(!path)return;
   forestTextureRequests.add(index);
-  forestTextureLoader.load(import.meta.env.BASE_URL+path,map=>{
-   forestTextureRequests.delete(index);map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;forestTextureCache.set(index,map);
-   if(activeVisualProfile.backgroundMode!=='layered-forest')return;
-   const layer=forest[index];if(!layer)return;
-   const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
-   applyForestTexture(layer,map,2,anisotropy);invalidateStaticFrame();
-  },undefined,()=>forestTextureRequests.delete(index));
+  // Give the first interactive menu frame priority over SVG decode/upload.
+  setTimeout(()=>{
+   if(activeVisualProfile.backgroundMode!=='layered-forest'){forestTextureRequests.delete(index);return;}
+   forestTextureLoader.load(import.meta.env.BASE_URL+path,map=>{
+    forestTextureRequests.delete(index);map.colorSpace=THREE.SRGBColorSpace;map.needsUpdate=true;forestTextureCache.set(index,map);
+    if(activeVisualProfile.backgroundMode!=='layered-forest')return;
+    const layer=forest[index];if(!layer)return;
+    const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
+    applyForestTexture(layer,map,2,anisotropy);invalidateStaticFrame();
+   },undefined,()=>forestTextureRequests.delete(index));
+  },900+index*180);
  }
  function refreshForestTextureQuality(){
   const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||2));
