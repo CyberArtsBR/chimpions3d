@@ -55,6 +55,7 @@ class DashWorldRenderer{
     this.viewW=20;this.viewH=12;this.groundY=-4;this.scroll=0;this.stage=1;this.time=0;this.environmentRoot=new THREE.Group();this.environmentRoot.name='dash-gpu-environment';scene.add(this.environmentRoot);
     this.gameplayRoot=new THREE.Group();this.gameplayRoot.name='dash-gpu-gameplay';scene.add(this.gameplayRoot);
     this.random=seeded(0x43a991);this.profile=DASH_BIOMES[0];this.qualityName=resolveDashQuality();this.quality=getDashQualityPreset(this.qualityName);
+    this.highVisibility=false;this.reducedMotion=false;
     this.hazardMap=new Map();this.hazardPools=new Map();this.hazardMaterials=[];this.disposables=[];
     this.buildMaterials();this.buildEnvironment();this.buildGameplay();this.vfx=new DashVFX(scene,this.quality);
     this.applyQuality(this.qualityName,false);this.installEvents();document.documentElement.classList.add('dash-gpu-world');
@@ -77,7 +78,8 @@ class DashWorldRenderer{
       glow:basic({map:makeSoftTexture(),color:0xffe890,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}),
       shadow:basic({map:makeShadowTexture(),transparent:true,opacity:.7,depthWrite:false,color:0x0b1a13})
     };
-    this.disposables.push(this.mat.ground.map,this.mat.glow.map,this.mat.shadow.map);
+    this.hazardHaloMaterial=new THREE.SpriteMaterial({map:this.mat.glow.map,color:0xffef93,transparent:true,opacity:0,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending});
+    this.disposables.push(this.mat.ground.map,this.mat.glow.map,this.mat.shadow.map,this.hazardHaloMaterial);
   }
   buildEnvironment(){
     this.skyMaterial=new THREE.ShaderMaterial({depthWrite:false,depthTest:false,toneMapped:false,uniforms:{top:{value:new THREE.Color(0x75d5ad)},bottom:{value:new THREE.Color(0x174b3c)},sun:{value:new THREE.Color(0xffe5a4)},sunStrength:{value:.28}},vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'varying vec2 vUv;uniform vec3 top;uniform vec3 bottom;uniform vec3 sun;uniform float sunStrength;void main(){float h=smoothstep(0.0,1.0,vUv.y);vec3 c=mix(bottom,top,h);float d=distance(vUv,vec2(.76,.82));c+=sun*pow(max(0.0,1.0-d*3.2),3.0)*sunStrength;gl_FragColor=vec4(c,1.0);}'});this.disposables.push(this.skyMaterial);
@@ -121,8 +123,16 @@ class DashWorldRenderer{
     const api={
       get quality(){return this._owner.qualityName;},
       setQuality:name=>this.setQuality(name),
+      setAccessibility:options=>this.setAccessibility(options),
       stats:()=>this.stats(),_owner:this
     };globalThis.chimpionsDashGraphics=api;
+  }
+  setAccessibility({highVisibility=this.highVisibility,reducedMotion=this.reducedMotion}={}){
+    this.highVisibility=!!highVisibility;this.reducedMotion=!!reducedMotion;
+    this.hazardHaloMaterial.opacity=this.highVisibility?.46:0;
+    for(const entry of this.hazardMap.values()){const halo=entry.group.userData.visibilityHalo;if(halo)halo.visible=this.highVisibility;}
+    this.vfx?.setReducedMotion(this.reducedMotion);
+    return{highVisibility:this.highVisibility,reducedMotion:this.reducedMotion};
   }
   setQuality(name){const key=String(name||'').toUpperCase();if(!DASH_QUALITY_PRESETS[key])throw new Error('Dash quality must be LOW, BALANCED, HIGH, or ULTRA.');storeDashQuality(key);this.applyQuality(key,true);return key;}
   applyQuality(name,persisted){
@@ -147,11 +157,11 @@ class DashWorldRenderer{
     const {from,to,t}=this.interpolateBiome(stage,time);this.profile=to;
     const top=lerpColor(new THREE.Color(),from.skyTop,to.skyTop,t),bottom=lerpColor(new THREE.Color(),from.skyBottom,to.skyBottom,t),fog=lerpColor(new THREE.Color(),from.fog,to.fog,t);
     this.skyMaterial.uniforms.top.value.copy(top);this.skyMaterial.uniforms.bottom.value.copy(bottom);lerpColor(this.skyMaterial.uniforms.sun.value,from.sun,to.sun,t);this.skyMaterial.uniforms.sunStrength.value=.12+.2*(1-(from.storm+(to.storm-from.storm)*t));
-    this.scene.fog??=new THREE.FogExp2(fog,.02);this.scene.fog.color.copy(fog);this.scene.fog.density=from.fogDensity+(to.fogDensity-from.fogDensity)*t;
+    this.scene.fog??=new THREE.FogExp2(fog,.02);this.scene.fog.color.copy(fog);this.scene.fog.density=(from.fogDensity+(to.fogDensity-from.fogDensity)*t)*(this.highVisibility?.72:1);
     lerpColor(this.mat.ground.color,from.dirt,to.dirt,t);lerpColor(this.mat.moss.color,from.ground,to.ground,t);lerpColor(this.mat.far.color,from.canopy,to.canopy,t);lerpColor(this.mat.mid.color,from.mid,to.mid,t);lerpColor(this.mat.foreground.color,from.canopy,to.canopy,t);lerpColor(this.mat.goldStone.color,0x74725a,to.accent,t*.35);
     lerpColor(this.hemisphere.color,from.ambient,to.ambient,t);this.hemisphere.groundColor.copy(bottom).multiplyScalar(.55);this.hemisphere.intensity=1.65+(1-(from.storm+(to.storm-from.storm)*t))*.55;
     lerpColor(this.keyLight.color,from.sun,to.sun,t);this.keyLight.intensity=2.3+(1-(from.storm+(to.storm-from.storm)*t))*.85;lerpColor(this.rimLight.color,from.rim,to.rim,t);this.rimLight.intensity=1.05+(to.moon*.35);
-    this.renderer.toneMappingExposure=from.exposure+(to.exposure-from.exposure)*t;
+    this.renderer.toneMappingExposure=from.exposure+(to.exposure-from.exposure)*t+(this.highVisibility?.06:0);
     return{
       canopyDensity:from.canopyDensity+(to.canopyDensity-from.canopyDensity)*t,foreground:from.foreground+(to.foreground-from.foreground)*t,
       waterfall:from.waterfall+(to.waterfall-from.waterfall)*t,ruins:from.ruins+(to.ruins-from.ruins)*t,moon:from.moon+(to.moon-from.moon)*t,
@@ -175,7 +185,7 @@ class DashWorldRenderer{
     for(let i=0;i<detailCount;i++){const d=this.envSeeds.detail[i],x=wrap(d.x*span-scrollWorld,span),stoneS=.12+d.s*.2;applyMatrix(this.groundStones,i,x,this.groundY-.05-d.y*.17,0,stoneS*(1.2+d.y),stoneS*.5,stoneS,d.r);applyMatrix(this.grass,i,x+.12,this.groundY+.03,0,.12+d.s*.1,.18+d.s*.18,1,d.r*.7);}
     this.groundStones.instanceMatrix.needsUpdate=true;this.grass.instanceMatrix.needsUpdate=true;
 
-    const fgCount=Math.min(this.foregroundLeaves.instanceMatrix.count,Math.round(this.quality.foregroundCount*features.foreground));this.foregroundLeaves.count=fgCount;
+    const fgCount=(this.reducedMotion||this.highVisibility)?0:Math.min(this.foregroundLeaves.instanceMatrix.count,Math.round(this.quality.foregroundCount*features.foreground));this.foregroundLeaves.count=fgCount;
     for(let i=0;i<fgCount;i++){const d=this.envSeeds.foreground[i],x=wrap(d.x*span-scrollWorld*(1.28+speedRatio*.05),span),top=i%3!==0,y=top?this.groundY+3.8+d.y*this.viewH*.43:this.groundY-.12-d.y*.5,s=.42+d.s*.48;applyMatrix(this.foregroundLeaves,i,x,y,0,s,s*1.65,1,d.r+Math.sin(time*1.7+i)*.08);}
     this.foregroundLeaves.instanceMatrix.needsUpdate=true;
 
@@ -185,10 +195,10 @@ class DashWorldRenderer{
 
     this.mat.ground.map.offset.x=-(scrollWorld*.06)%1;this.mat.ground.map.offset.y=Math.sin(time*.03)*.025;
     const waterfallOpacity=.06+.22*features.waterfall;this.mat.waterfall.opacity=waterfallOpacity;
-    this.waterfalls.forEach((mesh,i)=>{mesh.visible=features.waterfall>.08&&i<Math.ceil(features.waterfall*3);const x=((i-1.5)*this.viewW*.2)+Math.sin(time*.18+i)*.08;mesh.position.set(x,this.groundY+this.viewH*.36,-8+i*.08);mesh.scale.set(.35+.2*(i%2),this.viewH*.62,1);});
-    const shaftCount=Math.min(this.shafts.length,this.quality.lightShafts);this.shafts.forEach((mesh,i)=>{mesh.visible=i<shaftCount&&features.storm<.75;mesh.position.set((i-(shaftCount-1)/2)*this.viewW*.18+Math.sin(time*.08+i)*.18,this.groundY+this.viewH*.48,-3.4-i*.05);mesh.scale.set(.7+(.25*(i%2)),this.viewH*.7,1);mesh.material.opacity=.035+.04*(1-features.storm);});
-    this.moon.visible=features.moon>.12;this.mat.moon.opacity=.4+.5*features.moon;this.moon.rotation.z=time*.008;
-    this.mistMaterial.opacity=.045+.16*features.waterfall+.05*features.storm;this.mist.forEach((mesh,i)=>{mesh.position.set(wrap((i-1)*this.viewW*.36-time*(.03+i*.012),this.viewW*1.4),this.groundY+.75+i*.52,-2.8-i*.25);mesh.scale.set(this.viewW*.58,1.4+i*.3,1);});
+    this.waterfalls.forEach((mesh,i)=>{mesh.visible=features.waterfall>.08&&i<Math.ceil(features.waterfall*3);const drift=this.reducedMotion?0:Math.sin(time*.18+i)*.08,x=((i-1.5)*this.viewW*.2)+drift;mesh.position.set(x,this.groundY+this.viewH*.36,-8+i*.08);mesh.scale.set(.35+.2*(i%2),this.viewH*.62,1);});
+    const shaftCount=Math.min(this.shafts.length,this.quality.lightShafts);this.shafts.forEach((mesh,i)=>{mesh.visible=i<shaftCount&&features.storm<.75&&!this.reducedMotion;mesh.position.set((i-(shaftCount-1)/2)*this.viewW*.18+Math.sin(time*.08+i)*.18,this.groundY+this.viewH*.48,-3.4-i*.05);mesh.scale.set(.7+(.25*(i%2)),this.viewH*.7,1);mesh.material.opacity=.035+.04*(1-features.storm);});
+    this.moon.visible=features.moon>.12;this.mat.moon.opacity=.4+.5*features.moon;if(!this.reducedMotion)this.moon.rotation.z=time*.008;
+    this.mistMaterial.opacity=this.reducedMotion?Math.min(.06,.045+.16*features.waterfall+.05*features.storm):.045+.16*features.waterfall+.05*features.storm;this.mist.forEach((mesh,i)=>{const mx=this.reducedMotion?(i-1)*this.viewW*.36:wrap((i-1)*this.viewW*.36-time*(.03+i*.012),this.viewW*1.4);mesh.position.set(mx,this.groundY+.75+i*.52,-2.8-i*.25);mesh.scale.set(this.viewW*.58,1.4+i*.3,1);});
   }
   createMesh(geometry,material,parent,{x=0,y=0,z=0,sx=1,sy=1,sz=1,rz=0,cast=true}={}){const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.rotation.z=rz;m.castShadow=cast&&this.quality.shadows;m.receiveShadow=false;parent.add(m);return m;}
   buildHazard(type){
@@ -210,7 +220,9 @@ class DashWorldRenderer{
       case'canopy':wood(0,h*.7,w*.95,h*.18,-.08);for(let i=0;i<7;i++)leaf((i/6-.5)*w*.86,h*(.52+.12*(i%2)),.28,.5,(i-3)*.22);break;
       default:this.createMesh(u.box,this.mat.stone,g,{x:0,y:h*.5,z:.08,sx:w,sy:h,sz:.5});
     }
-    const shadow=this.createMesh(u.circle,this.mat.shadow,g,{x:0,y:.03,z:-.02,sx:w*.85,sy:.18,sz:1,cast:false});shadow.material=this.mat.shadow;g.userData.type=type.id;return g;
+    const shadow=this.createMesh(u.circle,this.mat.shadow,g,{x:0,y:.03,z:-.02,sx:w*.85,sy:.18,sz:1,cast:false});shadow.material=this.mat.shadow;
+    const halo=new THREE.Sprite(this.hazardHaloMaterial);halo.position.set(0,h*.5,.01);halo.scale.set(w*1.3,Math.max(.75,h*1.45),1);halo.renderOrder=3;halo.visible=this.highVisibility;g.add(halo);
+    g.userData.type=type.id;g.userData.visibilityHalo=halo;return g;
   }
   acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
   releaseHazard(entry){entry.group.visible=false;this.gameplayRoot.remove(entry.group);const pool=this.hazardPools.get(entry.typeId)||[];if(pool.length<10)pool.push(entry.group);this.hazardPools.set(entry.typeId,pool);}
@@ -222,7 +234,7 @@ class DashWorldRenderer{
   syncBananas(bananas,scroll,time){
     let regular=0,golden=0;
     for(let i=0;i<bananas.length;i++){
-      const b=bananas[i];if(b.collected)continue;const x=-this.viewW/2+(b.x-scroll)*this.unit;if(x<-this.viewW*.62||x>this.viewW*.65)continue;const y=this.groundY+b.y*this.unit+.04*Math.sin(time*5+i*.7),rot=time*3.2+i*.73;
+      const b=bananas[i];if(b.collected)continue;const x=-this.viewW/2+(b.x-scroll)*this.unit;if(x<-this.viewW*.62||x>this.viewW*.65)continue;const y=this.groundY+b.y*this.unit+(this.reducedMotion?0:.04*Math.sin(time*5+i*.7)),rot=this.reducedMotion?0:time*3.2+i*.73;
       if(b.golden){if(golden>=this.goldenMesh.instanceMatrix.count)continue;const scale=.72;applyMatrix(this.goldenMesh,golden,x,y,.34,scale,scale,scale,rot);applyMatrix(this.goldenGlow,golden,x,y,.12,.72,.72,1,0);golden++;}
       else{if(regular>=this.bananaMesh.instanceMatrix.count)continue;const scale=.62;applyMatrix(this.bananaMesh,regular,x,y,.32,scale,scale,scale,rot);regular++;}
     }
@@ -237,12 +249,15 @@ class DashWorldRenderer{
     this.time=time;this.scroll=scroll;this.stage=stage;const speedRatio=Math.max(.2,speed/Math.max(1,baseSpeed)),features=this.applyBiome(stage,time);this.updateEnvironment(scroll,time,speedRatio,features);this.syncHazards(obstacles,scroll);this.syncBananas(bananas,scroll,time);
     const jumpWorld=Math.max(0,playerY),shadowScale=clamp(1-jumpWorld/4.2,.46,1),shadowOpacity=clamp(.72-jumpWorld*.12,.16,.72);this.contactShadow.position.set(playerX,this.groundY+.02,-.04);this.contactShadow.scale.set(2.35*shadowScale,.5*shadowScale,1);this.contactShadowMaterial.opacity=shadowOpacity;
     this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH});
-    this.foregroundLeaves.visible=state!=='menu'||this.qualityName!=='LOW';this.goldenGlow.material.opacity=.22+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=.75+.35*Math.sin(time*4.7);
+    this.foregroundLeaves.visible=!(this.reducedMotion||this.highVisibility)&&(state!=='menu'||this.qualityName!=='LOW');
+    this.goldenGlow.material.opacity=this.highVisibility?.58:(.22+(this.reducedMotion?0:.12*Math.sin(time*5.3)));
+    this.mat.golden.emissiveIntensity=this.highVisibility?1.55:(.75+(this.reducedMotion?0:.35*Math.sin(time*4.7)));
+    this.mat.banana.emissiveIntensity=this.highVisibility?.78:.2;
     this.renderer.domElement.style.setProperty('--dash-speed-grade',String(clamp((speedRatio-1)*.08,0,.12)));
     if(flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
   }
   render(){this.renderer.render(this.scene,this.camera);}
-  stats(){return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count};}
+  stats(){return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count,highVisibility:this.highVisibility,reducedMotion:this.reducedMotion};}
   dispose(){
     globalThis.removeEventListener?.('chimpions-dash-event',this.eventListener);document.documentElement.classList.remove('dash-gpu-world');this.vfx.dispose();
     for(const entry of this.hazardMap.values())this.releaseHazard(entry);this.hazardMap.clear();this.scene.remove(this.environmentRoot,this.gameplayRoot);
