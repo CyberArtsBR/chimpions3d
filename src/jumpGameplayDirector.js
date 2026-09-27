@@ -19,14 +19,10 @@ export const HAZARD_TYPES=Object.freeze([
 export const JUMP_DIFFICULTY=Object.freeze({
  altitudeFull:900,
  timeFull:600,
- paceTimeline:Object.freeze([
-  Object.freeze([0,.92]),
-  Object.freeze([60,1.336]),
-  Object.freeze([120,1.752]),
-  Object.freeze([180,2.168]),
-  Object.freeze([240,2.584]),
-  Object.freeze([300,3.00])
- ]),
+ paceStepMeters:200,
+ paceStart:.96,
+ paceStep:.06,
+ paceCap:1.38,
  routeWidth:Object.freeze({start:2.00,end:1.34}),
  rise:Object.freeze({start:4.08,end:4.48,jitter:.26}),
  routeShift:Object.freeze({start:4.20,end:5.50}),
@@ -127,17 +123,11 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  })
 ]);
 
-const timelineValue=(timeline,time)=>{
- const t=Math.max(0,Number(time)||0);
- if(t<=timeline[0][0])return timeline[0][1];
- for(let i=1;i<timeline.length;i++){
-  const [rightTime,rightValue]=timeline[i],[leftTime,leftValue]=timeline[i-1];
-  if(t<=rightTime)return lerp(leftValue,rightValue,(t-leftTime)/(rightTime-leftTime));
- }
- return timeline.at(-1)[1];
+export const paceAt=height=>{
+ const meters=Math.max(0,Number(height)||0);
+ const steps=Math.floor(meters/JUMP_DIFFICULTY.paceStepMeters);
+ return Math.min(JUMP_DIFFICULTY.paceCap,JUMP_DIFFICULTY.paceStart+steps*JUMP_DIFFICULTY.paceStep);
 };
-
-export const paceAt=time=>timelineValue(JUMP_DIFFICULTY.paceTimeline,time);
 
 export function difficultyAt(height=0,time=0){
  const altitude=clamp((Number(height)||0)/JUMP_DIFFICULTY.altitudeFull);
@@ -149,7 +139,7 @@ export function difficultyAt(height=0,time=0){
   activeTime,
   intensity,
   complexity,
-  pace:paceAt(time),
+  pace:paceAt(height),
   routeWidth:lerp(JUMP_DIFFICULTY.routeWidth.start,JUMP_DIFFICULTY.routeWidth.end,intensity),
   rise:lerp(JUMP_DIFFICULTY.rise.start,JUMP_DIFFICULTY.rise.end,intensity),
   routeShift:lerp(JUMP_DIFFICULTY.routeShift.start,JUMP_DIFFICULTY.routeShift.end,intensity),
