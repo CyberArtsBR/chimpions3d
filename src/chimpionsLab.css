@@ -13,9 +13,9 @@ button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #f6e
 #dash-stage::after{content:"";position:absolute;inset:0;z-index:17;pointer-events:none;background:radial-gradient(ellipse at 46% 48%,transparent 35%,#03130f33 73%,#020d0a70 100%);box-shadow:inset 0 -90px 130px #03120d66}
 #dash-sky{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,var(--biome-top) 0,var(--biome-bottom) 78%);transition:background 1.2s ease}
 #dash-far,#dash-mid{
-  position:absolute;pointer-events:none;background-image:url('/dash/assets/jungle-v2.1f8e991e.webp');
-  background-repeat:repeat-x;will-change:background-position
+  position:absolute;pointer-events:none;background-repeat:repeat-x;will-change:background-position
 }
+.dash-dom-world #dash-far,.dash-dom-world #dash-mid{background-image:url('/dash/assets/jungle-v2.1f8e991e.webp')}
 #dash-far{
   inset:-2% -12%;z-index:1;background-position:var(--far-x) center;background-size:auto 108%;
   opacity:.82;filter:saturate(.92) contrast(1.05) brightness(.82)
@@ -35,9 +35,10 @@ body[data-lab-state=running] #dash-light::after{animation:dashWind .7s linear in
 
 #dash-ground{
   position:absolute;z-index:5;left:0;right:0;bottom:0;height:19%;pointer-events:none;
-  background:#25462d url('/dash/assets/ground-green.5163bede.png') repeat-x var(--ground-x) top/auto 76px;
+  background-color:#25462d;
   box-shadow:0 -7px 20px #061a1255,inset 0 54px 74px #587b3438
 }
+.dash-dom-world #dash-ground{background:#25462d url('/dash/assets/ground-green.5163bede.png') repeat-x var(--ground-x) top/auto 76px}
 #dash-ground::before{content:"";position:absolute;left:0;right:0;top:0;height:14px;background:linear-gradient(#a8bf4a55,#35572a00);filter:blur(2px)}
 #dash-ground::after{content:"";position:absolute;inset:58px 0 0;background:
   linear-gradient(90deg,#112c22 0 10%,#1a3b29 10% 30%,#10281f 30% 46%,#23462d 46% 62%,#132f24 62% 100%),
@@ -59,6 +60,10 @@ body[data-lab-state=running] #dash-light::after{animation:dashWind .7s linear in
 #lab-3d{position:absolute;inset:0;z-index:8;pointer-events:none}
 #lab-3d canvas{position:absolute;inset:0;width:100%;height:100%;display:block;filter:saturate(1.04) contrast(1.025)}
 #dash-shadow{position:absolute;z-index:7;bottom:17.35%;width:112px;height:24px;border-radius:50%;background:radial-gradient(ellipse,#02110cc7 0 24%,#06160d7a 48%,transparent 74%);filter:blur(2.5px);transform-origin:center;pointer-events:none}
+#dash-player-fallback{position:absolute;z-index:9;left:0;bottom:19%;display:none;pointer-events:none;transform-origin:50% 100%;border:2px solid #fff1a1;border-radius:42% 42% 34% 34%;background:linear-gradient(180deg,#354d40 0 34%,#152b24 35% 100%);box-shadow:0 7px 16px #0008,inset 0 0 0 2px #89b58c33}
+#dash-player-fallback::before{content:"";position:absolute;left:50%;top:-38%;width:72%;height:62%;transform:translateX(-50%);border:2px solid #fff1a1;border-radius:50%;background:#4e6e56;box-shadow:inset 0 -8px 0 #263e31}
+#dash-player-fallback::after{content:"";position:absolute;left:50%;top:-15%;width:34%;height:12%;transform:translateX(-50%);border-radius:99px;background:#f3eca1;box-shadow:-12px 0 0 -3px #182d25,12px 0 0 -3px #182d25}
+.dash-dom-world #dash-player-fallback{display:block}
 
 #dash-hud{position:absolute;z-index:20;top:0;left:0;right:0;padding:16px max(18px,3vw);display:grid;grid-template-columns:minmax(190px,1fr) repeat(3,minmax(105px,auto)) 44px;align-items:start;gap:10px;background:linear-gradient(180deg,#041714ed 0,#061c19ad 58%,transparent 100%);pointer-events:none;text-shadow:0 2px 4px #0009}
 #dash-hud>div{min-width:0}
