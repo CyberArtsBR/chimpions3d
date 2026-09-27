@@ -10,6 +10,7 @@ import {createDashWorldRenderer,DASH_BIOMES} from './dash/rendering/DashWorldRen
 import {DASH_PHYSICS,gravityForDashJump,releaseDashJump,sweptDashContact} from './dash/dashPhysics.js';
 import {dashDifficultySnapshot,dashNormalizedSpeed,dashPlanningSpeed,dashSpeedForTime,dashStageForTime,dashVisibilityForViewport} from './dash/dashDifficulty.js';
 import {DASH_OBSTACLE_TYPES,dashPatternCatalog,chooseDashObstacle,requiredDashReactionTime} from './dash/dashPatterns.js';
+import {createDashDirectorState,chooseDashSetPiece,advanceDashDirectorState} from './dash/dashDirector.js';
 import {hashDashSeed,nextDashRandom,chooseDashWeighted} from './dash/dashSeed.js';
 import {dashMultiplier,dashFlowDecay,rewardDashObstaclePass,rewardDashBanana,dashObstacleClearance} from './dash/dashScoring.js';
 import {DASH_EVENTS,emitDashEvent} from './dash/dashEvents.js';
@@ -315,6 +316,7 @@ window.addEventListener('chimpions-dash-foot-contact',()=>{if(state==='running')
 window.addEventListener(DASH_EVENTS.perfectJump,()=>{showFeedback('PERFECT JUMP','perfect');voice.play('perfect-jump',{gain:.72});dashGraphics.emit('perfectJump',{x:runnerWorldX,y:groundWorldY+.5});});
 window.addEventListener(DASH_EVENTS.perfectSlide,()=>{showFeedback('PERFECT SLIDE','perfect');voice.play('perfect-slide',{gain:.72});dashGraphics.emit('perfectSlide',{x:runnerWorldX,y:groundWorldY+.3});});
 window.addEventListener(DASH_EVENTS.nearMiss,()=>{showFeedback('CLOSE CALL','near');voice.play('near-miss',{gain:.72});dashGraphics.emit('nearMiss',{x:runnerWorldX,y:groundWorldY+.5});});
+window.addEventListener(DASH_EVENTS.perfectChain,event=>{const chain=event.detail?.chain||0;if(chain>=2)showFeedback('PERFECT ×'+chain,'perfect');});
 window.addEventListener(DASH_EVENTS.comboBreak,()=>showFeedback('COMBO BREAK','break'));
 window.addEventListener(DASH_EVENTS.multiplierChange,event=>{if((event.detail?.after||0)>(event.detail?.before||0)){showFeedback('MULTIPLIER UP','multiplier');voice.play('multiplier',{gain:.7});}});
 window.addEventListener(DASH_EVENTS.stageChange,()=>showFeedback('STAGE CHANGE','stage'));
@@ -331,9 +333,10 @@ function makeRun(options={}){
     y:0,vy:0,jumpHeld:false,jumpAge:0,jumpBuffer:0,jumpBufferHeld:false,coyote:COYOTE_TIME,
     slideHeld:false,slideTime:0,slideMin:0,slideBlocked:false,grounded:true,landing:0,dead:false,
     bananaCount:0,goldenBananas:0,flow:0,maxFlow:0,combo:0,longestCombo:0,bonus:0,score:0,
-    perfectJumps:0,perfectSlides:0,nearMisses:0,
+    perfectJumps:0,perfectSlides:0,nearMisses:0,perfectChain:0,maxPerfectChain:0,flowSavesUsed:0,
     tutorial:createDashTutorialState(!!options.tutorial),tutorialPatternActive:false,
-    landed:false,lastDifficulty:1,recentPressure:0,recentRecovery:1,recentActionVariety:.5,recentActions:[]
+    landed:false,lastDifficulty:1,recentPressure:.12,recentRecovery:1,recentActionVariety:.5,recentActions:[],
+    director:createDashDirectorState(),setPieces:[]
   };
 }
 function dashMeta(extra={}){
@@ -417,6 +420,21 @@ function bananaArc(start,end,apex=105,count=5,goldenChance=.07){
 function lowTrail(start,end,count=5){
   for(let i=0;i<count;i++)spawnBanana(start+(i+.5)*(end-start)/count,23,false);
 }
+function spawnRiskRoute(def,created){
+  const route=def?.riskRoute;
+  if(!route||!created.length)return;
+  const first=created[0],last=created.at(-1);
+  if(route.kind==='high-arc'){
+    const start=first.x-26,end=last.x+last.w+38,apex=route.reward==='golden'?154:132;
+    bananaArc(start,end,apex,5,0);
+    if(route.reward==='golden'&&randomValue(run)<.32)spawnBanana((start+end)*.5,apex+18,true);
+  }else if(route.kind==='precision-landing'){
+    const speed=planningSpeed(last.x+last.w);
+    const start=last.x+last.w+speed*.18,end=start+speed*.28;
+    lowTrail(start,end,3);
+    if(route.reward==='golden'&&randomValue(run)<.32)spawnBanana(start+(end-start)*.42,28,true);
+  }
+}
 function patternCatalog(){
   const viewportWidth=metrics().vw;
   const visibility=dashVisibilityForViewport({time:run.time,speed:run.speed,viewportWidth,playerX:PLAYER_X});
@@ -424,7 +442,7 @@ function patternCatalog(){
     time:run.time,previousDifficulty:run.lastDifficulty,previousAction:run.recentActions.at(-1)||null,
     recentPressure:run.recentPressure,recentRecovery:run.recentRecovery,
     recentActionVariety:run.recentActionVariety,visibility
-  }));
+  }),run.director);
 }
 function chooseWeighted(list){return chooseDashWeighted(run,list);}
 function chooseFamily(family,difficulty){return chooseDashObstacle(run,{family,difficulty,stage:run.stage});}
@@ -437,10 +455,13 @@ function planningSpeed(x){
 function spawnPattern(){
   if(run.tutorial?.enabled&&!run.tutorial.complete&&run.tutorialPatternActive)return false;
   let def=dashTutorialPattern(run.tutorial);
+  const viewportWidth=metrics().vw;
+  const visibility=dashVisibilityForViewport({time:run.time,speed:run.speed,viewportWidth,playerX:PLAYER_X});
   if(!def){
-    let options=patternCatalog();
-    if(run.lastDifficulty>=4)options=options.filter(p=>p.difficulty<=2);
-    def=chooseWeighted(options);
+    def=chooseDashSetPiece(run,run.director,{
+      time:run.time,stage:run.stage,normalizedSpeed:dashNormalizedSpeed(run.time),visibility
+    });
+    if(!def)def=chooseWeighted(patternCatalog());
   }
   if(!def)return false;
   const created=[];
@@ -458,20 +479,39 @@ function spawnPattern(){
     created.push(o);
     if(type.family==='flex'){
       lowTrail(x-38,x+type.w+28,3);
-      bananaArc(x-48,x+type.w+42,112,6,.18);
+      bananaArc(x-48,x+type.w+42,112,6,.12);
     }else if(type.action==='slide')lowTrail(x-50,x+type.w+34,5);
     else bananaArc(x-48,x+type.w+42,type.family==='high'?145:type.family==='wide'?122:102,type.family==='wide'?6:5);
   }
+
+  spawnRiskRoute(def,created);
   const lastO=created.at(-1);
-  spawnCursor=(lastO?.x||x)+(lastO?.w||0)+planningSpeed((lastO?.x||x)+(lastO?.w||0))*(Math.max(1.02,def.recovery+.28)+randomValue(run)*.24);
+  const lastEdge=(lastO?.x||x)+(lastO?.w||0);
+  spawnCursor=lastEdge+planningSpeed(lastEdge)*(Math.max(1.02,def.recovery+.28)+randomValue(run)*.24);
   run.lastDifficulty=def.difficulty;
-  run.recentRecovery=def.recovery;
-  run.recentPressure=Math.min(1,def.difficulty/5);
-  for(const obstacle of created){
-    run.recentActions.push(obstacle.action);
-    if(run.recentActions.length>6)run.recentActions.shift();
+
+  if(!def.tutorial){
+    advanceDashDirectorState(run.director,def,created,{
+      normalizedSpeed:dashNormalizedSpeed(run.time),visibility,stage:run.stage
+    });
+    run.recentRecovery=run.director.recovery;
+    run.recentPressure=run.director.pressure;
+    run.recentActions=[...run.director.recentActions];
+    run.recentActionVariety=run.director.actionVariety;
   }
-  run.recentActionVariety=run.recentActions.length?new Set(run.recentActions).size/run.recentActions.length:.5;
+
+  if(def.setPiece&&created.length){
+    const duration=Math.max(10,Math.min(20,Number(def.setPiece.durationSeconds)||12));
+    const first=created[0];
+    const startX=Math.max(run.scroll+PLAYER_X+40,first.x-run.speed*1.05);
+    const endX=Math.max(lastEdge+planningSpeed(lastEdge)*1.05,startX+run.speed*duration);
+    const setPiece={...def.setPiece,patternId:def.id,startX,endX,durationSeconds:duration,started:false,ended:false};
+    run.setPieces.push(setPiece);
+    emitDashEvent(DASH_EVENTS.setPieceQueued,dashMeta({
+      id:setPiece.id,theme:setPiece.theme,index:setPiece.index,startX,endX,durationSeconds:duration
+    }));
+  }
+
   if(def.tutorial){
     run.tutorialPatternActive=true;
     $('dash-tip').textContent=def.prompt;
@@ -606,6 +646,27 @@ function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);
 function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0;performanceController.invalidate();}
 function quit(){clearInputs();voice.setDash(false);voice.stopMusic();voice.stopAmbience();clearWorld();dashGraphics.reset();run=makeRun();setState('menu');accumulator=0;performanceController.invalidate();}
 
+function updateSetPieceEvents(){
+  if(!run?.setPieces?.length)return;
+  const runnerX=run.scroll+PLAYER_X;
+  for(const setPiece of run.setPieces){
+    if(!setPiece.started&&runnerX>=setPiece.startX){
+      setPiece.started=true;
+      emitDashEvent(DASH_EVENTS.setPieceStart,dashMeta({
+        id:setPiece.id,theme:setPiece.theme,index:setPiece.index,durationSeconds:setPiece.durationSeconds,
+        startX:setPiece.startX,endX:setPiece.endX
+      }));
+    }
+    if(setPiece.started&&!setPiece.ended&&runnerX>=setPiece.endX){
+      setPiece.ended=true;
+      emitDashEvent(DASH_EVENTS.setPieceEnd,dashMeta({
+        id:setPiece.id,theme:setPiece.theme,index:setPiece.index,durationSeconds:setPiece.durationSeconds
+      }));
+    }
+  }
+  run.setPieces=run.setPieces.filter(setPiece=>!setPiece.ended||runnerX-setPiece.endX<run.speed*2);
+}
+
 function updatePhysics(dt){
   if(state!=='running'||!run||run.dead)return;
   run.time+=dt;
@@ -620,6 +681,7 @@ function updatePhysics(dt){
   movePlayer(dt);
   run.scroll+=run.speed*dt;run.distance=run.scroll/100;
   let p=playerBox();p.x+=run.scroll;
+  updateSetPieceEvents();
   let collision=null,contact=Infinity;
   for(const o of obstacles){
     if(o.hit)continue;
@@ -652,6 +714,10 @@ function updatePhysics(dt){
       }));
       if(result.precision.nearMiss)emitDashEvent(DASH_EVENTS.nearMiss,dashMeta({obstacleId:o.id,patternId:o.patternId||'',precisionMargin:o.minClearance}));
       else if(result.precision.perfect)emitDashEvent(performedAction==='slide'?DASH_EVENTS.perfectSlide:DASH_EVENTS.perfectJump,dashMeta({obstacleId:o.id,patternId:o.patternId||'',precisionMargin:o.minClearance,performedAction}));
+      const chainReward=result.rewards.find(reward=>reward.kind==='perfect-chain');
+      if(chainReward)emitDashEvent(DASH_EVENTS.perfectChain,dashMeta({obstacleId:o.id,patternId:o.patternId||'',chain:result.perfectChain,points:chainReward.points}));
+      const riskReward=result.rewards.find(reward=>reward.kind==='risk-line');
+      if(riskReward)emitDashEvent(DASH_EVENTS.riskLine,dashMeta({obstacleId:o.id,patternId:o.patternId||'',points:riskReward.points}));
       handleTutorialEvent('obstacle-pass');
     }
   }
@@ -670,7 +736,7 @@ function updatePhysics(dt){
   run.score=Math.floor(run.distance*10)+run.bonus;
   if(collision){
     collision.hit=true;
-    const brokenCombo=run.combo;run.combo=0;
+    const brokenCombo=run.combo;run.combo=0;run.perfectChain=0;
     if(brokenCombo)emitDashEvent(DASH_EVENTS.comboBreak,dashMeta({combo:brokenCombo,obstacleId:collision.id,patternId:collision.patternId||''}));
     finishRun();return;
   }
@@ -795,10 +861,10 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
 window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad,selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
-window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
+window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,perfectChain:run?.perfectChain||0,maxPerfectChain:run?.maxPerfectChain||0,directorPressure:run?.recentPressure||0,inputDevice:activeInputDevice,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
 addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose();},{once:true});
 if(new URLSearchParams(location.search).has('test')){
- const snapshot=()=>{let sceneObjects=0;scene.traverse(()=>sceneObjects++);return{state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score}:null,inputs:{jump:[...heldJump],slide:[...heldSlide]},obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),pools:{hazards:pools.hazard.length,bananas:pools.banana.length},renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},standBlocked:run?overheadBlocksStand():false};};
+ const snapshot=()=>{let sceneObjects=0;scene.traverse(()=>sceneObjects++);return{state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,perfectChain:run.perfectChain,maxPerfectChain:run.maxPerfectChain,recentPressure:run.recentPressure,recentRecovery:run.recentRecovery,recentActionVariety:run.recentActionVariety,bonus:run.bonus,score:run.score}:null,inputs:{jump:[...heldJump],slide:[...heldSlide]},obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),pools:{hazards:pools.hazard.length,bananas:pools.banana.length},renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},standBlocked:run?overheadBlocksStand():false};};
  const reset=(seed='dash-regression',time=0)=>{clearInputs();voice.stopMusic();clearWorld();dashGraphics.reset();run=makeRun({seed:hashSeed(seed),tutorial:false});run.time=Math.max(0,Number(time)||0);run.stage=dashStageForTime(run.time);run.speed=dashSpeedForTime(run.time);seedWorld();setState('running');accumulator=0;last=performance.now();renderUI(0);dashGraphics.render();return snapshot();};
  const step=(steps=1)=>{const count=Math.max(0,Math.min(20000,Math.floor(Number(steps)||0)));for(let i=0;i<count&&state==='running';i++)updatePhysics(STEP);renderUI(0);dashGraphics.render();return snapshot();};
  const setRun=patch=>{if(!run)return snapshot();const allowed=new Set(['time','stage','speed','scroll','distance','y','vy','grounded','jumpHeld','jumpAge','jumpBuffer','jumpBufferHeld','coyote','slideHeld','slideTime','slideMin','slideBlocked','landing','dead','bananaCount','goldenBananas','flow','maxFlow','combo','longestCombo','bonus','score','lastDifficulty']);for(const [key,value] of Object.entries(patch||{}))if(allowed.has(key)&&(Number.isFinite(value)||typeof value==='boolean'))run[key]=value;renderUI(0);return snapshot();};
