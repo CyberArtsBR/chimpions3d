@@ -151,10 +151,10 @@ export function createDashPerformanceController({renderer,scene,keyLight,getRunt
   function resetFrameWindow(){sampleCount=0;sampleIndex=0;averageMs=0;p95Ms=0;badWindows=0;goodWindows=0;}
 
   function setQuality(value,{persist=true}={}){
-    requested=normalizeDashQualityRequest(value);
-    autoStep=0;resetFrameWindow();
-    if(persist)storeDashQuality(requested);
-    apply('manual');
+    const next=normalizeDashQualityRequest(value);
+    if(persist)storeDashQuality(next);
+    if(next===requested)return requested;
+    requested=next;autoStep=0;resetFrameWindow();apply('manual');
     return requested;
   }
 
