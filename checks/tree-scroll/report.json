@@ -1,0 +1,237 @@
+{
+  "status": "PASS",
+  "results": {
+    "math": [
+      2.1714285714285713,
+      22.742857142857144,
+      228.45714285714286,
+      2285.6,
+      22857142857.02857
+    ],
+    "negativeWrap": 0.7000000000000002,
+    "start": {
+      "treeScrollNormalized": 0,
+      "treeScrollScreens": 0,
+      "treeScrollSpeedFactor": 1,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 5,
+      "treeCameraY": 5,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.3134469696969697,
+      "offset": 0
+    },
+    "climb": {
+      "treeScrollNormalized": 0.5757575757575757,
+      "treeScrollScreens": 7.6,
+      "treeScrollSpeedFactor": 1,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 100,
+      "treeCameraY": 100,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.8892045454545454,
+      "offset": 2.432
+    },
+    "large": [
+      {
+        "treeScrollNormalized": 0.030303030303029388,
+        "treeScrollScreens": 79.6,
+        "treeScrollSpeedFactor": 1,
+        "treeWrapEnabled": true,
+        "treeTextureKind": "overlap-strip",
+        "treeCameraOrigin": 5,
+        "treeMeshY": 1000,
+        "treeCameraY": 1000,
+        "treeAuthoredVisible": true,
+        "treeTextureOffset": 0.3437499999999991,
+        "offset": 25.471999999999998
+      },
+      {
+        "treeScrollNormalized": 0.5757575757575779,
+        "treeScrollScreens": 799.6,
+        "treeScrollSpeedFactor": 1,
+        "treeWrapEnabled": true,
+        "treeTextureKind": "overlap-strip",
+        "treeCameraOrigin": 5,
+        "treeMeshY": 10000,
+        "treeCameraY": 10000,
+        "treeAuthoredVisible": true,
+        "treeTextureOffset": 0.8892045454545476,
+        "offset": 255.872
+      },
+      {
+        "treeScrollNormalized": 0.03030303030311643,
+        "treeScrollScreens": 7999.6,
+        "treeScrollSpeedFactor": 1,
+        "treeWrapEnabled": true,
+        "treeTextureKind": "overlap-strip",
+        "treeCameraOrigin": 5,
+        "treeMeshY": 100000,
+        "treeCameraY": 100000,
+        "treeAuthoredVisible": true,
+        "treeTextureOffset": 0.34375000000008615,
+        "offset": 2559.8720000000003
+      },
+      {
+        "treeScrollNormalized": 0.5757579803466797,
+        "treeScrollScreens": 79999999999.6,
+        "treeScrollSpeedFactor": 1,
+        "treeWrapEnabled": true,
+        "treeTextureKind": "overlap-strip",
+        "treeCameraOrigin": 5,
+        "treeMeshY": 1000000000000,
+        "treeCameraY": 1000000000000,
+        "treeAuthoredVisible": true,
+        "treeTextureOffset": 0.8892049500436494,
+        "offset": 25599999999.872
+      }
+    ],
+    "beforeResize": {
+      "treeScrollNormalized": 0.18181818181818166,
+      "treeScrollScreens": 15.6,
+      "treeScrollSpeedFactor": 1,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 200,
+      "treeCameraY": 200,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.4952651515151514,
+      "offset": 4.992
+    },
+    "afterResize": {
+      "treeScrollNormalized": 0.18181818181818166,
+      "treeScrollScreens": 4.505331753554502,
+      "treeScrollSpeedFactor": 1,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 200,
+      "treeCameraY": 200,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.20376845376845365,
+      "offset": 1.4417061611374409
+    },
+    "beforeReduced": {
+      "treeScrollNormalized": 0.18181818181818166,
+      "treeScrollScreens": 4.505331753554502,
+      "treeScrollSpeedFactor": 1,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 200,
+      "treeCameraY": 200,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.20376845376845365,
+      "offset": 1.4417061611374409
+    },
+    "afterReduced": {
+      "treeScrollNormalized": 0.18181818181818166,
+      "treeScrollScreens": 4.505331753554502,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 200,
+      "treeCameraY": 200,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.20376845376845365,
+      "offset": 0.3604265402843602
+    },
+    "reducedClimb": {
+      "treeScrollNormalized": 0.1969696969696968,
+      "treeScrollScreens": 4.736374407582938,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 210,
+      "treeCameraY": 210,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.2189199689199688,
+      "offset": 0.378909952606635
+    },
+    "balanced": {
+      "treeScrollNormalized": 0.1969696969696968,
+      "treeScrollScreens": 4.736374407582938,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 210,
+      "treeCameraY": 210,
+      "treeAuthoredVisible": false,
+      "treeTextureOffset": 0.2189199689199688,
+      "offset": 0.378909952606635
+    },
+    "high": {
+      "treeScrollNormalized": 0.1969696969696968,
+      "treeScrollScreens": 4.736374407582938,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 210,
+      "treeCameraY": 210,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.2189199689199688,
+      "offset": 0.378909952606635
+    },
+    "mobile": {
+      "treeScrollNormalized": 0.1969696969696968,
+      "treeScrollScreens": 4.736374407582938,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 210,
+      "treeCameraY": 210,
+      "treeAuthoredVisible": false,
+      "treeTextureOffset": 0.2189199689199688,
+      "offset": 0.378909952606635
+    },
+    "reset": {
+      "treeScrollNormalized": 0,
+      "treeScrollScreens": 0,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 5,
+      "treeCameraY": 5,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.021950271950271993,
+      "offset": 0
+    },
+    "memoryBefore": {
+      "geometries": 7,
+      "textures": 5
+    },
+    "memoryAfter": {
+      "geometries": 7,
+      "textures": 5
+    },
+    "final": {
+      "treeScrollNormalized": 0.5075757575757791,
+      "treeScrollScreens": 2310.311018957346,
+      "treeScrollSpeedFactor": 0.25,
+      "treeWrapEnabled": true,
+      "treeTextureKind": "overlap-strip",
+      "treeCameraOrigin": 5,
+      "treeMeshY": 100000,
+      "treeCameraY": 100000,
+      "treeAuthoredVisible": true,
+      "treeTextureOffset": 0.5295260295260511,
+      "offset": 184.82488151658768
+    },
+    "direction": {
+      "error": 120546,
+      "shift": -10
+    },
+    "wrapContinuity": 0.001021412037037037
+  },
+  "errors": []
+}

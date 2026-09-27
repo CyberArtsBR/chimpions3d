@@ -102,6 +102,7 @@ const controlledNames=[
   'environment.json',
   'environment/tree-wide-v2-16x9.webp',
   'environment/tree-wide-v2-9x16.webp',
+  'environment/tree-climb-abc-v1.webp',
   'environment/platforms/branch-moss.glb',
   'avatars.json',
   'characters.json',

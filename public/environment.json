@@ -1,7 +1,7 @@
 {
   "treeImages": {
-    "portrait": "environment/tree-wide-v2-9x16.webp",
-    "landscape": "environment/tree-wide-v2-16x9.webp"
+    "portrait": "environment/tree-climb-abc-v1.webp",
+    "landscape": "environment/tree-climb-abc-v1.webp"
   },
   "platformModel": "environment/platforms/branch-moss.glb",
   "platformHeight": 0.42,
@@ -10,5 +10,6 @@
     0,
     -0.4493639985,
     0
-  ]
+  ],
+  "treeScrollOverlap": 0.12
 }
