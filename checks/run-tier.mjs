@@ -32,6 +32,7 @@ const release=[
   ...standard,
   'dash-patterns.mjs',
   'dash-runtime-determinism-browser.mjs',
+  'dash-runtime-reliability-browser.mjs',
   'dash-black-screen-browser.mjs',
   'dash-accessibility-browser.mjs',
   'dash-resources.mjs',
