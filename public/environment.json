@@ -1,16 +1,12 @@
 {
   "treeImages": {
-    "portrait": "environment/tree-wide-v2-9x16.webp",
-    "landscape": "environment/tree-wide-v2-16x9.webp"
+    "portrait": "environment/tropical-canyon-v1-9x16.webp",
+    "landscape": "environment/tropical-canyon-v1-16x9.webp"
   },
   "treeImageMode": "cover",
   "platformModel": "environment/platforms/branch-moss.glb",
   "platformHeight": 0.42,
   "platformDepth": 0.65,
-  "platformRotation": [
-    0,
-    -0.4493639985,
-    0
-  ],
+  "platformRotation": [0, -0.4493639985, 0],
   "treeScrollOverlap": 0
 }
