@@ -151,7 +151,9 @@ class DashWorldRenderer{
     this.keyLight.shadow.camera.left=-viewW*.56;this.keyLight.shadow.camera.right=viewW*.56;this.keyLight.shadow.camera.top=viewH*.55;this.keyLight.shadow.camera.bottom=-viewH*.55;this.keyLight.shadow.camera.updateProjectionMatrix();
   }
   interpolateBiome(stage,time){
-    const current=biomeForStage(stage).profile;if(stage<=1)return{from:current,to:current,t:1};const previous=biomeForStage(stage-1).profile,within=((time%30)+30)%30,t=smooth(clamp(within/3.2,0,1));return{from:previous,to:current,t};
+    const current=biomeForStage(stage).profile;
+    if(stage<=1||this.reducedMotion)return{from:current,to:current,t:1};
+    const previous=biomeForStage(stage-1).profile,within=((time%30)+30)%30,t=smooth(clamp(within/3.2,0,1));return{from:previous,to:current,t};
   }
   applyBiome(stage,time){
     const {from,to,t}=this.interpolateBiome(stage,time);this.profile=to;
