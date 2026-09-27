@@ -779,7 +779,8 @@ function pollGamepad(){
  const start=!!p?.buttons?.[9]?.pressed;
  if(j||s||start)setInputDevice('gamepad');
  setInput('jump','pad',j);setInput('slide','pad',s);
- if(start&&!lastPadPause){if(state==='menu'||state==='over')startRun();else if(state==='paused')resume();else pause();}
+ if(state==='over'&&j&&!lastPadJump)document.activeElement?.click?.();
+ if(start&&!lastPadPause){if(state==='menu')$('dash-start')?.click();else if(state==='paused')resume();else if(state==='running')pause();}
  lastPadJump=j;lastPadSlide=s;lastPadPause=start;
 }
 
