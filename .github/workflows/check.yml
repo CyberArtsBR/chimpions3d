@@ -53,6 +53,7 @@ jobs:
       - name: Syntax-check browser and production suites
         run: |
           node --check checks/game-browser.mjs
+          node --check checks/reported-regressions-browser.mjs
           node --check checks/collection-browser.mjs
           node --check checks/countdown-browser.mjs
           node --check checks/responsive-browser.mjs
@@ -82,6 +83,42 @@ jobs:
           if-no-files-found: ignore
           path: |
             checks/*-report.json
+
+  reported-regressions:
+    name: TARGETED · reported Jump regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated regression bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify reported regressions
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-reported-regressions.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
+          node checks/reported-regressions-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-jump-reported-regressions
+          if-no-files-found: ignore
+          path: |
+            checks/reported-regressions-report.json
+            checks/reported-regressions-ultra.png
 
   standard-browser:
     name: STANDARD · Chromium E2E, responsive, a11y, network, soak
