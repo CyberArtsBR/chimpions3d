@@ -56,7 +56,7 @@ export class DashEnvironment{
     for(let i=0;i<count;i++){
       const d=this.seed.heroTrunks[i],x=wrap(d.x*span-scrollWorld*.105,span),h=1.35+d.s*1.18;
       applyMatrix(this.mesh.heroTrunks,i,x,this.groundY-.02,0,.48+d.s*.2,h,.72,d.r*.12);
-      applyMatrix(this.mesh.heroCrowns,i,x+d.r*.3,this.groundY+2.35+h*.84,0,1.2+d.s*.72,.82+d.s*.48,1,d.r*.65);
+      const canopyBulk=1+.15*clamp(features.darkCanopy,0,1.5);applyMatrix(this.mesh.heroCrowns,i,x+d.r*.3,this.groundY+2.35+h*.84,0,(1.2+d.s*.72)*canopyBulk,(.82+d.s*.48)*canopyBulk,1,d.r*.65);
     }
     finish(this.mesh.heroTrunks,count);finish(this.mesh.heroCrowns,count);
 
@@ -107,7 +107,7 @@ export class DashEnvironment{
     count=Math.min(DASH_SCENERY_CAPACITY.templeArches,Math.round((structureLimit*.52)*clamp(features.arches,0,1.6)));
     for(let i=0;i<count;i++){
       const d=this.seed.templeArches[i],x=wrap(d.x*span-scrollWorld*.082,span),s=1.15+d.s*.7;
-      applyMatrix(this.mesh.templeArches,i,x,this.groundY+2.2+d.y*.7,0,s,s*.82,1,Math.PI+d.r*.05);
+      applyMatrix(this.mesh.templeArches,i,x,this.groundY+2.2+d.y*.7,0,s,s*.82,1,d.r*.05);
     }
     finish(this.mesh.templeArches,count);
 
