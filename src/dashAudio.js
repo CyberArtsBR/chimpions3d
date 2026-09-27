@@ -353,13 +353,19 @@ export class GameAudio {
     this.appliedSpeedNorm=this.speedNorm;this.applyAmbienceMix();
   }
 
-  stopAmbience(){
-    for(const node of this.ambienceNodes){try{node.stop?.()}catch{}}
+  stopAmbience(fade=true){
+    const c=this.context,now=c?.currentTime||0,tail=fade?.08:.01;
+    for(const gain of [this.windGain,this.leavesGain,this.insectGain,this.birdGain,this.waterGain]){
+      try{
+        if(gain&&c){gain.gain.cancelScheduledValues(now);gain.gain.setValueAtTime(Math.max(.0001,gain.gain.value||.001),now);gain.gain.exponentialRampToValueAtTime(.0001,now+tail);}
+      }catch{}
+    }
+    for(const node of this.ambienceNodes){try{node.stop?.(now+tail+.02)}catch{}}
     this.ambienceNodes=[];this.windGain=null;this.windFilter=null;this.leavesGain=null;this.insectGain=null;this.birdGain=null;this.waterGain=null;this.appliedSpeedNorm=-1;
   }
 
   destroy(){
-    this.stopMusic();this.stopDashLoop(false);this.stopAmbience();
+    this.stopMusic();this.stopDashLoop(false);this.stopAmbience(false);
     this.sampleBuffers.clear();this.sampleLoads.clear();
     try{this.context?.close?.()}catch{}
     this.context=null;this.nodes=null;
