@@ -6,7 +6,7 @@ export function createExpeditionBackdrop(world,scene,camera){
  const layers=names.map((name,index)=>{
   const picture=document.createElement('picture');picture.className='expedition-backdrop';
   const source=document.createElement('source');source.media='(orientation: landscape)';
-  source.srcset=import.meta.env.BASE_URL+'backgrounds/expedition/'+name+(index<2?'-landscape.jpg':'-portrait.jpg');
+  source.srcset=import.meta.env.BASE_URL+'backgrounds/expedition/'+name+'-landscape.jpg';
   const img=document.createElement('img');img.src=import.meta.env.BASE_URL+'backgrounds/expedition/'+name+'-portrait.jpg';img.alt='';img.decoding='async';
   picture.append(source,img);world.prepend(picture);return picture;
  });
@@ -24,7 +24,7 @@ export function createExpeditionBackdrop(world,scene,camera){
   if(index!==current){current=index;layers.forEach((layer,i)=>layer.classList.toggle('active',i===index));}
   const width=(camera.right-camera.left)/camera.zoom,height=(camera.top-camera.bottom)/camera.zoom,wide=width>height;
   backplates.forEach((mesh,i)=>{
-   const url=import.meta.env.BASE_URL+'backgrounds/expedition/'+names[i]+(wide&&i<2?'-landscape.jpg':'-portrait.jpg');
+   const url=import.meta.env.BASE_URL+'backgrounds/expedition/'+names[i]+(wide?'-landscape.jpg':'-portrait.jpg');
    const map=load(url),image=map.image;if(mesh.material.map!==map){mesh.material.map=map;mesh.material.needsUpdate=true;}
    mesh.visible=enabled&&!!image?.width&&i===index;mesh.material.opacity=1;
    if(image?.width){const aspect=image.width/image.height,view=width/height;map.repeat.set(Math.min(1,view/aspect),Math.min(1,aspect/view));map.offset.set((1-map.repeat.x)/2,(1-map.repeat.y)/2);}
