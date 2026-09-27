@@ -11,7 +11,7 @@ export {DASH_BIOMES,resolveDashQuality,DASH_QUALITY_PRESETS};
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const smooth=t=>t*t*(3-2*t);
 const wrap=(v,span)=>{const half=span/2;return((v+half)%span+span)%span-half;};
-const TMP_COLOR_A=new THREE.Color(),TMP_COLOR_B=new THREE.Color(),TMP_COLOR_C=new THREE.Color(),TMP_COLOR_D=new THREE.Color();
+const TMP_COLOR_A=new THREE.Color(),TMP_COLOR_B=new THREE.Color(),TMP_COLOR_C=new THREE.Color(),TMP_COLOR_D=new THREE.Color(),TMP_COLOR_E=new THREE.Color();
 const TMP_MATRIX=new THREE.Matrix4(),TMP_POS=new THREE.Vector3(),TMP_QUAT=new THREE.Quaternion(),TMP_SCALE=new THREE.Vector3();
 const Z_AXIS=new THREE.Vector3(0,0,1);
 
@@ -151,7 +151,7 @@ class DashWorldRenderer{
   }
   applyBiome(stage,time){
     const {from,to,t}=this.interpolateBiome(stage,time);this.profile=to;
-    const top=lerpColor(TMP_COLOR_C,from.skyTop,to.skyTop,t),bottom=lerpColor(TMP_COLOR_D,from.skyBottom,to.skyBottom,t),fog=lerpColor(TMP_COLOR_A,from.fog,to.fog,t);
+    const top=lerpColor(TMP_COLOR_C,from.skyTop,to.skyTop,t),bottom=lerpColor(TMP_COLOR_D,from.skyBottom,to.skyBottom,t),fog=lerpColor(TMP_COLOR_E,from.fog,to.fog,t);
     this.skyMaterial.uniforms.top.value.copy(top);this.skyMaterial.uniforms.bottom.value.copy(bottom);lerpColor(this.skyMaterial.uniforms.sun.value,from.sun,to.sun,t);this.skyMaterial.uniforms.sunStrength.value=.12+.2*(1-(from.storm+(to.storm-from.storm)*t));
     this.scene.fog??=new THREE.FogExp2(fog,.02);this.scene.fog.color.copy(fog);this.scene.fog.density=from.fogDensity+(to.fogDensity-from.fogDensity)*t;
     lerpColor(this.mat.ground.color,from.dirt,to.dirt,t);lerpColor(this.mat.moss.color,from.ground,to.ground,t);lerpColor(this.mat.far.color,from.canopy,to.canopy,t);lerpColor(this.mat.mid.color,from.mid,to.mid,t);lerpColor(this.mat.foreground.color,from.canopy,to.canopy,t);lerpColor(this.mat.goldStone.color,0x74725a,to.accent,t*.35);
