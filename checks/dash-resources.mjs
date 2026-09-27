@@ -28,7 +28,7 @@ try{
   // Block localized decorative raster assets and music. The GPU gameplay world must
   // remain readable and lethal hazards must still have geometry.
   await failurePage.route('**/dash/assets/**',r=>r.abort('failed'));
-  await failurePage.route('**/chimpions-army.mp3',r=>r.abort('failed'));
+  await failurePage.route('**/audio/music-full.mp3*',r=>r.abort('failed'));
   await failurePage.goto((process.env.CHIMP_TEST_URL||'http://127.0.0.1:4173')+'/?dash=1&test=1',{waitUntil:'domcontentloaded'});
   await failurePage.waitForFunction(()=>window.chimpionsDash?.().ready,{timeout:90000});
   assert(await failurePage.getByRole('button',{name:'Start Game'}).isVisible(),'asset/audio failure must not block start');
