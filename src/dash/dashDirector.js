@@ -32,27 +32,27 @@ export const DASH_STAGE_IDENTITIES=Object.freeze([
 export const DASH_SET_PIECES=Object.freeze([
   Object.freeze({
     id:'giant-root-rhythm',theme:'giant-root-rhythm',minStage:3,difficulty:4,weight:1.10,durationSeconds:13,
-    items:Object.freeze([['short',0],['short',.82],['high',1.02],['short',.92],['overhead',1.02],['short',.90],['wide',1.18],['short',1.02]])
+    items:Object.freeze([['short',0],['short',.82],['high',1.02],['short',.92],['overhead',1.02],['short',.90],['wide',1.18],['short',1.02],['short',.80],['high',1.02],['overhead',1.04],['short',.92]])
   }),
   Object.freeze({
     id:'temple-corridor',theme:'temple-corridor',minStage:3,difficulty:4,weight:1,durationSeconds:12,
-    items:Object.freeze([['overhead',0],['short',.92],['overhead',.96],['high',1.10],['overhead',1.02],['short',.92],['overhead',.98]])
+    items:Object.freeze([['overhead',0],['short',.92],['overhead',.96],['high',1.10],['overhead',1.02],['short',.92],['overhead',.98],['short',.90],['high',1.08],['overhead',1.02],['short',.92],['overhead',.98]])
   }),
   Object.freeze({
     id:'waterfall-sequence',theme:'waterfall-sequence',minStage:4,difficulty:4,weight:1.08,durationSeconds:14,
-    items:Object.freeze([['wide',0],['short',1.28],['wide',1.38],['high',1.24],['short',1.12],['wide',1.42]])
+    items:Object.freeze([['wide',0],['short',1.28],['wide',1.38],['high',1.24],['short',1.12],['wide',1.42],['short',1.12],['wide',1.34],['high',1.18],['wide',1.42]])
   }),
   Object.freeze({
     id:'canopy-sprint',theme:'canopy-sprint',minStage:4,difficulty:4,weight:1.02,durationSeconds:11,
-    items:Object.freeze([['overhead',0],['short',.86],['overhead',.92],['short',.88],['flex',1.02],['overhead',.98],['short',.92]])
+    items:Object.freeze([['overhead',0],['short',.86],['overhead',.92],['short',.88],['flex',1.02],['overhead',.98],['short',.92],['overhead',.90],['short',.86],['high',1.04],['overhead',1.02],['short',.90]])
   }),
   Object.freeze({
     id:'ruin-gateway',theme:'ruin-gateway',minStage:5,difficulty:5,weight:.92,durationSeconds:15,
-    items:Object.freeze([['high',0],['short',1.04],['flex',1.08],['overhead',1.02],['wide',1.30],['short',1.00],['high',1.12]])
+    items:Object.freeze([['high',0],['short',1.04],['flex',1.08],['overhead',1.02],['wide',1.30],['short',1.00],['high',1.12],['short',.94],['flex',1.06],['overhead',1.04],['wide',1.28],['short',1.00]])
   }),
   Object.freeze({
     id:'rolling-threat',theme:'rolling-visual-threat',minStage:6,difficulty:5,weight:.86,durationSeconds:16,
-    items:Object.freeze([['short',0],['high',1.02],['overhead',1.02],['short',.92],['wide',1.20],['overhead',1.06],['high',1.10],['short',.96]])
+    items:Object.freeze([['short',0],['high',1.02],['overhead',1.02],['short',.92],['wide',1.20],['overhead',1.06],['high',1.10],['short',.96],['overhead',1.00],['wide',1.18],['short',.92],['high',1.08],['overhead',1.04]])
   })
 ]);
 
