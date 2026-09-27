@@ -36,6 +36,7 @@ export const platformTravelFor=type=>type==='moving'?PLATFORM_TRAVEL:type==='lea
 
 // Moving-platform speed no longer gets a second late-run acceleration multiplier.
 export const platformPhaseAt=time=>.72*Math.max(0,time);
+const VERTICAL_PHASE_SPEED=1.22;
 
 export const movingX=(platform,time)=>
  platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange??PLATFORM_TRAVEL);
@@ -89,7 +90,7 @@ export class Game {
   });
   const platform=this.platforms.at(-1);
   if(moveRange)platform.x=platformX(platform,this.time);
-  if(type==='vertical')platform.y=platform.baseY+Math.sin(platformPhaseAt(this.time)+platform.phase)*.65;
+  if(type==='vertical')platform.y=platform.baseY+Math.sin(platformPhaseAt(this.time)*VERTICAL_PHASE_SPEED+platform.phase)*.65;
   return true;
  }
  nextEncounterStep(difficulty){
@@ -356,7 +357,7 @@ export class Game {
   let landing=null,earliest=2;
   for(const p of this.platforms){
    const previousX=p.x,previousY=p.y;
-   if(p.type==='vertical')p.y=p.baseY+Math.sin(platformPhaseAt(this.time)+p.phase)*.65;
+   if(p.type==='vertical')p.y=p.baseY+Math.sin(platformPhaseAt(this.time)*VERTICAL_PHASE_SPEED+p.phase)*.65;
    if(platformTravelFor(p.type))p.x=platformX(p,this.time);
    if(p.broken)continue;
    if(this.vy<0&&oldY>=previousY&&this.y<=p.y){

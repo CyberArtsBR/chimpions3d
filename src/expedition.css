@@ -1,5 +1,5 @@
 /* Reference-inspired expedition HUD and untouched JPEG scenery. */
-body.expedition-ui[data-mode] #world>.expedition-backdrop{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;pointer-events:none;display:block}
+body.expedition-ui[data-mode] #world>.expedition-backdrop{position:absolute;inset:0;opacity:0;transition:opacity 3s linear;pointer-events:none;display:block}
 body.expedition-ui[data-mode] #world>.expedition-backdrop.active{opacity:1}
 .expedition-backdrop img{width:100%;height:100%;object-fit:cover;display:block}
 body.expedition-ui[data-mode] #world>.sun,body.expedition-ui[data-mode] #world>.rays,body.expedition-ui[data-mode] #world>.hill,body.expedition-ui[data-mode] #world>.mist,body.expedition-ui[data-mode] #world::before,body.expedition-ui[data-mode] #world::after{display:none!important}
