@@ -10,6 +10,7 @@ const fast=[
   'asset-budget.mjs',
   'upload-validation.mjs',
   'jump-audit.mjs',
+  'dash-gameplay-director.mjs',
   'production-hook-safety.mjs',
   'dash-gameplay.mjs',
   'dash-presentation-contract.mjs'
