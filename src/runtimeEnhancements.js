@@ -3,7 +3,9 @@ import {inputManager} from './InputManager.js';
 const isVisible=el=>{
  if(!el||el.disabled||el.hidden)return false;
  const style=getComputedStyle(el);
- return style.display!=='none'&&style.visibility!=='hidden'&&style.opacity!=='0'&&el.getClientRects().length>0;
+ // Artwork menus use fully transparent real buttons as controller/mouse hotspots.
+ // Opacity must not make an otherwise interactive control disappear from gamepad navigation.
+ return style.display!=='none'&&style.visibility!=='hidden'&&el.getClientRects().length>0;
 };
 const focusables=root=>[...root.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),summary,[tabindex]:not([tabindex="-1"])')].filter(isVisible);
 const focusElement=el=>{

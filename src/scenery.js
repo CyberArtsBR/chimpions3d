@@ -275,8 +275,11 @@ export function createScenery(scene,renderer){
  }
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
-  forest.forEach((m,i)=>{m.visible=background.visible&&(highQuality||i>0);});
-  if(treeImageMesh)treeImageMesh.visible=background.visible&&highQuality&&!!treeImageMesh.material.map;
+  const authoredTreeReady=highQuality&&!!treeImageMesh?.material.map;
+  // High/Ultra use the authored scrolling tree as the only background once ready.
+  // Keep the procedural forest strictly as a loading/error fallback, never as an overlay.
+  forest.forEach((m,i)=>{m.visible=background.visible&&!authoredTreeReady&&(highQuality||i>0);});
+  if(treeImageMesh)treeImageMesh.visible=background.visible&&authoredTreeReady;
   invalidateStaticFrame();
  }
  function fitTree(){
@@ -294,11 +297,11 @@ export function createScenery(scene,renderer){
  function loadTree(){
   if(!runtimeAssetsActive||!highQuality||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
   if(treeTextures.has(url)){
-   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xd4d4d4,toneMapped:false,fog:false,transparent:true,opacity:.72,depthWrite:false}));configureTreeMaterial(treeImageMesh.material);background.add(treeImageMesh);}
+   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false,transparent:false,opacity:1,depthWrite:false}));configureTreeMaterial(treeImageMesh.material);background.add(treeImageMesh);}
    treeImageMesh.material.map=treeTextures.get(url);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
   }
   if(treeRequests.has(url))return;treeRequests.add(url);
-  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;map.anisotropy=4;treeTextures.set(url,map);loadTree();invalidateStaticFrame();},undefined,()=>{treeRequests.delete(url);console.warn('Tree image unavailable; layered forest remains.');});
+  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;map.anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));treeTextures.set(url,map);loadTree();invalidateStaticFrame();},undefined,()=>{treeRequests.delete(url);console.warn('Tree image unavailable; layered forest remains.');});
  }
  function prefetchRuntimeAssets(){
   runtimePrefetchRequested=true;
@@ -498,7 +501,7 @@ export function createScenery(scene,renderer){
    updateTreeScroll();
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
-    if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}
+    if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xffffff);}
     const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1);mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;mistMaterial.opacity=.12+mist*.46;mistLayers.visible=mistMaterial.opacity>.01;moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
    }else mistLayers.visible=false;
    wrapAge+=dt;if(wrapAge<.45){wrapCues.visible=true;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);}else{wrapCues.visible=false;cueMaterial.opacity=0;}
@@ -510,6 +513,10 @@ export function createScenery(scene,renderer){
    activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
    visualConstraints={constrained:!!options.constrained};
    highQuality=!!activeVisualProfile.highScenery&&!visualConstraints.constrained;
+   for(const texture of treeTextures.values()){
+    const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));
+    if(texture.anisotropy!==anisotropy){texture.anisotropy=anisotropy;texture.needsUpdate=true;}
+   }
    loadPlatform();loadTree();
    scene.traverse(o=>{
     if(o.name==='authored-branch')o.visible=highQuality;
