@@ -21,8 +21,10 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v9-higher-lateral-routes';
+export const RULESET='2026-09-expedition-v10-weather-lategame-pace';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
+export const PACE_SLOW_HEIGHT=1000, POST_1000_PACE_CLOCK_SCALE=.35;
+export const paceClockScaleAtHeight=height=>(Number(height)||0)>=PACE_SLOW_HEIGHT?POST_1000_PACE_CLOCK_SCALE:1;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>directedWrappedDistance(a,b,WRAP_SPAN);
@@ -59,7 +61,7 @@ export class Game {
  constructor(seed=1){this.reset(seed);}
  reset(seed=1){
   this.runSeed=seed>>>0;this.seed=this.runSeed;this.x=0;this.y=0;this.vx=0;this.vy=JUMP;
-  this.time=0;this.height=0;this.camera=5;this.previousCamera=5;
+  this.time=0;this.paceClock=0;this.height=0;this.camera=5;this.previousCamera=5;
   this.jetpack=null;this.jetRemaining=0;this.jetIndex=0;this.nextJetAt=firstJetTime(this.runSeed);
   this.bounceAge=0;this.bounces=0;this.bananas=0;this.dead=false;
   this.event=null;this.eventIndex=0;this.nextEventAt=firstEventTime(this.runSeed);this.specialBlockedUntil=0;
@@ -69,6 +71,7 @@ export class Game {
   this.add(0,0,2.8,'solid',false,'safe',{encounterType:'start',encounterPhase:ENCOUNTER_PHASES.READ});
   this.generate();
  }
+ get pace(){return paceAt(this.paceClock);}
  random(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296;}
  canPlace(x,y,width,type){
   const extent=width/2+platformTravelFor(type);
@@ -293,10 +296,12 @@ export class Game {
  }
  step(input,dt=STEP){
   if(this.dead)return [];
-  const events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
+  const events=[],realDt=dt;this.time+=realDt;
+  this.paceClock+=realDt*paceClockScaleAtHeight(this.height);
+  this.updateCanopyEvent(events);
   this.hazardCooldown=Math.max(0,this.hazardCooldown-realDt);
 
-  dt*=paceAt(this.time);this.bounceAge+=dt;
+  dt*=this.pace;this.bounceAge+=dt;
   this.previousCamera=this.camera;
   const target=input*SPEED,amount=24*dt;
   this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
@@ -308,7 +313,7 @@ export class Game {
   else this.x=nextX;
 
   if(this.jetRemaining>0){
-   const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.time);
+   const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/this.pace;
    if(this.jetRemaining===0){
     this.vy=JUMP;
     for(const h of this.hazards)if(h.type!=='thorn-pod'){h.createdAt=this.time;h.telegraphCycle=-1;h.activeCycle=-1;}
