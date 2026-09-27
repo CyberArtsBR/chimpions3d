@@ -250,8 +250,8 @@ export function createScenery(scene,renderer){
   }
  }
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
- // Low/Balanced keep the lightweight layered forest fallback. High/Ultra use the
- // authored portrait/landscape premium canopy artwork from environment.json.
+ // Every quality preset uses the authored portrait/landscape premium canopy artwork.
+ // Quality only changes render cost/effects; the core art direction stays identical.
  let viewWidth=20,viewHeight=14,currentCamera=5;
  let treeCameraOrigin=null,treeClimbOffset=0;
  let treeScrollBias=0,treeRepeatY=1,treeScrollSpeedFactor=1;
@@ -294,7 +294,7 @@ export function createScenery(scene,renderer){
  }
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
-  const wantsAuthoredTree=highQuality&&activeVisualProfile.backgroundMode==='authored-tree';
+  const wantsAuthoredTree=activeVisualProfile.backgroundMode==='authored-tree';
   const authoredTreeReady=wantsAuthoredTree&&!!treeImageMesh?.material.map;
   // Balanced and High use the exact same layered-forest composition. HIGH only
   // raises texture density/filtering/render quality; Ultra swaps to the authored tree.
@@ -334,7 +334,7 @@ export function createScenery(scene,renderer){
   treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);treeImageMesh.position.set(0,currentCamera,-8);
  }
  function loadTree(){
-  if(!runtimeAssetsActive||!highQuality||activeVisualProfile.backgroundMode!=='authored-tree'||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
+  if(!runtimeAssetsActive||activeVisualProfile.backgroundMode!=='authored-tree'||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
   if(treeTextures.has(url)){
    if(!treeImageMesh){
     treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false,transparent:false,opacity:1,depthWrite:false}));
@@ -568,7 +568,7 @@ export function createScenery(scene,renderer){
      treeImageMesh.position.y=currentCamera+(coverMode&&!reduced?Math.sin(cameraY*.011)*viewHeight*.012:0);
      treeImageMesh.material.color.set(0xffffff);
     }
-    const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1),authoredTreeOnly=highQuality&&!!treeImageMesh?.visible;
+    const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1),authoredTreeOnly=!!treeImageMesh?.visible;
     mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
     mistMaterial.opacity=authoredTreeOnly?0:.12+mist*.46;
     mistLayers.visible=!authoredTreeOnly&&mistMaterial.opacity>.01;
