@@ -136,10 +136,10 @@ inputManager.bindMouseSurface(renderer.domElement,e=>{
 });
 const THEME_METERS=400,THEME_TRANSITION_METERS=80;
 const themes=[
- {name:'Canopy Morning',top:'#73c9ff',bottom:'#dff4ff',light:0xfff0d4,fog:0xd7efff,fogNear:25,fogFar:58,sun:2.65,hero:2.72,fill:1.02,mist:.12,rain:0,night:0},
- {name:'Golden Canopy',top:'#f49a42',bottom:'#ffd08a',light:0xffc778,fog:0xf4bc78,fogNear:23,fogFar:53,sun:2.35,hero:2.58,fill:.94,mist:.24,rain:0,night:.08},
- {name:'Neon Mist',top:'#d73cff',bottom:'#45cfff',light:0xff71dc,fog:0x9c58df,fogNear:21,fogFar:49,sun:1.82,hero:2.38,fill:1.18,mist:.34,rain:0,night:.28},
- {name:'Moonstorm Jungle',top:'#102b62',bottom:'#315b91',light:0xaed5ff,fog:0x5579a9,fogNear:19,fogFar:45,sun:.78,hero:1.88,fill:1.38,mist:.42,rain:1,night:1}
+ {name:'Canopy Morning',rain:0},
+ {name:'Golden Canopy',rain:0},
+ {name:'Neon Mist',rain:0},
+ {name:'Moonstorm Jungle',rain:1}
 ];
 function themeAtHeight(height){
  const h=Math.max(0,Number(height)||0);
@@ -150,7 +150,6 @@ function themeAtHeight(height){
  if(local>=THEME_TRANSITION_METERS)return {from:to,to,blend:1};
  return {from,to,blend:THREE.MathUtils.smoothstep(local,0,THEME_TRANSITION_METERS)};
 }
-const color=new THREE.Color(),other=new THREE.Color();
 const eventLabels={
  'banana-bloom':'BANANA BLOOM',
  'spring-fever':'SPRING FEVER'
@@ -300,19 +299,15 @@ function drawWorld(dt=0){
  const liveHazards=new Set(game.hazards.map(h=>h.id));for(const [id,m]of hazardMeshes){if(!liveHazards.has(id)){removeHazard(m);hazardMeshes.delete(id);}}
  for(const h of game.hazards){let m=hazardMeshes.get(h.id);if(!m){m=scenery.hazard(h);world.add(m);hazardMeshes.set(h.id,m);}m.visible=Math.abs(h.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateHazard(m,h,visualTime);}
  if(mode==='playing'&&game.hazardCooldown<=0&&game.time-lastHazardWarningAt>1.6){const threat=game.hazards.find(h=>h.y>game.y+.45&&h.y<game.y+2.5&&Math.abs(h.x-game.x)<1.15);if(threat){lastHazardWarningAt=game.time;sound('hazard-warning');}}
- const themeState=themeAtHeight(game.height),from=themes[themeState.from],current=themes[themeState.to],idx=themeState.to,blend=themeState.blend;
+ const themeState=themeAtHeight(game.height),current=themes[themeState.to],idx=themeState.to,blend=themeState.blend;
  if(pixelMode)pixelBackdrop.draw(idx,blend);
  if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
- const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
- const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone(),fogColor=color.setHex(from.fog).lerp(other.setHex(current.fog),blend).clone();
- scene.fog.color.copy(fogColor);scene.fog.near=THREE.MathUtils.lerp(from.fogNear,current.fogNear,blend);scene.fog.far=THREE.MathUtils.lerp(from.fogFar,current.fogFar,blend);
- const night=THREE.MathUtils.lerp(from.night,current.night,blend),rain=THREE.MathUtils.lerp(from.rain,current.rain,blend),mist=THREE.MathUtils.lerp(from.mist,current.mist,blend);
- renderThemeIndex=idx;renderNight=night;
- sun.intensity=THREE.MathUtils.lerp(from.sun,current.sun,blend)+(game.event?.type==='banana-bloom'?.18:0);heroLight.intensity=THREE.MathUtils.lerp(from.hero,current.hero,blend);heroFill.intensity=THREE.MathUtils.lerp(from.fill,current.fill,blend);
+ const rain=themeState.from===3?(themeState.to===3?1:1-blend):(themeState.to===3?blend:0);
+ renderThemeIndex=idx;renderNight=0;
  audio.setIntensity(Math.min(1,game.time/150+(game.event ? .12 : 0)));
- scenery.update(game.camera,visualTime,dt,palette,night,idx,blend,{from:themeState.from,to:themeState.to,rain,mist,height:game.height});
- $('world').classList.toggle('night',night>.5);$('world').style.setProperty('--night-strength',night);sun.color.setHex(from.light).lerp(other.setHex(current.light),blend);
+ scenery.update(game.camera,visualTime,dt,scene.fog.color,0,idx,blend,{from:themeState.from,to:themeState.to,rain,height:game.height});
+ $('world').classList.remove('night');$('world').style.setProperty('--night-strength','0');
 }
 function tick(dt,control=input()){
  if(mode!=='playing')return;control=inputTrace.append(control);animationIntentX=control;
@@ -326,7 +321,7 @@ function tick(dt,control=input()){
    music.pause();mode='dying';deathAge=0;splashed=false;best=Math.max(best,game.height);try{localStorage.setItem('chimp-jump-best',String(best));}catch{}
    // The physics marks death only after the fall crosses the lower camera boundary. Keep the
    // exact current position and real-time vertical speed: no teleport, no acceleration, no pose.
-   deathPoint={x:game.x,visualY:game.y,velocity:Math.min(-.1,game.vy*paceAt(game.time))};
+   deathPoint={x:game.x,visualY:game.y,velocity:Math.min(-.1,game.vy*paceAt(game.height))};
    runSession.finish();runSession.prepare();
    inputManager.clearGameplay();avatar.root.visible=true;syncUI();
   }else if(e.type==='wrap'){animationSignals.wrapEvent=e.side==='left'?-1:1;sound('wrap');if(!wrapShown){wrapShown=true;toast('CROSS THE EDGE TO WRAP AROUND');}}
@@ -421,7 +416,7 @@ function renderFrame(now){if(document.hidden){previous=now;return;}if(!['startin
  renderPipeline.render(dt);
 }
 renderer.setAnimationLoop(renderFrame);
-const runtimeSnapshot=()=>({ready:ready&&document.body.dataset.uiReady==='true',characterReady:ready,uiReady:document.body.dataset.uiReady==='true',menuReady:document.body.dataset.menuReady==='true',animationState:avatar?.animationState||null,secondaryBones:avatar?.secondaryBoneCount||0,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,treeClimbOffset:scenery.treeClimbOffset,...scenery.treeScrollDiagnostics,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[Math.floor(game.time/30)%4].name,biome:themes[Math.floor(game.time/30)%4].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs?.length||0,pooledBranches:scenery.pooledBranches,assetTelemetry:assetRuntimeSnapshot(),controller:inputManager.snapshot(),diagnosticsVersion:2});
+const runtimeSnapshot=()=>({ready:ready&&document.body.dataset.uiReady==='true',characterReady:ready,uiReady:document.body.dataset.uiReady==='true',menuReady:document.body.dataset.menuReady==='true',animationState:avatar?.animationState||null,secondaryBones:avatar?.secondaryBoneCount||0,mode,countdown:mode==='starting'?Math.max(0,Math.ceil(countdownTime/.75)-1):null,runSeed,runSession:runSession.state,onlineSubmitCapable:runSession.onlineSubmitCapable,cleanLandings,reducedMotion:document.body.dataset.reducedMotion==='true',jetRemaining:game.jetRemaining,event:game.event?.type||null,hazardCount:game.hazards.length,platformTypes:[...new Set(game.platforms.map(p=>p.type))],muted,musicPaused:music.paused,musicTime:music.currentTime,musicDuration:music.duration,musicVolume:music.volume,musicPlaybackRate:music.playbackRate,musicMuted:music.muted,cameraZoom:camera.zoom,pixelMode,courtWidth:WIDTH,selectedId,platformReady:scenery.platformReady,backgroundReady:scenery.backgroundReady,treeVisible:scenery.treeVisible,treeClimbOffset:scenery.treeClimbOffset,...scenery.treeScrollDiagnostics,characterScale:avatar?.root.scale.x||0,authoredBranches:[...platformMeshes.values()].filter(m=>m.getObjectByName('authored-branch')?.visible).length,x:game.x,y:game.y,vx:game.vx,vy:game.vy,height:game.height,bounces:game.bounces,time:game.time,theme:themes[themeAtHeight(game.height).to].name,biome:themes[themeAtHeight(game.height).to].name,yaw,visible:!!avatar?.model.visible,bones:avatar?.boneCount||0,platformCount:game.platforms.length,visibleBranches:[...platformMeshes.values()].filter(m=>m.parent===world&&m.visible).length,visibleHazards:[...hazardMeshes.values()].filter(m=>m.parent===world&&m.visible).length,pace:paceAt(game.time),quality:activeQualityName,qualitySettings:activeQuality,...renderPipeline.getDiagnostics(),drawCalls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,programs:renderer.info.programs?.length||0,pooledBranches:scenery.pooledBranches,assetTelemetry:assetRuntimeSnapshot(),controller:inputManager.snapshot(),diagnosticsVersion:2});
 const diagnostics=installDiagnostics(window,runtimeSnapshot);
 Object.defineProperty(window,'chimpJump',{value:()=>diagnostics.snapshot(),writable:false,configurable:false});
 const testApiEnabled=(import.meta.env.DEV||import.meta.env.VITE_CHIMP_QA_HOOKS==='1')&&['localhost','127.0.0.1'].includes(location.hostname);
