@@ -304,7 +304,7 @@ function drawWorld(dt=0){
  if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
  $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
  const rain=themeState.from===3?(themeState.to===3?1:1-blend):(themeState.to===3?blend:0);
- renderThemeIndex=idx;renderNight=0;
+ renderThemeIndex=0;renderNight=0;
  audio.setIntensity(Math.min(1,game.time/150+(game.event ? .12 : 0)));
  scenery.update(game.camera,visualTime,dt,scene.fog.color,0,idx,blend,{from:themeState.from,to:themeState.to,rain,height:game.height});
  $('world').classList.remove('night');$('world').style.setProperty('--night-strength','0');
