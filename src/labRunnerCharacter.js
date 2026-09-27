@@ -11,6 +11,13 @@ const BONE_MAPPING={
 const ARM_REST_ANGLE=THREE.MathUtils.degToRad(22);
 const X=new THREE.Vector3(1,0,0),Y=new THREE.Vector3(0,1,0),Z=new THREE.Vector3(0,0,1);
 const WORLD_AXES=[X,Y,Z];
+const SIDES=['left','right'];
+const SLIDE_POSE={
+  hips:[.34,0,0],spine:[.70,0,0],chest:[.22,0,0],neck:[-.43,0,0],head:[-.29,0,0],
+  leftThigh:[-1.48,0,.055],leftShin:[1.96,0,0],leftFoot:[-.48,0,0],leftShoulder:[.09,0,-.025],leftUpperArm:[.50,0,.075],leftForearm:[-1.06,0,0],leftHand:[-.10,0,0],
+  rightThigh:[-1.48,0,-.055],rightShin:[1.96,0,0],rightFoot:[-.48,0,0],rightShoulder:[.09,0,.025],rightUpperArm:[.50,0,-.075],rightForearm:[-1.06,0,0],rightHand:[-.10,0,0]
+};
+const SLIDE_KEYS=Object.keys(SLIDE_POSE);
 const aliases={
   hips:['hips','hip','pelvis'],spine:['spine','spine0','spine1','spine01'],chest:['chest','upperchest','spine2','spine02','spine3'],neck:['neck','neck1','necktwist01'],head:['head'],
   Shoulder:['shoulder','clavicle','collar'],UpperArm:['upperarm','arm','uparm'],Forearm:['forearm','lowerarm','elbow'],Hand:['hand','wrist'],
@@ -75,9 +82,9 @@ export async function createLabRunnerCharacter(source){
   model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=false;o.frustumCulled=false;}});
 
   function worldDirection(a,b,out){
-    a.getWorldPosition(tmpVecA);b.getWorldPosition(tmpVecB);return out.copy(tmpVecB).sub(tmpVecA).normalize();
+    a.getWorldPosition(tmpVecA);b.getWorldPosition(tmpVecB);return out.subVectors(tmpVecB,tmpVecA).normalize();
   }
-  for(const side of ['left','right']){
+  for(const side of SIDES){
     const arm=rig[side+'UpperArm'],elbow=rig[side+'Forearm'];if(!isDescendant(elbow,arm))throw new Error('Forearm hierarchy is incompatible.');
     model.updateWorldMatrix(true,true);const from=worldDirection(arm,elbow,tmpVecA);if(from.lengthSq()<.5)throw new Error('Arm has zero length.');
     tmpVecB.set((side==='left'?1:-1)*Math.sin(ARM_REST_ANGLE),-Math.cos(ARM_REST_ANGLE),.04).normalize();
@@ -92,9 +99,9 @@ export async function createLabRunnerCharacter(source){
     axes.set(key,WORLD_AXES.map(axis=>axis.clone().applyQuaternion(tmpQuatA)));
   }
   const rigEntries=Object.entries(rig).map(([key,bone])=>({key,bone,base:bases.get(key),axes:axes.get(key)}));
-  const pose={};for(const key of Object.keys(BONE_MAPPING))pose[key]=new Float32Array(3);
+  const pose={},poseKeys=Object.keys(BONE_MAPPING);for(const key of poseKeys)pose[key]=new Float32Array(3);
   const set=(key,x=0,y=0,z=0)=>{const p=pose[key];p[0]=x;p[1]=y;p[2]=z;};
-  const resetPose=()=>{for(const key of Object.keys(pose))pose[key].fill(0);};
+  const resetPose=()=>{for(const key of poseKeys)pose[key].fill(0);};
 
   let gaitPhase=0,elapsed=0,bodyOffset=0,groundCorrection=0,landingPulse=0,landingStrength=.65,slideBlend=0,slideEntryPulse=0,slideExitPulse=0;
   let wasGrounded=true,wasSliding=false,lastHalfStep=0,lastAirPhase='grounded';
@@ -139,7 +146,7 @@ export async function createLabRunnerCharacter(source){
     set('neck',-lean*.38,-lateral*.012);
     set('head',-lean*.26+Math.sin(elapsed*.72)*.006,-lateral*.016+Math.sin(elapsed*.48)*.008);
 
-    for(const side of ['left','right']){
+    for(const side of SIDES){
       const left=side==='left',local=gaitPhase+(left?0:Math.PI),swing=Math.sin(local),contact=Math.max(0,Math.cos(local)),flight=Math.max(0,-Math.cos(local));
       const plant=smooth01((contact-.25)/.68),armSwing=swing*(.44+.20*speedT);
       set(side+'Shoulder',.015+flight*.018,0,(left?-1:1)*(.018+lateral*.008));
@@ -181,7 +188,7 @@ export async function createLabRunnerCharacter(source){
     set('neck',-.035-.06*hang+.06*prep);
     set('head',-.025-.045*hang+.045*prep);
 
-    for(const side of ['left','right']){
+    for(const side of SIDES){
       const sign=side==='left'?1:-1,asym=sign*Math.sin(jumpAge*8)*.035*(1-hang);
       const thigh=-.30*compact-.20*heightT-.16*anticipation+.18*prep+asym;
       const shin=.44*compact+.32*heightT+.38*anticipation-.28*prep;
@@ -200,13 +207,8 @@ export async function createLabRunnerCharacter(source){
   function blendSlide(offset){
     if(slideBlend<=.001&&slideExitPulse<=.001)return offset;
     const t=slideBlend,entry=slideEntryPulse,exit=slideExitPulse;
-    const slide={
-      hips:[.34,0,0],spine:[.70,0,0],chest:[.22,0,0],neck:[-.43,0,0],head:[-.29,0,0],
-      leftThigh:[-1.48,0,.055],leftShin:[1.96,0,0],leftFoot:[-.48,0,0],leftShoulder:[.09,0,-.025],leftUpperArm:[.50,0,.075],leftForearm:[-1.06,0,0],leftHand:[-.10,0,0],
-      rightThigh:[-1.48,0,-.055],rightShin:[1.96,0,0],rightFoot:[-.48,0,0],rightShoulder:[.09,0,.025],rightUpperArm:[.50,0,-.075],rightForearm:[-1.06,0,0],rightHand:[-.10,0,0]
-    };
-    for(const key of Object.keys(slide)){
-      const p=pose[key],target=slide[key];p[0]=THREE.MathUtils.lerp(p[0],target[0],t);p[1]=THREE.MathUtils.lerp(p[1],target[1],t);p[2]=THREE.MathUtils.lerp(p[2],target[2],t);
+    for(const key of SLIDE_KEYS){
+      const p=pose[key],target=SLIDE_POSE[key];p[0]=THREE.MathUtils.lerp(p[0],target[0],t);p[1]=THREE.MathUtils.lerp(p[1],target[1],t);p[2]=THREE.MathUtils.lerp(p[2],target[2],t);
     }
     if(exit>.001){
       const p=pose.spine;p[0]-=.06*exit;
@@ -221,7 +223,7 @@ export async function createLabRunnerCharacter(source){
     const impact=t*t*strength;
     pose.hips[0]+=.20*impact;pose.spine[0]+=.14*impact;pose.chest[0]-=.04*impact;
     pose.neck[0]-=.07*impact;pose.head[0]-=.05*impact;
-    for(const side of ['left','right']){
+    for(const side of SIDES){
       pose[side+'Thigh'][0]-=.30*impact;
       pose[side+'Shin'][0]+=.58*impact;
       pose[side+'Foot'][0]-=.12*impact;
@@ -234,9 +236,9 @@ export async function createLabRunnerCharacter(source){
   resetPose();
   const idleBreath=Math.sin(elapsed*1.7);
   set('spine',-.012+idleBreath*.006);set('chest',idleBreath*.008);set('neck',-.008);
-  for(const side of ['left','right']){set(side+'UpperArm',0);set(side+'Forearm',-.14);set(side+'Thigh',-.035);set(side+'Shin',.09);set(side+'Foot',-.045);}
+  for(const side of SIDES){set(side+'UpperArm',0);set(side+'Forearm',-.14);set(side+'Thigh',-.035);set(side+'Shin',.09);set(side+'Foot',-.045);}
   applyPose(0,1);model.updateWorldMatrix(true,true);
-  for(const side of ['left','right'])if(worldDirection(rig[side+'UpperArm'],rig[side+'Forearm'],tmpVecA).y>-.55)throw new Error('Idle arm validation failed.');
+  for(const side of SIDES)if(worldDirection(rig[side+'UpperArm'],rig[side+'Forearm'],tmpVecA).y>-.55)throw new Error('Idle arm validation failed.');
   model.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});box.setFromObject(model,true);model.position.y-=box.min.y;model.updateWorldMatrix(true,true);root.rotation.y=Math.PI/2;model.visible=true;
 
   function footHeight(){
@@ -287,7 +289,7 @@ export async function createLabRunnerCharacter(source){
       else{
         const breath=Math.sin(elapsed*1.7);
         set('spine',-.012+breath*.006);set('chest',breath*.008);set('neck',-.008);set('head',Math.sin(elapsed*.7)*.006,Math.sin(elapsed*.5)*.009);
-        for(const side of ['left','right']){set(side+'UpperArm',0);set(side+'Forearm',-.14);set(side+'Thigh',-.035);set(side+'Shin',.09);set(side+'Foot',-.045);}
+        for(const side of SIDES){set(side+'UpperArm',0);set(side+'Forearm',-.14);set(side+'Thigh',-.035);set(side+'Shin',.09);set(side+'Foot',-.045);}
         offset=breath*.003;
       }
       offset=blendSlide(offset);
