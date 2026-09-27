@@ -52,6 +52,7 @@ export function setupDashMenu(){
   // after an avatar is explicitly ready.
   const start=document.querySelector('#dash-start');
   if(start){
+    start.disabled=false;
     start.classList.remove('primary','original-dash-start');
     start.classList.add('screen-primary');
     start.textContent='START GAME';
