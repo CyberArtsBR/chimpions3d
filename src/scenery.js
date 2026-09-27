@@ -4,6 +4,12 @@ import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './ph
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
 import {createTrackedLoadingManager,prefetchVisualAsset,versionedAssetUrl} from './assetRuntime.js';
 
+export const TREE_SCROLL_PER_SCREEN=.32;
+export const wrap01=value=>((value%1)+1)%1;
+export function computeTreeScroll(cameraY,origin,viewHeight,speedFactor=1){
+ return Math.max(0,cameraY-(origin??cameraY))/Math.max(.001,viewHeight)*TREE_SCROLL_PER_SCREEN*speedFactor;
+}
+
 function rng(seed){return()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function canvasTexture(w,h,draw){
  const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
@@ -229,7 +235,44 @@ export function createScenery(scene,renderer){
  // High detail uses the authored canopy image as a distant plate; Balanced uses only the layered forest.
  let viewWidth=20,viewHeight=14,currentCamera=5;
  let treeCameraOrigin=null,treeClimbOffset=0;
- const TREE_CLIMB_PARALLAX=.07;
+ let treeScrollBias=0,treeRepeatY=1,treeScrollSpeedFactor=1;
+ // A soft overlap is required even for the prepared strip: its edges are not pixel-seamless.
+ let treeOverlap=.12;
+ const treePhase=()=>wrap01(treeClimbOffset*treeRepeatY+treeScrollBias);
+ function updateTreeScroll(){
+  const factor=document.body?.dataset?.reducedMotion==='true'?.25:1;
+  if(factor!==treeScrollSpeedFactor){
+   const previous=computeTreeScroll(currentCamera,treeCameraOrigin,viewHeight,treeScrollSpeedFactor);
+   const next=computeTreeScroll(currentCamera,treeCameraOrigin,viewHeight,factor);
+   treeScrollBias=wrap01(treeScrollBias+(previous-next)*treeRepeatY);
+   treeScrollSpeedFactor=factor;
+  }
+  treeClimbOffset=computeTreeScroll(currentCamera,treeCameraOrigin,viewHeight,treeScrollSpeedFactor);
+ }
+ function configureTreeMaterial(material){
+  material.onBeforeCompile=shader=>{
+   shader.uniforms.treeOverlap={value:treeOverlap};
+   shader.fragmentShader='uniform float treeOverlap;\n'+shader.fragmentShader;
+   shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
+    #ifdef USE_MAP
+     vec2 treeUV=vMapUv;
+     // Increasing V samples higher bark, which moves the image DOWN on screen.
+     float treePeriod=1.0-treeOverlap;
+     float treeY=treeOverlap+fract(treeUV.y)*treePeriod;
+     // Derivatives must come from continuous UVs, before fract/branch, to avoid a mip seam.
+     vec2 treeDx=dFdx(vec2(treeUV.x,treeUV.y*treePeriod));
+     vec2 treeDy=dFdy(vec2(treeUV.x,treeUV.y*treePeriod));
+     vec4 treeSample=textureGrad(map,vec2(treeUV.x,treeY),treeDx,treeDy);
+     if(treeOverlap>0.0 && treeY>treePeriod){
+      vec4 nextSample=textureGrad(map,vec2(treeUV.x,treeY-treePeriod),treeDx,treeDy);
+      treeSample=mix(treeSample,nextSample,smoothstep(treePeriod,1.0,treeY));
+     }
+     diffuseColor*=treeSample;
+    #endif
+   `);
+  };
+  material.customProgramCacheKey=()=>'tree-overlap-v1';
+ }
  const treeTextures=new Map(),treeRequests=new Set();
  function refreshBackground(){
   forest.forEach((m,i)=>{m.visible=background.visible&&(highQuality||i>0);});
@@ -240,17 +283,22 @@ export function createScenery(scene,renderer){
   if(!treeImageMesh?.material.map)return;const map=treeImageMesh.material.map,image=map.image;if(!image?.width||!image?.height)return;
   const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;let repeatX=1,repeatY=1;
   if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;else repeatY=imageAspect/viewAspect;
-  const marginX=(1-repeatX)/2,marginY=(1-repeatY)/2;map.repeat.set(repeatX,repeatY);map.offset.set(marginX,marginY+Math.sin(currentCamera*.012)*Math.min(.035,marginY*.65));
-  treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);treeImageMesh.position.set(0,currentCamera-treeClimbOffset,-8);
+  const oldPhase=treePhase();
+  const period=1-treeOverlap;
+  repeatY/=period;
+  if(treeRepeatY!==repeatY){treeRepeatY=repeatY;treeScrollBias=wrap01(oldPhase-treeClimbOffset*repeatY);}
+  const marginX=(1-repeatX)/2,marginY=(.5-treeOverlap)/period-repeatY/2;
+  map.repeat.set(repeatX,repeatY);map.offset.set(marginX,wrap01(marginY+treePhase()));
+  treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);treeImageMesh.position.set(0,currentCamera,-8);
  }
  function loadTree(){
   if(!runtimeAssetsActive||!highQuality||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
-  if(treeTextures.has(kind)){
-   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xd4d4d4,toneMapped:false,fog:false,transparent:true,opacity:.72,depthWrite:false}));background.add(treeImageMesh);}
-   treeImageMesh.material.map=treeTextures.get(kind);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
+  if(treeTextures.has(url)){
+   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xd4d4d4,toneMapped:false,fog:false,transparent:true,opacity:.72,depthWrite:false}));configureTreeMaterial(treeImageMesh.material);background.add(treeImageMesh);}
+   treeImageMesh.material.map=treeTextures.get(url);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
   }
-  if(treeRequests.has(kind))return;treeRequests.add(kind);
-  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.ClampToEdgeWrapping;map.anisotropy=4;treeTextures.set(kind,map);loadTree();invalidateStaticFrame();},undefined,()=>console.warn('Tree image unavailable; layered forest remains.'));
+  if(treeRequests.has(url))return;treeRequests.add(url);
+  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;map.anisotropy=4;treeTextures.set(url,map);loadTree();invalidateStaticFrame();},undefined,()=>{treeRequests.delete(url);console.warn('Tree image unavailable; layered forest remains.');});
  }
  function prefetchRuntimeAssets(){
   runtimePrefetchRequested=true;
@@ -264,6 +312,7 @@ export function createScenery(scene,renderer){
   fetch(import.meta.env.BASE_URL+'asset-manifest.json').then(r=>r.ok?r.json():{}).catch(()=>({}))
  ]).then(([config,manifest])=>{
   platformConfig=config;
+  treeOverlap=Math.max(0,Math.min(.25,Number(config.treeScrollOverlap??.12)||0));
   assetHashes=new Map((manifest.assets||[]).map(asset=>[asset.path,asset.sha256]));
   if(runtimePrefetchRequested)prefetchRuntimeAssets();
   loadPlatform();loadTree();
@@ -408,6 +457,13 @@ export function createScenery(scene,renderer){
   get backgroundReady(){return !!treeImageMesh?.visible;},
   get treeVisible(){return forest.some(m=>m.visible)||!!treeImageMesh?.visible;},
   get treeClimbOffset(){return treeClimbOffset;},
+  get treeScrollDiagnostics(){return {
+   treeScrollNormalized:treePhase(),treeScrollScreens:Math.max(0,currentCamera-(treeCameraOrigin??currentCamera))/Math.max(.001,viewHeight),
+   treeScrollSpeedFactor,treeWrapEnabled:treeImageMesh?.material.map?.wrapT===THREE.RepeatWrapping,
+   treeTextureKind:treeImageMesh?.material.map?'overlap-strip':'forest-fallback',
+   treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
+   treeAuthoredVisible:!!treeImageMesh?.visible,treeTextureOffset:treeImageMesh?.material.map?.offset.y??0
+  };},
   get pooledBranches(){return pooledBranchCount;},
   prefetchRuntimeAssets,
   prepareRuntimeAssets(){
@@ -416,7 +472,7 @@ export function createScenery(scene,renderer){
    loadTree();
    invalidateStaticFrame();
   },
-  resize(width,height){viewWidth=width;viewHeight=height;if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();fitTree();invalidateStaticFrame();},
+  resize(width,height){const phase=treePhase();viewWidth=Math.max(.001,width);viewHeight=Math.max(.001,height);updateTreeScroll();treeScrollBias=wrap01(phase-treeClimbOffset*treeRepeatY);if(runtimePrefetchRequested)prefetchRuntimeAssets();loadTree();fitTree();invalidateStaticFrame();},
   burst(event){
    if(document.body?.dataset?.reducedMotion==='true')return;
    const colors={spring:0xffb94f,leaf:0xaee77b,swing:0x77d9c7,vanish:0xb792ff,cracked:0xe8b271,hazard:0xff765f,jet:0x7cecff,milestone:0xffe47a,coin:0xffdf79};
@@ -439,17 +495,17 @@ export function createScenery(scene,renderer){
    if(!active&&!staticRenderDirty)return;
    currentCamera=cameraY;
    if(treeCameraOrigin===null)treeCameraOrigin=cameraY;
-   treeClimbOffset=Math.max(0,cameraY-treeCameraOrigin)*TREE_CLIMB_PARALLAX;
+   updateTreeScroll();
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
-    if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=Math.sin(time*.018)*.13;treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}
+    if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xd4d4d4).lerp(palette,.10+night*.3);}
     const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1);mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;mistMaterial.opacity=.12+mist*.46;mistLayers.visible=mistMaterial.opacity>.01;moss.roughness=.96-mist*.3;bark.roughness=.87-mist*.25;
    }else mistLayers.visible=false;
    wrapAge+=dt;if(wrapAge<.45){wrapCues.visible=true;cueMaterial.opacity=Math.max(0,1-wrapAge/.4)*.7;for(const cue of wrapCues.children)cue.scale.setScalar(1+Math.min(wrapAge,1)*2);}else{wrapCues.visible=false;cueMaterial.opacity=0;}
    ringAge+=dt;if(ringAge<.3){ring.visible=true;ring.material.opacity=Math.max(0,1-ringAge*4)*.65;ring.scale.setScalar(1+ringAge*3);}else{ring.visible=false;ring.material.opacity=0;}
    if(sparks.length){for(const s of sparks){s.age+=dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy-=3*dt;}while(sparks.length&&(sparks[0].age>.7||sparks.length>48))sparks.shift();if(sparks.length){for(let i=0;i<48;i++){const s=sparks[i];particlePositions[i*3]=s?s.x:0;particlePositions[i*3+1]=s?s.y:-10000;particlePositions[i*3+2]=s?s.z:0;}particleGeo.attributes.position.needsUpdate=true;particles.visible=true;}else particles.visible=false;}
   },
-  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;fitTree();invalidateStaticFrame();},
+  reset(){sparks.length=0;particles.visible=false;ringAge=1;ring.visible=false;wrapAge=1;wrapCues.visible=false;cueMaterial.opacity=0;lastJetTrailAt=-1;treeCameraOrigin=null;treeClimbOffset=0;treeScrollBias=0;treeScrollSpeedFactor=document.body?.dataset?.reducedMotion==='true'?.25:1;fitTree();invalidateStaticFrame();},
   setQuality(profile,options={}){
    activeVisualProfile=typeof profile==='object'&&profile?profile:{profile:profile?'high':'balanced',highScenery:!!profile};
    visualConstraints={constrained:!!options.constrained};
