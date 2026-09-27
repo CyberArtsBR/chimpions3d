@@ -52,7 +52,7 @@ export function createDashWorldRenderer(options){return new DashWorldRenderer(op
 class DashWorldRenderer{
   constructor({scene,camera,renderer,hemisphere,keyLight,rimLight,pixelsToWorld=1/40}){
     this.scene=scene;this.camera=camera;this.renderer=renderer;this.hemisphere=hemisphere;this.keyLight=keyLight;this.rimLight=rimLight;this.unit=pixelsToWorld;
-    this.viewW=20;this.viewH=12;this.groundY=-4;this.scroll=0;this.stage=1;this.time=0;this.environmentRoot=new THREE.Group();this.environmentRoot.name='dash-gpu-environment';scene.add(this.environmentRoot);
+    this.viewW=20;this.viewH=12;this.groundY=-4;this.scroll=0;this.stage=1;this.time=0;this.highVisibility=false;this.reducedMotion=false;this.screenShake=true;this.shakeAmount=0;this.environmentRoot=new THREE.Group();this.environmentRoot.name='dash-gpu-environment';scene.add(this.environmentRoot);
     this.gameplayRoot=new THREE.Group();this.gameplayRoot.name='dash-gpu-gameplay';scene.add(this.gameplayRoot);
     this.random=seeded(0x43a991);this.profile=DASH_BIOMES[0];this.qualityName=resolveDashQuality();this.quality=getDashQualityPreset(this.qualityName);
     this.hazardMap=new Map();this.hazardPools=new Map();this.hazardMaterials=[];this.disposables=[];
@@ -75,7 +75,8 @@ class DashWorldRenderer{
       shaft:basic({color:0xfff1ba,transparent:true,opacity:.08,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}),
       moon:basic({color:0xdce6ff,transparent:true,opacity:.9,depthWrite:false}),
       glow:basic({map:makeSoftTexture(),color:0xffe890,transparent:true,opacity:.35,depthWrite:false,blending:THREE.AdditiveBlending}),
-      shadow:basic({map:makeShadowTexture(),transparent:true,opacity:.7,depthWrite:false,color:0x0b1a13})
+      shadow:basic({map:makeShadowTexture(),transparent:true,opacity:.7,depthWrite:false,color:0x0b1a13}),
+      hazardOutline:basic({color:0xfff2a8,wireframe:true,transparent:true,opacity:.86,depthTest:false,depthWrite:false})
     };
     this.disposables.push(this.mat.ground.map,this.mat.glow.map,this.mat.shadow.map);
   }
@@ -121,10 +122,19 @@ class DashWorldRenderer{
     const api={
       get quality(){return this._owner.qualityName;},
       setQuality:name=>this.setQuality(name),
+      setAccessibility:settings=>this.setAccessibility(settings),
       stats:()=>this.stats(),_owner:this
     };globalThis.chimpionsDashGraphics=api;
   }
   setQuality(name){const key=String(name||'').toUpperCase();if(!DASH_QUALITY_PRESETS[key])throw new Error('Dash quality must be LOW, BALANCED, HIGH, or ULTRA.');storeDashQuality(key);this.applyQuality(key,true);return key;}
+  setAccessibility({highVisibility=this.highVisibility,reducedMotion=this.reducedMotion,screenShake=this.screenShake}={}){
+    this.highVisibility=!!highVisibility;this.reducedMotion=!!reducedMotion;this.screenShake=!!screenShake;this.vfx?.setReducedMotion(this.reducedMotion);
+    const applyGroup=group=>{const outline=group?.getObjectByName?.('dash-high-visibility-outline');if(outline)outline.visible=this.highVisibility;};
+    for(const entry of this.hazardMap.values())applyGroup(entry.group);for(const pool of this.hazardPools.values())for(const group of pool)applyGroup(group);
+    this.mat.banana.emissiveIntensity=this.highVisibility?1.05:.2;
+    if(!this.screenShake||this.reducedMotion){this.shakeAmount=0;this.camera.position.x=0;this.camera.position.y=0;}
+    return{highVisibility:this.highVisibility,reducedMotion:this.reducedMotion,screenShake:this.screenShake};
+  }
   applyQuality(name,persisted){
     this.qualityName=name;this.quality=getDashQualityPreset(name);this.pixelRatioCap=this.quality.pixelRatio;this.vfx?.setQuality(this.quality);
     this.renderer.shadowMap.enabled=this.quality.shadows;this.keyLight.castShadow=this.quality.shadows;const map=this.quality.shadowMap;this.keyLight.shadow.mapSize.set(map,map);if(this.keyLight.shadow.map){this.keyLight.shadow.map.dispose();this.keyLight.shadow.map=null;}
@@ -210,6 +220,7 @@ class DashWorldRenderer{
       case'canopy':wood(0,h*.7,w*.95,h*.18,-.08);for(let i=0;i<7;i++)leaf((i/6-.5)*w*.86,h*(.52+.12*(i%2)),.28,.5,(i-3)*.22);break;
       default:this.createMesh(u.box,this.mat.stone,g,{x:0,y:h*.5,z:.08,sx:w,sy:h,sz:.5});
     }
+    const outline=this.createMesh(u.box,this.mat.hazardOutline,g,{x:0,y:h*.5,z:.42,sx:w*1.08,sy:h*1.08,sz:.7,cast:false});outline.name='dash-high-visibility-outline';outline.visible=this.highVisibility;outline.renderOrder=22;
     const shadow=this.createMesh(u.circle,this.mat.shadow,g,{x:0,y:.03,z:-.02,sx:w*.85,sy:.18,sz:1,cast:false});shadow.material=this.mat.shadow;g.userData.type=type.id;return g;
   }
   acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
@@ -228,21 +239,22 @@ class DashWorldRenderer{
     }
     this.bananaMesh.count=regular;this.goldenMesh.count=golden;this.goldenGlow.count=golden;this.bananaMesh.instanceMatrix.needsUpdate=true;this.goldenMesh.instanceMatrix.needsUpdate=true;this.goldenGlow.instanceMatrix.needsUpdate=true;
   }
-  emit(type,payload={}){this.vfx.emit(type,payload);}
+  emit(type,payload={}){if(this.screenShake&&!this.reducedMotion&&['land','nearMiss','stage','death','record'].includes(type))this.shakeAmount=Math.max(this.shakeAmount,type==='death'||type==='record'?.18:type==='stage'?.11:.065);this.vfx.emit(type,payload);}
   consumeGameplayEvent(detail={}){
     const type=detail.type||detail.name;if(!type)return;const aliases={'golden-banana':'goldenBanana','perfect-jump':'perfectJump','perfect-slide':'perfectSlide','near-miss':'nearMiss','stage-change':'stage'};this.emit(aliases[type]||type,detail);
   }
-  reset(){this.vfx.reset();}
+  reset(){this.vfx.reset();this.shakeAmount=0;this.camera.position.x=0;this.camera.position.y=0;}
   update({dt=0,time=0,scroll=0,stage=1,speed=1,baseSpeed=1,obstacles=[],bananas=[],playerX=0,playerY=0,sliding=false,state='menu',flow=0}={}){
     this.time=time;this.scroll=scroll;this.stage=stage;const speedRatio=Math.max(.2,speed/Math.max(1,baseSpeed)),features=this.applyBiome(stage,time);this.updateEnvironment(scroll,time,speedRatio,features);this.syncHazards(obstacles,scroll);this.syncBananas(bananas,scroll,time);
     const jumpWorld=Math.max(0,playerY),shadowScale=clamp(1-jumpWorld/4.2,.46,1),shadowOpacity=clamp(.72-jumpWorld*.12,.16,.72);this.contactShadow.position.set(playerX,this.groundY+.02,-.04);this.contactShadow.scale.set(2.35*shadowScale,.5*shadowScale,1);this.contactShadowMaterial.opacity=shadowOpacity;
     this.vfx.update(dt,{time,speedRatio,playerX,groundY:this.groundY,state,pollen:features.pollen,storm:features.storm,viewW:this.viewW,viewH:this.viewH});
-    this.foregroundLeaves.visible=state!=='menu'||this.qualityName!=='LOW';this.goldenGlow.material.opacity=.22+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=.75+.35*Math.sin(time*4.7);
+    if(this.screenShake&&!this.reducedMotion&&this.shakeAmount>0){this.camera.position.x=Math.sin(time*67)*this.shakeAmount;this.camera.position.y=Math.cos(time*53)*this.shakeAmount*.65;this.shakeAmount=Math.max(0,this.shakeAmount-dt*1.8);}else{this.camera.position.x=0;this.camera.position.y=0;}
+    this.foregroundLeaves.visible=state!=='menu'||this.qualityName!=='LOW';this.goldenGlow.material.opacity=(this.highVisibility?.5:.22)+.12*Math.sin(time*5.3);this.mat.golden.emissiveIntensity=(this.highVisibility?1.45:.75)+.35*Math.sin(time*4.7);
     this.renderer.domElement.style.setProperty('--dash-speed-grade',String(clamp((speedRatio-1)*.08,0,.12)));
     if(flow>=80&&state==='running'&&Math.floor(time*2)!==this._lastFlowPulse){this._lastFlowPulse=Math.floor(time*2);this.vfx.emit('flow',{x:playerX,y:this.groundY+.75,intensity:.35});}
   }
   render(){this.renderer.render(this.scene,this.camera);}
-  stats(){return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count};}
+  stats(){const highlightedHazards=[...this.hazardMap.values()].filter(entry=>entry.group.getObjectByName('dash-high-visibility-outline')?.visible).length;return{quality:this.qualityName,pixelRatio:this.renderer.getPixelRatio(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles,hazards:this.hazardMap.size,highlightedHazards,bananaInstances:this.bananaMesh.count+this.goldenMesh.count,environmentInstances:this.farCanopy.count+this.midTrunks.count+this.midCanopy.count+this.groundStones.count+this.grass.count+this.foregroundLeaves.count+this.ruins.count,accessibility:{highVisibility:this.highVisibility,reducedMotion:this.reducedMotion,screenShake:this.screenShake},shakeAmount:this.shakeAmount,vfx:this.vfx.stats()};}
   dispose(){
     globalThis.removeEventListener?.('chimpions-dash-event',this.eventListener);document.documentElement.classList.remove('dash-gpu-world');this.vfx.dispose();
     for(const entry of this.hazardMap.values())this.releaseHazard(entry);this.hazardMap.clear();this.scene.remove(this.environmentRoot,this.gameplayRoot);
