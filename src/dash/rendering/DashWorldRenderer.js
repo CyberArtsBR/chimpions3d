@@ -226,7 +226,7 @@ class DashWorldRenderer{
     const halo=new THREE.Sprite(this.hazardHaloMaterial);halo.position.set(0,h*.5,.01);halo.scale.set(w*1.3,Math.max(.75,h*1.45),1);halo.renderOrder=3;halo.visible=this.highVisibility;g.add(halo);
     g.userData.type=type.id;g.userData.visibilityHalo=halo;return g;
   }
-  acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;this.gameplayRoot.add(group);return{group,typeId:type.id};}
+  acquireHazard(type){const pool=this.hazardPools.get(type.id)||[];let group=pool.pop();if(!group)group=this.buildHazard(type);this.hazardPools.set(type.id,pool);group.visible=true;if(group.userData.visibilityHalo)group.userData.visibilityHalo.visible=this.highVisibility;this.gameplayRoot.add(group);return{group,typeId:type.id};}
   releaseHazard(entry){entry.group.visible=false;this.gameplayRoot.remove(entry.group);const pool=this.hazardPools.get(entry.typeId)||[];if(pool.length<10)pool.push(entry.group);this.hazardPools.set(entry.typeId,pool);}
   syncHazards(obstacles,scroll){
     const live=new Set(obstacles);
