@@ -4,7 +4,6 @@ import {WIDTH, VINE_INSET, PLATFORM_SCALE, ITEM_SCALE, BANANA_HEIGHT} from './ph
 import {allowsDesktopDetail,applyVisualDetailBudget} from './mobileVisualBudget.js';
 import {createTrackedLoadingManager,prefetchVisualAsset,versionedAssetUrl} from './assetRuntime.js';
 import {createCanopyArt} from './canopyArt.js';
-import {createCanopyPlatforms} from './canopyPlatforms.js';
 import {createCanopyVfx} from './canopyVfx.js';
 
 export const TREE_SCROLL_PER_SCREEN=.32;
@@ -113,7 +112,7 @@ const arrowShape=new THREE.Shape();arrowShape.moveTo(-.7,-.25);arrowShape.lineTo
 const arrowGeo=new THREE.ExtrudeGeometry(arrowShape,{depth:.12,bevelEnabled:true,bevelSize:.04,bevelThickness:.04,bevelSegments:1,steps:1}),dummy=new THREE.Object3D();
 
 export function createScenery(scene,renderer){
- const canopyArt=createCanopyArt(scene),canopyPlatforms=createCanopyPlatforms(),canopyVfx=createCanopyVfx(scene);
+ const canopyArt=createCanopyArt(scene),canopyVfx=createCanopyVfx(scene);
  const bark=new THREE.MeshStandardMaterial({color:0xc5a782,map:barkTexture,bumpMap:barkRelief,bumpScale:.055,roughness:.87});
  const moss=new THREE.MeshStandardMaterial({color:0xa8bd79,map:mossTexture,bumpMap:mossRelief,bumpScale:.045,roughness:.96});
  const leaf=new THREE.MeshStandardMaterial({map:leafTexture,alphaTest:.35,side:THREE.DoubleSide,roughness:.88});
@@ -251,8 +250,8 @@ export function createScenery(scene,renderer){
   }
  }
  // The old procedural low-poly trunk and its surrounding ivy have been removed entirely.
- // Balanced and High use the layered forest; High renders it with maximum desktop quality.
- // Ultra keeps the authored scrolling tree plate.
+ // Low/Balanced keep the lightweight layered forest fallback. High/Ultra use the
+ // authored portrait/landscape premium canopy artwork from environment.json.
  let viewWidth=20,viewHeight=14,currentCamera=5;
  let treeCameraOrigin=null,treeClimbOffset=0;
  let treeScrollBias=0,treeRepeatY=1,treeScrollSpeedFactor=1;
@@ -304,25 +303,55 @@ export function createScenery(scene,renderer){
   invalidateStaticFrame();
  }
  function fitTree(){
-  if(!treeImageMesh?.material.map)return;const map=treeImageMesh.material.map,image=map.image;if(!image?.width||!image?.height)return;
-  const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;let repeatX=1,repeatY=1;
-  if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;else repeatY=imageAspect/viewAspect;
+  if(!treeImageMesh?.material.map)return;
+  const map=treeImageMesh.material.map,image=map.image;
+  if(!image?.width||!image?.height)return;
+  const viewAspect=viewWidth/viewHeight,imageAspect=image.width/image.height;
+  let repeatX=1,repeatY=1;
+  if(imageAspect>viewAspect)repeatX=viewAspect/imageAspect;
+  else repeatY=imageAspect/viewAspect;
+
+  const coverMode=platformConfig?.treeImageMode==='cover';
+  if(coverMode){
+   // The premium mountain/canopy paintings are authored scenic plates, not
+   // seamless strips. Crop them like CSS background-size: cover and never tile.
+   map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.ClampToEdgeWrapping;
+   map.repeat.set(repeatX,repeatY);
+   map.offset.set((1-repeatX)/2,(1-repeatY)/2);
+   treeRepeatY=1;
+   treeImageMesh.scale.set(viewWidth*1.10,viewHeight*1.10,1);
+   treeImageMesh.position.set(0,currentCamera,-8);
+   return;
+  }
+
   const oldPhase=treePhase();
   const period=1-treeOverlap;
   repeatY/=period;
   if(treeRepeatY!==repeatY){treeRepeatY=repeatY;treeScrollBias=wrap01(oldPhase-treeClimbOffset*repeatY);}
   const marginX=(1-repeatX)/2,marginY=(.5-treeOverlap)/period-repeatY/2;
+  map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;
   map.repeat.set(repeatX,repeatY);map.offset.set(marginX,wrap01(marginY+treePhase()));
   treeImageMesh.scale.set(viewWidth*1.04,viewHeight*1.04,1);treeImageMesh.position.set(0,currentCamera,-8);
  }
  function loadTree(){
   if(!runtimeAssetsActive||!highQuality||activeVisualProfile.backgroundMode!=='authored-tree'||!platformConfig?.treeImages)return;const kind=viewWidth>viewHeight?'landscape':'portrait',url=platformConfig.treeImages[kind];if(!url)return;
   if(treeTextures.has(url)){
-   if(!treeImageMesh){treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false,transparent:false,opacity:1,depthWrite:false}));configureTreeMaterial(treeImageMesh.material);background.add(treeImageMesh);}
+   if(!treeImageMesh){
+    treeImageMesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false,transparent:false,opacity:1,depthWrite:false}));
+    if(platformConfig?.treeImageMode!=='cover')configureTreeMaterial(treeImageMesh.material);
+    background.add(treeImageMesh);
+   }
    treeImageMesh.material.map=treeTextures.get(url);treeImageMesh.material.needsUpdate=true;fitTree();refreshBackground();return;
   }
   if(treeRequests.has(url))return;treeRequests.add(url);
-  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{map.colorSpace=THREE.SRGBColorSpace;map.wrapS=THREE.ClampToEdgeWrapping;map.wrapT=THREE.RepeatWrapping;map.anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));treeTextures.set(url,map);loadTree();invalidateStaticFrame();},undefined,()=>{treeRequests.delete(url);console.warn('Tree image unavailable; layered forest remains.');});
+  new THREE.TextureLoader(createTrackedLoadingManager('environment-texture')).load(controlledAssetUrl(url),map=>{
+   map.colorSpace=THREE.SRGBColorSpace;
+   map.wrapS=THREE.ClampToEdgeWrapping;
+   map.wrapT=platformConfig?.treeImageMode==='cover'?THREE.ClampToEdgeWrapping:THREE.RepeatWrapping;
+   map.minFilter=THREE.LinearMipmapLinearFilter;map.magFilter=THREE.LinearFilter;
+   map.anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));
+   treeTextures.set(url,map);treeRequests.delete(url);loadTree();invalidateStaticFrame();
+  },undefined,()=>{treeRequests.delete(url);console.warn('Premium background unavailable; layered forest remains.');});
  }
  function prefetchRuntimeAssets(){
   runtimePrefetchRequested=true;
@@ -409,7 +438,7 @@ export function createScenery(scene,renderer){
   instances(tipGeo,dark,coin,fruitCount*2,(i,o)=>{const fruit=Math.floor(i/2);fruitPosition(fruit,o);endpoint.copy(i%2?bananaPath.v2:bananaPath.v0).applyEuler(o.rotation);o.position.add(endpoint);o.scale.set(.56,.8,.62);});
   const roots=new THREE.Group();group.add(roots);instances(logGeo,branchBark,roots,2+variant,(i,o)=>{o.position.set((i/(variant+1)-.5)*p.width*.7,-.48,.02);o.scale.set(.1,.45+((i+variant)%3)*.1,.1);o.rotation.z=Math.sin(i+variant)*.25;});
   const offshoots=new THREE.Group();group.add(offshoots);instances(logGeo,branchBark,offshoots,1+(variant%3),(i,o)=>{const side=i%2?1:-1;o.position.set(side*p.width*(.24+i*.07),-.43,-.08+i*.05);o.scale.set(.11,.34+variant*.055,.11);o.rotation.z=side*(.62+variant*.13+i*.16);});
-  group.userData.coin=coin;canopyPlatforms.decorate(group,p);attachPlatform(group);armBranchPooling(group);return group;
+  group.userData.coin=coin;attachPlatform(group);armBranchPooling(group);return group;
  }
 
  function hazard(h){
@@ -486,7 +515,7 @@ export function createScenery(scene,renderer){
   get treeScrollDiagnostics(){return {
    treeScrollNormalized:treePhase(),treeScrollScreens:Math.max(0,currentCamera-(treeCameraOrigin??currentCamera))/Math.max(.001,viewHeight),
    treeScrollSpeedFactor,treeWrapEnabled:treeImageMesh?.material.map?.wrapT===THREE.RepeatWrapping,
-   treeTextureKind:treeImageMesh?.material.map?'overlap-strip':'forest-fallback',
+   treeTextureKind:treeImageMesh?.material.map?(platformConfig?.treeImageMode==='cover'?'premium-cover':'overlap-strip'):'forest-fallback',
    treeCameraOrigin,treeMeshY:treeImageMesh?.position.y??null,treeCameraY:currentCamera,
    backgroundMode:activeVisualProfile.backgroundMode||'layered-forest',
    forestTextureScale:activeVisualProfile.backgroundTextureScale||1,
@@ -530,7 +559,15 @@ export function createScenery(scene,renderer){
    canopyVfx.update(dt);
    if(background.visible){
     forest.forEach((m,i)=>{if(!m.visible)return;m.position.x=Math.sin(time*(.035+i*.012)+i*1.7)*(.18+i*.22);m.position.y=cameraY+2-Math.sin(cameraY*(.009+i*.003))*(i+1.35);m.material.color.copy(palette).lerp(forestTint,.4+i*.12);});
-    if(treeImageMesh?.visible){fitTree();treeImageMesh.position.x=0;treeImageMesh.material.color.set(0xffffff);}
+    if(treeImageMesh?.visible){
+     fitTree();
+     const coverMode=platformConfig?.treeImageMode==='cover';
+     const reduced=document.body?.dataset?.reducedMotion==='true';
+     // Camera-locked scenic cover with only a restrained distant parallax drift.
+     treeImageMesh.position.x=coverMode&&!reduced?Math.sin(cameraY*.008)*viewWidth*.012:0;
+     treeImageMesh.position.y=currentCamera+(coverMode&&!reduced?Math.sin(cameraY*.011)*viewHeight*.012:0);
+     treeImageMesh.material.color.set(0xffffff);
+    }
     const weight=index=>(biome===index?blend:((biome+3)%4===index?1-blend:0)),mist=weight(1),authoredTreeOnly=highQuality&&!!treeImageMesh?.visible;
     mistLayers.position.y=cameraY;mistLayers.position.x=Math.sin(time*.09)*1.4;
     mistMaterial.opacity=authoredTreeOnly?0:.12+mist*.46;
@@ -547,7 +584,6 @@ export function createScenery(scene,renderer){
    visualConstraints={constrained:!!options.constrained};
    highQuality=!!activeVisualProfile.highScenery&&!visualConstraints.constrained;
    canopyArt.setQuality(activeVisualProfile,visualConstraints);
-   canopyPlatforms.setQuality(activeVisualProfile);
    canopyVfx.setQuality(activeVisualProfile);
    for(const texture of treeTextures.values()){
     const anisotropy=Math.max(1,Math.round(activeVisualProfile.maxAnisotropy||4));
