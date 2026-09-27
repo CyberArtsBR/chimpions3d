@@ -286,7 +286,10 @@ export function createJumpRenderPipeline({renderer,scene,camera,sun,width=innerW
   function applyQuality(next){
     const previous=settings?.profile;
     settings=next;
-    renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio||1,settings.dprCap||1));
+    const deviceDpr=Math.max(1,Number(globalThis.devicePixelRatio)||1);
+    const dprFloor=Math.max(1,Number(settings.dprFloor)||1);
+    const dprCap=Math.max(dprFloor,Number(settings.dprCap)||dprFloor);
+    renderer.setPixelRatio(Math.min(Math.max(deviceDpr,dprFloor),dprCap));
     applyShadows();
     if(previous!==settings.profile||!!composer!==!!settings.postProcessing)buildComposer();
     else{
