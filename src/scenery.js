@@ -444,7 +444,9 @@ export function createScenery(scene,renderer){
 
  const mistMap=canvasTexture(128,64,(c,w,h)=>{const gradient=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);gradient.addColorStop(0,'#d2efdf77');gradient.addColorStop(1,'#d2efdf00');c.fillStyle=gradient;c.fillRect(0,0,w,h);});
  const mistMaterial=new THREE.MeshBasicMaterial({map:mistMap,transparent:true,depthWrite:false,opacity:0}),mistLayers=new THREE.Group();background.add(mistLayers);
- for(let i=0;i<3;i++){const cloud=new THREE.Mesh(new THREE.PlaneGeometry(22,5),mistMaterial);cloud.position.set(i%2?3:-3,(i-1)*5,-2.7);mistLayers.add(cloud);}
+ // One broad feathered mist volume replaces the legacy stacked 22x5 strips that
+ // could read as horizontal bands on tall and ultrawide viewports.
+ const mistCloud=new THREE.Mesh(new THREE.PlaneGeometry(30,18),mistMaterial);mistCloud.position.set(0,0,-2.7);mistLayers.add(mistCloud);
  let wrapAge=1;const wrapCues=new THREE.Group();wrapCues.visible=false;scene.add(wrapCues);const cueMaterial=new THREE.MeshBasicMaterial({color:0xb9ffdb,transparent:true,opacity:0,depthWrite:false});
  for(const side of [-1,1]){const cue=new THREE.Mesh(new THREE.RingGeometry(.26,.32,20),cueMaterial);cue.position.x=side*(WIDTH/2-VINE_INSET);cue.position.z=.8;wrapCues.add(cue);}
  const forestTint=new THREE.Color(0x25483e);
