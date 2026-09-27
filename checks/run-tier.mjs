@@ -25,7 +25,8 @@ const standard=[
   'visual-regression.mjs',
   'dash-physics.mjs',
   'dash-browser.mjs',
-  'dash-mobile-browser.mjs'
+  'dash-mobile-browser.mjs',
+  'dash-gamepad-flow-browser.mjs'
 ];
 const release=[
   ...standard,
