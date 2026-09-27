@@ -134,12 +134,22 @@ inputManager.bindMouseSurface(renderer.domElement,e=>{
  const court=Math.min(innerWidth,innerHeight*WIDTH/VIEW_HEIGHT);
  return Math.max(-WIDTH/2+.3,Math.min(WIDTH/2-.3,(e.clientX-innerWidth/2)/court*WIDTH));
 });
+const THEME_METERS=400,THEME_TRANSITION_METERS=120;
 const themes=[
- {name:'Jungle Morning',top:'#69bccb',bottom:'#d7e6b6',leaf:0x88ae57,bark:0x876047,light:0xffe9c8},
- {name:'Emerald Mist',top:'#328e9b',bottom:'#99d9c1',leaf:0x5aa884,bark:0x66574e,light:0xc9ffe8},
- {name:'Golden Canopy',top:'#df8c83',bottom:'#f4d2a0',leaf:0xb9a359,bark:0x90624c,light:0xffd1a3},
- {name:'Moonlit Grove',top:'#283d71',bottom:'#7787ae',leaf:0x5d8e9b,bark:0x595a71,light:0xc5dcff}
+ {name:'Canopy Morning',top:'#73c9ff',bottom:'#dff4ff',light:0xfff0d4,fog:0xd7efff,fogNear:25,fogFar:58,sun:2.65,hero:2.72,fill:1.02,mist:.12,rain:0,night:0},
+ {name:'Golden Canopy',top:'#f49a42',bottom:'#ffd08a',light:0xffc778,fog:0xf4bc78,fogNear:23,fogFar:53,sun:2.35,hero:2.58,fill:.94,mist:.24,rain:0,night:.08},
+ {name:'Neon Mist',top:'#d73cff',bottom:'#45cfff',light:0xff71dc,fog:0x9c58df,fogNear:21,fogFar:49,sun:1.82,hero:2.38,fill:1.18,mist:.34,rain:0,night:.28},
+ {name:'Moonstorm Jungle',top:'#102b62',bottom:'#315b91',light:0xaed5ff,fog:0x5579a9,fogNear:19,fogFar:45,sun:.78,hero:1.88,fill:1.38,mist:.42,rain:1,night:1}
 ];
+function themeAtHeight(height){
+ const h=Math.max(0,Number(height)||0),half=THEME_TRANSITION_METERS/2;
+ for(let next=1;next<themes.length;next++){
+  const boundary=next*THEME_METERS;
+  if(h<boundary-half)return {from:next-1,to:next-1,blend:1};
+  if(h<=boundary+half)return {from:next-1,to:next,blend:THREE.MathUtils.smoothstep(h,boundary-half,boundary+half)};
+ }
+ return {from:themes.length-1,to:themes.length-1,blend:1};
+}
 const color=new THREE.Color(),other=new THREE.Color();
 const eventLabels={
  'banana-bloom':'BANANA BLOOM',
@@ -290,13 +300,19 @@ function drawWorld(dt=0){
  const liveHazards=new Set(game.hazards.map(h=>h.id));for(const [id,m]of hazardMeshes){if(!liveHazards.has(id)){removeHazard(m);hazardMeshes.delete(id);}}
  for(const h of game.hazards){let m=hazardMeshes.get(h.id);if(!m){m=scenery.hazard(h);world.add(m);hazardMeshes.set(h.id,m);}m.visible=Math.abs(h.y-game.camera)<VIEW_HEIGHT+2;if(m.visible)scenery.animateHazard(m,h,visualTime);}
  if(mode==='playing'&&game.hazardCooldown<=0&&game.time-lastHazardWarningAt>1.6){const threat=game.hazards.find(h=>h.y>game.y+.45&&h.y<game.y+2.5&&Math.abs(h.x-game.x)<1.15);if(threat){lastHazardWarningAt=game.time;sound('hazard-warning');}}
- const idx=Math.floor(game.time/30)%4,blend=THREE.MathUtils.smoothstep(game.time%30,0,4);if(pixelMode)pixelBackdrop.draw(idx,game.time<30?1:blend);
- const current=themes[idx],previousTheme=themes[(idx+3)%4],from=game.time<30?current:previousTheme;if(lastTheme!==idx){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
- $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
- const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone();scene.fog.color.copy(palette);const night=THREE.MathUtils.lerp(from===themes[3]?1:0,idx===3?1:0,blend);renderThemeIndex=idx;renderNight=night;
- const climb=Math.min(1,game.height/260);scene.fog.near=25-climb*3.5;scene.fog.far=58-climb*7;sun.intensity=2.25+climb*.55+(game.event?.type==='banana-bloom' ? .18 : 0);heroLight.intensity=2.5+climb*.35;heroFill.intensity=1+night*.32;
+ const themeState=themeAtHeight(game.height),from=themes[themeState.from],current=themes[themeState.to],idx=themeState.to,blend=themeState.blend;
+ if(pixelMode)pixelBackdrop.draw(idx,blend);
+ if(lastTheme!==idx&&blend>.5){lastTheme=idx;themeAge=0;$('theme').textContent=current.name;}if(mode==='playing')themeAge+=dt;
+ $('theme').style.opacity=mode==='playing'?String(Math.max(0,Math.min(1,4-themeAge))):'0';
+ const top=color.set(from.top).lerp(other.set(current.top),blend).getStyle(),bottom=color.set(from.bottom).lerp(other.set(current.bottom),blend).getStyle();$('world').style.background='linear-gradient('+top+','+bottom+')';
+ const palette=color.set(from.bottom).lerp(other.set(current.bottom),blend).clone(),fogColor=color.setHex(from.fog).lerp(other.setHex(current.fog),blend).clone();
+ scene.fog.color.copy(fogColor);scene.fog.near=THREE.MathUtils.lerp(from.fogNear,current.fogNear,blend);scene.fog.far=THREE.MathUtils.lerp(from.fogFar,current.fogFar,blend);
+ const night=THREE.MathUtils.lerp(from.night,current.night,blend),rain=THREE.MathUtils.lerp(from.rain,current.rain,blend),mist=THREE.MathUtils.lerp(from.mist,current.mist,blend);
+ renderThemeIndex=idx;renderNight=night;
+ sun.intensity=THREE.MathUtils.lerp(from.sun,current.sun,blend)+(game.event?.type==='banana-bloom'?.18:0);heroLight.intensity=THREE.MathUtils.lerp(from.hero,current.hero,blend);heroFill.intensity=THREE.MathUtils.lerp(from.fill,current.fill,blend);
  audio.setIntensity(Math.min(1,game.time/150+(game.event ? .12 : 0)));
- scenery.update(game.camera,visualTime,dt,palette,night,idx,game.time<30?1:blend);$('world').classList.toggle('night',night>.5);$('world').style.setProperty('--night-strength',night);sun.color.set(from.light).lerp(other.set(current.light),blend);
+ scenery.update(game.camera,visualTime,dt,palette,night,idx,blend,{from:themeState.from,to:themeState.to,rain,mist,height:game.height});
+ $('world').classList.toggle('night',night>.5);$('world').style.setProperty('--night-strength',night);sun.color.setHex(from.light).lerp(other.setHex(current.light),blend);
 }
 function tick(dt,control=input()){
  if(mode!=='playing')return;control=inputTrace.append(control);animationIntentX=control;
