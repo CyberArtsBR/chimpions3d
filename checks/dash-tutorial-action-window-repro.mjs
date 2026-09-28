@@ -29,10 +29,11 @@ try{
     if(retryState.tutorial?.index!==0)throw new Error('tutorial collision advanced the lesson');
     if(!retrySnap.obstacles.some(o=>o.patternId==='tutorial-tap-jump'&&!o.hit))throw new Error('tutorial retry obstacle was not respawned');
 
-    // Pass the retry safely to advance to HOLD JUMP.
+    // Advance the retry fixture past the first lesson without depending on
+    // realtime browser cadence; the HOLD JUMP lesson is the behavior under test.
     const retry=retrySnap.obstacles.find(o=>o.patternId==='tutorial-tap-jump'&&!o.hit);
-    api.setRun({scroll:retry.x-190,y:150,vy:0,grounded:false});
-    api.step(75);
+    api.setRun({scroll:retry.x+retry.w-150+30,y:120,vy:0,grounded:false});
+    api.step(1);
     const secondState=window.chimpionsDash();
     const secondSnap=api.snapshot();
     if(secondState.tutorial?.index!==1)throw new Error('did not advance to hold-jump lesson');
