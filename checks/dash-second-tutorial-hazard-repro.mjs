@@ -44,15 +44,12 @@ try{
   }
 
   if(!process.exitCode){
-    await page.evaluate(()=>{
-      try{localStorage.removeItem('chimpions-dash-tutorial-v1')}catch{}
-      window.chimpionsDashPresentationApi.startRun();
-    });
-    await page.waitForFunction(()=>window.chimpionsDash().state==='running',{timeout:10000});
+    await page.evaluate(()=>window.chimpionsDashPresentationApi.startRun({tutorial:true,seed:0xD45A2026}));
+    await page.waitForFunction(()=>window.chimpionsDash().state==='running'&&window.chimpionsDash().tutorial?.enabled,{timeout:10000});
 
-    let acted0=false,acted1=false;
+    let acted0=false,acted1=false,reachedTutorial2=false;
     const started=Date.now();
-    while(Date.now()-started<22000){
+    while(Date.now()-started<26000){
       const s=await page.evaluate(()=>({public:window.chimpionsDash(),snap:window.chimpionsDashTest.snapshot()}));
       if(s.public.state==='paused'){
         console.error('REPRO_PAUSED',JSON.stringify({
@@ -75,10 +72,18 @@ try{
         acted1=true;await page.keyboard.down('Space');await page.waitForTimeout(430);await page.keyboard.up('Space');
       }
       if(ti>=2){
-        console.log('PASS_REACHED_TUTORIAL_2',JSON.stringify({tutorial:s.public.tutorial,lastRuntimeError:s.public.lastRuntimeError,pageErrors,consoleErrors}));
+        reachedTutorial2=true;
+        console.log('PASS_REACHED_TUTORIAL_2',JSON.stringify({tutorial:s.public.tutorial,lastRuntimeError:s.public.lastRuntimeError,runtimeFaults:s.public.runtimeFaults,pageErrors,consoleErrors}));
         break;
       }
       await page.waitForTimeout(12);
+    }
+    const final=await state();
+    if(!reachedTutorial2||final.state!=='running'){
+      console.error('REPRO_DID_NOT_CLEAR_SECOND_HAZARD',JSON.stringify({public:final,snap:await snap(),acted0,acted1,pageErrors,consoleErrors},null,2));
+      process.exitCode=4;
+    }else{
+      console.log('PASS_NO_PAUSE_LOOP',JSON.stringify({state:final.state,tutorial:final.tutorial,lastRuntimeError:final.lastRuntimeError,runtimeErrorCount:final.runtimeErrorCount,runtimeFaults:final.runtimeFaults}));
     }
   }
 }finally{
