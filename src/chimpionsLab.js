@@ -250,7 +250,7 @@ const multiplier=dashMultiplier;
 
 function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
 let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
-let suppressLongFramePause=false,longFrameRecoveries=0;
+let suppressLongFramePause=false,longFrameRecoveries=0,lastRuntimeError='';
 const keys=new Set(),obstacles=[],bananas=[];
 const performanceController=createDashPerformanceController({renderer,scene,keyLight:key,getRuntimeStats:()=>({hazards:obstacles.length,bananas:bananas.length,poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},domGameplayNodes:objectLayer.childElementCount})});
 window.chimpionsDashPerformance={setQuality:q=>performanceController.setQuality(q),diagnostics:()=>performanceController.diagnostics()};
@@ -613,14 +613,42 @@ function startRun(options={}){
 function finishRun(){
   if(!run||run.dead)return;
   const previousBest=best,score=Math.floor(run.score),isRecord=score>previousBest;
-  run.dead=true;state='over';voice.setDash(false);voice.suspendMusic();voice.stopAmbience();voice.play(isRecord?'record':'dead');haptic([35,28,55]);
-  dashGraphics.emit(isRecord?'record':'death',{x:runnerWorldX,y:groundWorldY+.8,intensity:isRecord?1:.8});
-  emitDashEvent(DASH_EVENTS.death,dashMeta({score,distance:run.distance,combo:run.combo}));
-  best=Math.max(best,score);try{localStorage.setItem('chimpions-dash-best-v2',best);}catch{}
-  hudText('dash-best',String(best).padStart(6,'0'));hudText('result-score',score);hudText('result-distance',(run.distance/1000).toFixed(2)+' KM');hudText('result-bananas',run.bananaCount);
-  hudText('result-golden',run.goldenBananas);hudText('result-stage',run.stage);hudText('result-flow',Math.round(run.maxFlow));hudText('result-combo',run.longestCombo);
-  hudText('result-perfect-jumps',run.perfectJumps);hudText('result-perfect-slides',run.perfectSlides);hudText('result-near-misses',run.nearMisses);hudText('result-best',best);
-  hudText('result-pb',previousBest?((score-previousBest)>=0?'+':'')+(score-previousBest):'NEW BASELINE');setState('over');requestAnimationFrame(()=>$('dash-retry')?.focus());
+
+  // Commit the UI state first. Previously state was changed to "over" before the
+  // results panel was shown; any presentation exception in between stopped the
+  // simulation and left the player looking at a frozen gameplay frame with no
+  // retry controls.
+  run.dead=true;
+  clearInputs();
+  setState('over');
+  accumulator=0;
+
+  const safe=(label,fn)=>{try{return fn()}catch(error){lastRuntimeError=label+': '+(error?.message||error);console.error('Dash end-run '+label+' failed',error);return undefined;}};
+
+  safe('audio',()=>{voice.setDash(false);voice.suspendMusic();voice.stopAmbience();voice.play(isRecord?'record':'dead');});
+  safe('haptics',()=>haptic([35,28,55]));
+  safe('vfx',()=>dashGraphics.emit(isRecord?'record':'death',{x:runnerWorldX,y:groundWorldY+.8,intensity:isRecord?1:.8}));
+  safe('death-event',()=>emitDashEvent(DASH_EVENTS.death,dashMeta({score,distance:run.distance,combo:run.combo})));
+
+  best=Math.max(best,score);
+  try{localStorage.setItem('chimpions-dash-best-v2',best)}catch{}
+
+  safe('results',()=>{
+    hudText('dash-best',String(best).padStart(6,'0'));
+    hudText('result-score',score);
+    hudText('result-distance',(run.distance/1000).toFixed(2)+' KM');
+    hudText('result-bananas',run.bananaCount);
+    hudText('result-golden',run.goldenBananas);
+    hudText('result-stage',run.stage);
+    hudText('result-flow',Math.round(run.maxFlow));
+    hudText('result-combo',run.longestCombo);
+    hudText('result-perfect-jumps',run.perfectJumps);
+    hudText('result-perfect-slides',run.perfectSlides);
+    hudText('result-near-misses',run.nearMisses);
+    hudText('result-best',best);
+    hudText('result-pb',previousBest?((score-previousBest)>=0?'+':'')+(score-previousBest):'NEW BASELINE');
+  });
+  requestAnimationFrame(()=>$('dash-retry')?.focus());
 }
 function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();voice.stopAmbience();setState('paused');performanceController.invalidate();requestAnimationFrame(()=>$('dash-resume')?.focus());}
 function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0;performanceController.invalidate();}
@@ -822,7 +850,7 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
 window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad,selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
-window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,longFrameRecoveries,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
+window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,longFrameRecoveries,lastRuntimeError,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
 addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose();},{once:true});
 if(new URLSearchParams(location.search).has('test')){
  const snapshot=()=>{let sceneObjects=0;scene.traverse(()=>sceneObjects++);return{state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score}:null,inputs:{jump:[...heldJump],slide:[...heldSlide]},obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),pools:{hazards:pools.hazard.length,bananas:pools.banana.length},renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},standBlocked:run?overheadBlocksStand():false};};
@@ -842,22 +870,29 @@ renderer.setAnimationLoop(now=>{
   if(document.hidden)return;
   const recoveredLongFrame=elapsedFrame>.3&&state==='running'&&!suppressLongFramePause;
   if(recoveredLongFrame){
-    // Never convert a transient decode/GC/GPU hitch into a gameplay pause. Drop
-    // the stalled wall-clock interval instead of simulating a huge backlog.
     accumulator=0;longFrameRecoveries++;performanceController.invalidate();
   }
-  pollGamepad();
-  performanceController.observeFrame(elapsedFrame*1000,state,now);
-  if(state==='running'){
-    accumulator=Math.min(.12,accumulator+(recoveredLongFrame?0:frameDt));
-    let steps=0;
-    while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
-  }else accumulator=0;
-  if(performanceController.shouldRender(now,state)){renderUI(recoveredLongFrame?0:frameDt);dashGraphics.render();performanceController.markRendered(now);}
+  try{
+    pollGamepad();
+    performanceController.observeFrame(elapsedFrame*1000,state,now);
+    if(state==='running'){
+      accumulator=Math.min(.12,accumulator+(recoveredLongFrame?0:frameDt));
+      let steps=0;
+      while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
+    }else accumulator=0;
+    if(performanceController.shouldRender(now,state)){renderUI(recoveredLongFrame?0:frameDt);dashGraphics.render();performanceController.markRendered(now);}
+  }catch(error){
+    lastRuntimeError=String(error?.stack||error?.message||error);
+    console.error('Dash frame recovered from runtime exception',error);
+    accumulator=0;clearInputs();
+    // Never leave an exception as a dead, control-less gameplay frame.
+    if(state==='running')setState('paused');
+    performanceController.invalidate();
+  }
 });
 
 window.chimpionsLab=()=>({
   state,ready:!!character,selected:currentEntry?.id,score:Math.floor(run?.score||0),
   distance:run?.distance||0,stage:run?.stage||1,bananas:run?.bananaCount||0,best,
-  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,longFrameRecoveries,pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats(),performance:performanceController.diagnostics()
+  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,longFrameRecoveries,lastRuntimeError,pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats(),performance:performanceController.diagnostics()
 });
