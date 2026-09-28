@@ -204,10 +204,8 @@ addEventListener('resize',()=>{resize3D();renderObjects();});
 // like a frozen run after the first few jumps.
 warmDashImages(['jungle','ground','log','mushroom','banana','golden']);
 const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','puddle','spike-patch','branch','vine','canopy']);
-if(globalThis.requestIdleCallback)globalThis.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});
+if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});
 else setTimeout(warmSecondaryDashAssets,900);
-const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
-if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
 let catalog=[],character=null,loading=false,currentEntry=null,avatarLoadToken=0;
 async function loadAvatar(entry,{timeoutMs=15000}={}){
