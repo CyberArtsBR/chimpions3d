@@ -47,7 +47,10 @@ try{
 
   await page.keyboard.press('KeyP');await page.waitForFunction(()=>window.chimpionsDash().state==='paused');await shot(page,'dash-pause-desktop.png');await page.getByRole('button',{name:'RESUME'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='BUTTON'),false,'resume must release button focus');
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForFunction(()=>window.chimpionsDash().state==='paused');await page.getByRole('button',{name:'RESUME'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');
-  await page.evaluate(()=>{const start=performance.now();while(performance.now()-start<360){};});await page.waitForFunction(()=>window.chimpionsDash().state==='paused',{timeout:3000});report.pause.largeFrameProtection='pass';await page.getByRole('button',{name:'RESUME'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');
+  const recoveriesBefore=await page.evaluate(()=>window.chimpionsDash().longFrameRecoveries||0);
+  await page.evaluate(()=>{const start=performance.now();while(performance.now()-start<360){};});
+  await page.waitForFunction(before=>window.chimpionsDash().state==='running'&&(window.chimpionsDash().longFrameRecoveries||0)>before,recoveriesBefore,{timeout:3000});
+  report.pause.largeFrameProtection='recovered-without-pausing';
 
   await page.evaluate(()=>window.chimpionsDashTest.finishRun());await page.waitForFunction(()=>window.chimpionsDash().state==='over');await shot(page,'dash-results-desktop.png');await page.getByRole('button',{name:'RETRY'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='running');
   await page.evaluate(()=>window.chimpionsDashTest.finishRun());await page.getByRole('button',{name:'Change Chimpion'}).click();await page.waitForFunction(()=>window.chimpionsDash().state==='menu');
