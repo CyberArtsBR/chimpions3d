@@ -59,6 +59,47 @@ body[data-lab-state=running] #dash-light::after{animation:dashWind .7s linear in
 #lab-3d{position:absolute;inset:0;z-index:8;pointer-events:none}
 #lab-3d canvas{position:absolute;inset:0;width:100%;height:100%;display:block;filter:saturate(1.04) contrast(1.025)}
 #dash-shadow{position:absolute;z-index:7;bottom:17.35%;width:112px;height:24px;border-radius:50%;background:radial-gradient(ellipse,#02110cc7 0 24%,#06160d7a 48%,transparent 74%);filter:blur(2.5px);transform-origin:center;pointer-events:none}
+/* Dash V3 hybrid visual recovery: authored raster world + WebGL character/VFX. */
+.dash-hybrid-world #dash-stage{background:#071914}
+.dash-hybrid-world #dash-sky{background:linear-gradient(180deg,var(--biome-top) 0%,#153f34 55%,var(--biome-bottom) 100%)}
+.dash-hybrid-world #dash-far{
+  opacity:1;filter:saturate(1.12) contrast(1.08) brightness(.9);
+  background-size:auto 112%;background-position:var(--far-x) center
+}
+.dash-hybrid-world #dash-mid{
+  opacity:.24;filter:saturate(1.22) contrast(1.18) brightness(.58) blur(.45px);
+  mix-blend-mode:multiply
+}
+.dash-hybrid-world #dash-light{
+  opacity:.72;background:
+    radial-gradient(ellipse at 70% 7%,#fff0b66b 0 6%,transparent 28%),
+    linear-gradient(180deg,#dffff00d 0 38%,transparent 62%,#03120d52 100%)
+}
+.dash-hybrid-world #dash-ground{
+  box-shadow:0 -10px 24px #061a1277,inset 0 48px 64px #6d93472f
+}
+.dash-hybrid-world .hazard{
+  z-index:4;opacity:1!important;
+  filter:drop-shadow(0 0 2px #f5e8b655) drop-shadow(0 10px 8px #01110bb8) saturate(1.18) contrast(1.08)!important
+}
+.dash-hybrid-world .hazard.branch,
+.dash-hybrid-world .hazard.vine,
+.dash-hybrid-world .hazard.canopy{
+  filter:drop-shadow(0 0 2px #e9f0bf44) drop-shadow(0 10px 9px #01110bc0) saturate(1.15) contrast(1.1)!important
+}
+.dash-hybrid-world .banana{
+  z-index:5;opacity:1!important;
+  filter:drop-shadow(0 0 5px #ffef75aa) drop-shadow(0 5px 5px #3a250ba0) saturate(1.28) contrast(1.08)!important
+}
+.dash-hybrid-world .banana.golden{
+  filter:drop-shadow(0 0 8px #ffd451dd) drop-shadow(0 5px 6px #4a2b0bb0) saturate(1.38) brightness(1.08)!important
+}
+.dash-hybrid-world #lab-3d canvas{filter:saturate(1.08) contrast(1.04) brightness(1.08)}
+.dash-hybrid-world #dash-stage::after{
+  background:radial-gradient(ellipse at 47% 46%,transparent 42%,#02110d22 72%,#010b0860 100%);
+  box-shadow:inset 0 -80px 115px #020d0955
+}
+
 
 #dash-hud{position:absolute;z-index:20;top:0;left:0;right:0;padding:16px max(18px,3vw);display:grid;grid-template-columns:minmax(190px,1fr) repeat(3,minmax(105px,auto)) 44px;align-items:start;gap:10px;background:linear-gradient(180deg,#041714ed 0,#061c19ad 58%,transparent 100%);pointer-events:none;text-shadow:0 2px 4px #0009}
 #dash-hud>div{min-width:0}
