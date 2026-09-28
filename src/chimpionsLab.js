@@ -250,7 +250,9 @@ const multiplier=dashMultiplier;
 
 function readSavedBest(){try{return Number(localStorage.getItem('chimpions-dash-best-v2'))||0;}catch{return 0;}}
 let run=null,state='menu',last=performance.now(),accumulator=0,spawnCursor=0,best=readSavedBest(),stageFlashTimer=0,lastPadJump=false,lastPadSlide=false,lastPadPause=false;
-let suppressLongFramePause=false,longFrameRecoveries=0,lastRuntimeError='';
+let suppressLongFramePause=false,longFrameRecoveries=0,lastRuntimeError='',runtimeErrorCount=0,lastPauseReason='';
+const runtimeFaults={gamepad:false,audio:false,vfx:false,character:false,renderer:false};
+function recordRuntimeFault(scope,error){runtimeErrorCount++;lastRuntimeError=scope+': '+String(error?.stack||error?.message||error);runtimeFaults[scope]=true;console.error('Dash '+scope+' subsystem disabled after runtime error',error);}
 const keys=new Set(),obstacles=[],bananas=[];
 const performanceController=createDashPerformanceController({renderer,scene,keyLight:key,getRuntimeStats:()=>({hazards:obstacles.length,bananas:bananas.length,poolSizes:{hazards:pools.hazard.length,bananas:pools.banana.length},domGameplayNodes:objectLayer.childElementCount})});
 window.chimpionsDashPerformance={setQuality:q=>performanceController.setQuality(q),diagnostics:()=>performanceController.diagnostics()};
@@ -650,8 +652,8 @@ function finishRun(){
   });
   requestAnimationFrame(()=>$('dash-retry')?.focus());
 }
-function pause(){if(state!=='running')return;clearInputs();voice.setDash(false);voice.suspendMusic();voice.stopAmbience();setState('paused');performanceController.invalidate();requestAnimationFrame(()=>$('dash-resume')?.focus());}
-function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0;performanceController.invalidate();}
+function pause(reason='manual'){if(state!=='running')return;lastPauseReason=reason;clearInputs();voice.setDash(false);voice.suspendMusic();voice.stopAmbience();setState('paused');performanceController.invalidate();requestAnimationFrame(()=>$('dash-resume')?.focus());}
+function resume(){if(state!=='paused')return;if(document.activeElement instanceof HTMLElement)document.activeElement.blur();lastPauseReason='';setState('running');voice.resumeMusic();voice.startAmbience();last=performance.now();accumulator=0;performanceController.invalidate();}
 function quit(){clearInputs();voice.setDash(false);voice.stopMusic();voice.stopAmbience();clearWorld();dashGraphics.reset();run=makeRun();setState('menu');accumulator=0;performanceController.invalidate();}
 
 function updatePhysics(dt){
@@ -732,6 +734,9 @@ function updatePhysics(dt){
 
 function renderUI(dt){
   const active=run||makeRun(),biome=BIOMES[(active.stage-1)%BIOMES.length],m=metrics();
+
+  // Authoritative DOM presentation always updates first. Premium WebGL/audio
+  // subsystems are optional and may fail closed without stopping the run.
   document.documentElement.style.setProperty('--biome-top',biome[1]);
   document.documentElement.style.setProperty('--biome-bottom',biome[2]);
   document.documentElement.style.setProperty('--far-x',`${-(active.scroll*m.scale*.08)%1600}px`);
@@ -745,26 +750,9 @@ function renderUI(dt){
   hudText('dash-mult',multiplier(active.flow).toFixed(2)+'×');
   hudText('dash-stage-number',String(active.stage).padStart(2,'0'));
   hudText('dash-stage-label',String(active.stage).padStart(2,'0')+' / '+biome[0]);
-  voice.setSpeed(active.speed/BASE_SPEED);
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
   const graphicsSliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked);
-  if(GPU_WORLD){
-    dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
-  }else{
-    // Keep premium event VFX without allowing the hidden GPU world to tint/fog the
-    // avatar or recreate the broken procedural hazards.
-    dashGraphics.vfx?.update(dt,{time:active.time,speedRatio:Math.max(.2,active.speed/BASE_SPEED),playerX:runnerWorldX,groundY:groundWorldY,state,pollen:.45,storm:0,viewW,viewH});
-    scene.fog=null;renderer.toneMappingExposure=1.08;
-  }
-  if(character){
-    const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
-    character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
-    character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
-    const jumpWorld=active.y*WORLD_UNIT;
-    character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
-  }
-  active.landed=false;
   const shadow=$('dash-shadow');
   if(shadow&&!GPU_WORLD){
     const jump=active.y*m.scale;
@@ -774,6 +762,29 @@ function renderUI(dt){
     shadow.style.transform=`translateX(-50%) scale(${clamp(1-jump/240,.52,1)})`;
   }
   renderObjects();
+
+  if(!runtimeFaults.audio){
+    try{voice.setSpeed(active.speed/BASE_SPEED)}catch(error){recordRuntimeFault('audio',error)}
+  }
+  if(!runtimeFaults.vfx){
+    try{
+      if(GPU_WORLD)dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
+      else{
+        dashGraphics.vfx?.update(dt,{time:active.time,speedRatio:Math.max(.2,active.speed/BASE_SPEED),playerX:runnerWorldX,groundY:groundWorldY,state,pollen:.45,storm:0,viewW,viewH});
+        scene.fog=null;renderer.toneMappingExposure=1.08;
+      }
+    }catch(error){recordRuntimeFault('vfx',error)}
+  }
+  if(character&&!runtimeFaults.character){
+    try{
+      const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
+      character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
+      character.root.scale.setScalar(AVATAR_HEIGHT*WORLD_UNIT/2.08);
+      const jumpWorld=active.y*WORLD_UNIT;
+      character.root.position.set(runnerWorldX,groundWorldY+jumpWorld,0);
+    }catch(error){recordRuntimeFault('character',error)}
+  }
+  active.landed=false;
 }
 
 const heldJump=new Set(),heldSlide=new Set();
@@ -792,7 +803,7 @@ addEventListener('keydown',e=>{
   if(jumpCodes.has(e.code)||slideCodes.has(e.code)||e.code==='KeyP'){e.preventDefault();keys.add(e.code);}
   if(jumpCodes.has(e.code)&&!e.repeat)setInput('jump',e.code,true);
   if(slideCodes.has(e.code))setInput('slide',e.code,true);
-  if(e.code==='KeyP'&&!e.repeat)(state==='paused'?resume():pause());
+  if(e.code==='KeyP'&&!e.repeat)(state==='paused'?resume():pause('keyboard'));
   if(e.code==='Escape'&&state!=='menu')quit();
 });
 addEventListener('keyup',e=>{
@@ -800,8 +811,9 @@ addEventListener('keyup',e=>{
   if(jumpCodes.has(e.code))setInput('jump',e.code,false);
   if(slideCodes.has(e.code))setInput('slide',e.code,false);
 });
-addEventListener('blur',pause);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
+// Window blur can fire transiently for browser/UI focus changes. Only actual page
+// visibility loss auto-pauses; manual pause remains available at all times.
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause('visibility');});
 
 function touchHold(id,start,end){
   const el=$(id);
@@ -820,7 +832,7 @@ $('dash-stage').addEventListener('pointerdown',event=>{
 addEventListener('pointerup',event=>{if(event.pointerType==='mouse'){if(event.button===0)setInput('jump','mouse',false);if(event.button===2)setInput('slide','mouse',false);}});
 addEventListener('pointercancel',()=>{setInput('jump','mouse',false);setInput('slide','mouse',false);});
 
-$('dash-pause').onclick=()=>state==='paused'?resume():pause();
+$('dash-pause').onclick=()=>state==='paused'?resume():pause('button');
 $('dash-resume').onclick=resume;$('dash-quit').onclick=quit;$('dash-retry').onclick=startRun;$('dash-change').onclick=quit;$('dash-main-menu').onclick=quit;$('dash-start').onclick=startRun;
 $('dash-random').onclick=()=>{if(!catalog.length)return;const entry=catalog[Math.floor(Math.random()*catalog.length)];$('lab-avatar').value=entry.id;loadAvatar(entry);};
 $('lab-avatar').onchange=()=>loadAvatar(catalog.find(e=>e.id===$('lab-avatar').value));
@@ -834,7 +846,7 @@ function pollGamepad(){
  const start=!!p?.buttons?.[9]?.pressed;
  if(j||s||start)setInputDevice('gamepad');
  setInput('jump','pad',j);setInput('slide','pad',s);
- if(start&&!lastPadPause){if(state==='menu'||state==='over')startRun();else if(state==='paused')resume();else pause();}
+ if(start&&!lastPadPause){if(state==='menu'||state==='over')startRun();else if(state==='paused')resume();else pause('gamepad');}
  lastPadJump=j;lastPadSlide=s;lastPadPause=start;
 }
 
@@ -850,7 +862,7 @@ fetch(BASE+'avatars.json').then(r=>r.json()).then(entries=>{
 }).catch(error=>{$('lab-message').textContent='Avatar catalog unavailable: '+error.message;console.error(error);});
 
 window.chimpionsDashPresentationApi={audioGesture:()=>voice.unlock(),playUi:kind=>voice.play(kind||'click'),setInputDevice,openSettings:()=>$('dash-settings')?.showModal(),cancelAvatarLoad,selectAvatar:async(id,options={})=>{const entry=catalog.find(e=>String(e.id)===String(id));if(!entry)throw new Error('Chimpion is not in the approved roster');$('lab-avatar').value=entry.id;const ok=await loadAvatar(entry,options);if(!ok)throw new Error('Could not load '+entry.name);return true;},startRun};
-window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,longFrameRecoveries,lastRuntimeError,settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
+window.chimpionsDash=()=>({state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,seed:run?.seed||0,rulesVersion:run?.rulesVersion||DASH_RULES_VERSION,y:run?.y||0,vy:run?.vy||0,grounded:!!run?.grounded,sliding:!!run&&(run.slideHeld||run.slideTime>0||run.slideMin>0||run.slideBlocked),score:Math.floor(run?.score||0),stage:run?.stage||1,speed:run?.speed||BASE_SPEED,normalizedSpeed:dashNormalizedSpeed(run?.time||0),flow:run?.flow||0,maxFlow:run?.maxFlow||0,combo:run?.combo||0,longestCombo:run?.longestCombo||0,bananas:run?.bananaCount||0,goldenBananas:run?.goldenBananas||0,perfectJumps:run?.perfectJumps||0,perfectSlides:run?.perfectSlides||0,nearMisses:run?.nearMisses||0,inputDevice:activeInputDevice,longFrameRecoveries,lastRuntimeError,runtimeErrorCount,lastPauseReason,runtimeFaults:{...runtimeFaults},settings:{...dashSettings},quality:performanceController.diagnostics().qualityTier,dpr:renderer.getPixelRatio(),tutorial:run?.tutorial?{enabled:run.tutorial.enabled,index:run.tutorial.index,complete:run.tutorial.complete}:null});
 addEventListener('pagehide',()=>{voice.destroy();dashGraphics.dispose();},{once:true});
 if(new URLSearchParams(location.search).has('test')){
  const snapshot=()=>{let sceneObjects=0;scene.traverse(()=>sceneObjects++);return{state,ready:!!character,selectedId:currentEntry?.id||'',selectedName:currentEntry?.name||'',localAvatar:!!currentEntry?.buffer,rosterCount:catalog.length,run:run?{seed:run.seed,seedState:run.seedState,time:run.time,stage:run.stage,speed:run.speed,scroll:run.scroll,distance:run.distance,y:run.y,vy:run.vy,grounded:run.grounded,jumpHeld:run.jumpHeld,jumpAge:run.jumpAge,jumpBuffer:run.jumpBuffer,coyote:run.coyote,slideHeld:run.slideHeld,slideTime:run.slideTime,slideMin:run.slideMin,slideBlocked:run.slideBlocked,dead:run.dead,bananaCount:run.bananaCount,goldenBananas:run.goldenBananas,flow:run.flow,maxFlow:run.maxFlow,combo:run.combo,longestCombo:run.longestCombo,bonus:run.bonus,score:run.score}:null,inputs:{jump:[...heldJump],slide:[...heldSlide]},obstacles:obstacles.map(o=>({id:o.id,name:o.name,family:o.family,action:o.action,w:o.w,h:o.h,x:o.x,passed:o.passed,hit:o.hit,patternId:o.patternId||'',patternDifficulty:o.patternDifficulty||0,boxes:o.boxes})),bananas:bananas.map(b=>({x:b.x,y:b.y,golden:b.golden,collected:b.collected})),pools:{hazards:pools.hazard.length,bananas:pools.banana.length},renderer:{calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures},resources:{sceneObjects,domNodes:document.getElementsByTagName('*').length,hazards:obstacles.length,collectibles:bananas.length},standBlocked:run?overheadBlocksStand():false};};
@@ -869,30 +881,49 @@ renderer.setAnimationLoop(now=>{
   const elapsedFrame=Math.max(0,(now-last)/1000),frameDt=Math.min(.05,elapsedFrame);last=now;
   if(document.hidden)return;
   const recoveredLongFrame=elapsedFrame>.3&&state==='running'&&!suppressLongFramePause;
-  if(recoveredLongFrame){
-    accumulator=0;longFrameRecoveries++;performanceController.invalidate();
+  if(recoveredLongFrame){accumulator=0;longFrameRecoveries++;performanceController.invalidate();}
+
+  if(!runtimeFaults.gamepad){
+    try{pollGamepad()}catch(error){recordRuntimeFault('gamepad',error)}
   }
-  try{
-    pollGamepad();
-    performanceController.observeFrame(elapsedFrame*1000,state,now);
-    if(state==='running'){
-      accumulator=Math.min(.12,accumulator+(recoveredLongFrame?0:frameDt));
-      let steps=0;
-      while(accumulator>=STEP&&steps<15){updatePhysics(STEP);accumulator-=STEP;steps++;}
-    }else accumulator=0;
-    if(performanceController.shouldRender(now,state)){renderUI(recoveredLongFrame?0:frameDt);dashGraphics.render();performanceController.markRendered(now);}
-  }catch(error){
-    lastRuntimeError=String(error?.stack||error?.message||error);
-    console.error('Dash frame recovered from runtime exception',error);
-    accumulator=0;clearInputs();
-    // Never leave an exception as a dead, control-less gameplay frame.
-    if(state==='running')setState('paused');
-    performanceController.invalidate();
+  try{performanceController.observeFrame(elapsedFrame*1000,state,now)}catch(error){lastRuntimeError='performance: '+String(error?.stack||error);runtimeErrorCount++;}
+
+  if(state==='running'){
+    accumulator=Math.min(.12,accumulator+(recoveredLongFrame?0:frameDt));
+    let steps=0;
+    while(accumulator>=STEP&&steps<15){
+      try{updatePhysics(STEP)}
+      catch(error){
+        lastRuntimeError='physics: '+String(error?.stack||error?.message||error);runtimeErrorCount++;console.error('Dash physics frame failed safely',error);
+        accumulator=0;
+        // Physics failures are not recoverable by repeatedly retrying the same
+        // frame. End the run cleanly so RETRY remains available.
+        finishRun();
+        break;
+      }
+      accumulator-=STEP;steps++;
+    }
+  }else accumulator=0;
+
+  let shouldRender=true;
+  try{shouldRender=performanceController.shouldRender(now,state)}catch(error){lastRuntimeError='performance-render: '+String(error?.stack||error);runtimeErrorCount++;}
+  if(shouldRender){
+    try{renderUI(recoveredLongFrame?0:frameDt)}
+    catch(error){
+      // Essential DOM rendering is intentionally simple; even if it faults,
+      // never translate the exception into a pause loop.
+      lastRuntimeError='ui: '+String(error?.stack||error?.message||error);runtimeErrorCount++;console.error('Dash UI frame failed safely',error);
+    }
+    if(!runtimeFaults.renderer){
+      try{dashGraphics.render()}
+      catch(error){recordRuntimeFault('renderer',error);renderer.domElement.style.visibility='hidden';}
+    }
+    try{performanceController.markRendered(now)}catch{}
   }
 });
 
 window.chimpionsLab=()=>({
   state,ready:!!character,selected:currentEntry?.id,score:Math.floor(run?.score||0),
   distance:run?.distance||0,stage:run?.stage||1,bananas:run?.bananaCount||0,best,
-  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,longFrameRecoveries,lastRuntimeError,pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats(),performance:performanceController.diagnostics()
+  speed:run?.speed||BASE_SPEED,obstacles:obstacles.length,longFrameRecoveries,lastRuntimeError,runtimeErrorCount,lastPauseReason,runtimeFaults:{...runtimeFaults},pool:{hazards:pools.hazard.length,bananas:pools.banana.length},graphics:dashGraphics.stats(),performance:performanceController.diagnostics()
 });
