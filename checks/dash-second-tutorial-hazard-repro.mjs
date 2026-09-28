@@ -31,7 +31,7 @@ try{
         await page.evaluate(()=>window.chimpionsDashTest.setInput('slide','repro',false));
       }else{
         await page.evaluate(()=>window.chimpionsDashTest.setInput('jump','repro',true));
-        await page.evaluate(()=>window.chimpionsDashTest.step(action==='high-jump'?55:22));
+        await page.evaluate(a=>window.chimpionsDashTest.step(a==='high-jump'?55:22),action);
         await page.evaluate(()=>window.chimpionsDashTest.setInput('jump','repro',false));
         await page.evaluate(()=>window.chimpionsDashTest.step(180));
       }
