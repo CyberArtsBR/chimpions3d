@@ -145,7 +145,19 @@ key.shadow.camera.left=-5;key.shadow.camera.right=5;key.shadow.camera.top=6;key.
 key.shadow.normalBias=.03;scene.add(key,key.target);
 const rim=new THREE.DirectionalLight(0x9fe7db,1.25);rim.position.set(5,4,5);scene.add(rim);
 const dashGraphics=createDashWorldRenderer({scene,camera,renderer,hemisphere:hemi,keyLight:key,rimLight:rim,pixelsToWorld:1/40});
-const GPU_WORLD=true;
+// V3 recovery mode: keep Three.js for the Chimpion and VFX, but render the world,
+// hazards and collectibles with the proven authored raster presentation. This avoids
+// the procedural primitive renderer that caused unreadable/invisible hazards.
+const GPU_WORLD=false;
+document.documentElement.classList.remove('dash-gpu-world');
+document.documentElement.classList.add('dash-hybrid-world');
+dashGraphics.environmentRoot.visible=false;
+dashGraphics.gameplayRoot.visible=false;
+scene.fog=null;
+renderer.toneMappingExposure=1.08;
+hemi.color.set(0xe7f3df);hemi.groundColor.set(0x33463a);hemi.intensity=2.15;
+key.color.set(0xfff0ce);key.intensity=3.05;
+rim.color.set(0xbde8ff);rim.intensity=1.35;
 
 const {
   step:STEP,playerX:PLAYER_X,gravity:GRAVITY,jumpImpulse:JUMP_IMPULSE,lowHeight:LOW_HEIGHT,
@@ -187,7 +199,7 @@ function resize3D(){
 resize3D();
 addEventListener('resize',()=>{resize3D();renderObjects();});
 
-warmDashImages(['jungle','ground','log','mushroom','puddle','banana','golden']);
+warmDashImages(['jungle','ground','log','mushroom','thorns','stump','spike','puddle','spike-patch','branch','vine','canopy','banana','golden']);
 const warmSecondaryDashAssets=()=>warmDashImages(['thorns','stump','spike','spike-patch','branch','vine','canopy']);
 if(window.requestIdleCallback)window.requestIdleCallback(warmSecondaryDashAssets,{timeout:1800});else setTimeout(warmSecondaryDashAssets,700);
 
@@ -701,7 +713,14 @@ function renderUI(dt){
   if(stageFlashTimer>0){stageFlashTimer-=dt;$('dash-stage-flash').classList.add('show');}else $('dash-stage-flash').classList.remove('show');
 
   const graphicsSliding=active.grounded&&(active.slideHeld||active.slideTime>0||active.slideMin>0||active.slideBlocked);
-  dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
+  if(GPU_WORLD){
+    dashGraphics.update({dt,time:active.time,scroll:active.scroll,stage:active.stage,speed:active.speed,baseSpeed:BASE_SPEED,obstacles,bananas,playerX:runnerWorldX,playerY:active.y*WORLD_UNIT,sliding:graphicsSliding,state,flow:active.flow});
+  }else{
+    // Keep premium event VFX without allowing the hidden GPU world to tint/fog the
+    // avatar or recreate the broken procedural hazards.
+    dashGraphics.vfx?.update(dt,{time:active.time,speedRatio:Math.max(.2,active.speed/BASE_SPEED),playerX:runnerWorldX,groundY:groundWorldY,state,pollen:.45,storm:0,viewW,viewH});
+    scene.fog=null;renderer.toneMappingExposure=1.08;
+  }
   if(character){
     const jumping=!active.grounded,sliding=graphicsSliding,animState=jumping?'JUMP':state==='running'?'RUN':'IDLE';
     character.update(dt,{state:animState,speed:active.speed/265,normalizedSpeed:dashNormalizedSpeed(active.time),jumpHeight:active.y,vy:active.vy,sliding,landed:active.landed});
