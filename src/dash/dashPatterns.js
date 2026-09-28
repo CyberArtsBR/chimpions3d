@@ -104,9 +104,15 @@ export function dashTransitionReport(previous,next,{gapDistance,speed,chainLengt
   return{available,required,ok:available+1e-9>=required,previousAction:previous?.action||null,nextAction:next?.action||null};
 }
 
-export function chooseDashObstacle(holder,{family,difficulty,stage}){
-  const list=DASH_OBSTACLE_TYPES.filter(t=>t.family===family&&t.minStage<=stage&&t.difficulty<=difficulty+1);
-  return list[dashRandomInt(holder,list.length)]||DASH_OBSTACLE_TYPES[0];
+export function chooseDashObstacle(holder,{family,difficulty,stage,allowLocked=false}){
+  let list=DASH_OBSTACLE_TYPES.filter(t=>t.family===family&&(allowLocked||t.minStage<=stage)&&t.difficulty<=difficulty+1);
+  // Never let a family/data mismatch crash the live simulation. Tutorial steps
+  // intentionally teach slide before Stage 2, so they may opt into locked family
+  // hazards. The family fallback is a final safety net for future catalog edits.
+  if(!list.length)list=DASH_OBSTACLE_TYPES.filter(t=>t.family===family&&t.difficulty<=difficulty+1);
+  if(!list.length)list=DASH_OBSTACLE_TYPES.filter(t=>t.family===family);
+  if(!list.length)return DASH_OBSTACLE_TYPES[0];
+  return list[dashRandomInt(holder,list.length)];
 }
 
 export function chooseDashPattern(holder,{time,previousDifficulty=1,previousAction=null,recentPressure=0,recentRecovery=1,recentActionVariety=.5,visibility=1}={}){
