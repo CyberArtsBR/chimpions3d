@@ -372,13 +372,11 @@ function handleTutorialEvent(type){
   const result=advanceDashTutorial(run.tutorial,{type});
   if(result.retry){
     run.tutorialPatternActive=false;
-    $('dash-tip')?.classList.remove('show');
     emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'retry',event:type,step:run.tutorial.index}));
     return;
   }
   if(!result.advanced)return;
   run.tutorialPatternActive=false;
-  $('dash-tip')?.classList.remove('show');
   emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:result.complete?'complete':'advance',event:type,step:run.tutorial.index}));
   if(result.complete){
     try{localStorage.setItem(DASH_TUTORIAL_KEY,'done');}catch{}
@@ -386,47 +384,6 @@ function handleTutorialEvent(type){
     $('dash-tip').classList.add('show');
     setTimeout(()=>{if(state==='running'&&run?.tutorial?.complete)$('dash-tip')?.classList.remove('show');},2200);
   }
-}
-
-function tutorialCueLead(obstacle){
-  if(!obstacle)return{ready:0,now:0};
-  const action=obstacle.action;
-  const now=action==='high-jump'?140:action==='slide'?190:action==='jump-or-slide'?170:110;
-  return{now,ready:now+(action==='slide'?260:220)};
-}
-function updateTutorialCue(){
-  if(!run?.tutorial?.enabled||run.tutorial.complete)return;
-  const tip=$('dash-tip');
-  if(!tip)return;
-  const obstacle=obstacles.find(o=>o.tutorial&&!o.hit&&!o.passed);
-  if(!obstacle){tip.classList.remove('show');return;}
-  const distance=obstacle.x-(run.scroll+PLAYER_X);
-  const cue=tutorialCueLead(obstacle);
-  const prompt=obstacle.tutorialPrompt||'ACTION';
-  if(distance<=cue.now&&distance>-obstacle.w){
-    tip.textContent=prompt+' NOW';
-    tip.classList.add('show');
-  }else if(distance<=cue.ready&&distance>cue.now){
-    tip.textContent='GET READY · '+prompt;
-    tip.classList.add('show');
-  }else tip.classList.remove('show');
-}
-function retryTutorialCollision(collision){
-  if(!run?.tutorial?.enabled||run.tutorial.complete||!collision?.tutorial)return false;
-  clearInputs();
-  run.combo=0;
-  run.y=0;run.vy=0;run.jumpHeld=false;run.jumpAge=0;run.jumpBuffer=0;run.jumpBufferHeld=false;
-  run.coyote=COYOTE_TIME;run.grounded=true;run.slideHeld=false;run.slideTime=0;run.slideMin=0;run.slideBlocked=false;
-  run.tutorialPatternActive=false;
-  clearWorld();
-  const m=metrics();
-  spawnCursor=run.scroll+PLAYER_X+Math.min(760,Math.max(560,m.vw*.42));
-  spawnPattern();
-  $('dash-tip')?.classList.remove('show');
-  showFeedback('TRY AGAIN','retry');
-  emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'collision-retry',step:run.tutorial.index,obstacleId:collision.id}));
-  performanceController.invalidate();
-  return true;
 }
 
 function playerBox(){
@@ -515,7 +472,7 @@ function spawnPattern(){
       x=previous.x+previous.w+transitionSpeed*safeGap(previous,type,gap,def.items.length);
     }
     const o=spawnObstacle(type,x);
-    o.patternId=def.id;o.patternDifficulty=def.difficulty;o.riskReward=!!def.riskReward;o.tutorial=!!def.tutorial;o.tutorialPrompt=def.tutorial?def.prompt:'';o.tookRiskLine=false;o.plannedSpeed=transitionSpeed||run.speed;
+    o.patternId=def.id;o.patternDifficulty=def.difficulty;o.riskReward=!!def.riskReward;o.tutorial=!!def.tutorial;o.tookRiskLine=false;o.plannedSpeed=transitionSpeed||run.speed;
     created.push(o);
     if(type.family==='flex'){
       lowTrail(x-38,x+type.w+28,3);
@@ -535,14 +492,15 @@ function spawnPattern(){
   run.recentActionVariety=run.recentActions.length?new Set(run.recentActions).size/run.recentActions.length:.5;
   if(def.tutorial){
     run.tutorialPatternActive=true;
-    $('dash-tip').classList.remove('show');
-    emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'armed',step:run.tutorial.index,id:def.id,prompt:def.prompt}));
+    $('dash-tip').textContent=def.prompt;
+    $('dash-tip').classList.add('show');
+    emitDashEvent(DASH_EVENTS.tutorial,dashMeta({phase:'prompt',step:run.tutorial.index,id:def.id,prompt:def.prompt}));
   }
   return true;
 }
 function seedWorld(){
   const m=metrics();
-  spawnCursor=run?.tutorial?.enabled?PLAYER_X+Math.min(760,Math.max(620,m.vw*.45)):m.vw+360;
+  spawnCursor=m.vw+360;
   while(spawnCursor<m.vw*2.4){if(!spawnPattern())break;}
 }
 function clearWorld(){
@@ -706,13 +664,11 @@ function updatePhysics(dt){
     const previousStage=run.stage;run.stage=stage;stageFlashTimer=1.8;$('dash-stage-flash').textContent='STAGE '+stage;voice.play('stage');
     emitDashEvent(DASH_EVENTS.stageChange,dashMeta({previousStage,stage}));dashGraphics.emit('stage',{x:0,y:groundWorldY+viewH*.3,intensity:.9});
   }
-  const targetSpeed=dashSpeedForTime(run.time);
-  run.speed=run.tutorial?.enabled&&!run.tutorial.complete?Math.min(targetSpeed,320):targetSpeed;
+  run.speed=dashSpeedForTime(run.time);
   const oldScroll=run.scroll,previousBox=playerBox(),oldY=run.y;
   previousBox.x+=oldScroll;
   movePlayer(dt);
   run.scroll+=run.speed*dt;run.distance=run.scroll/100;
-  updateTutorialCue();
   let p=playerBox();p.x+=run.scroll;
   let collision=null,contact=Infinity;
   for(const o of obstacles){
@@ -763,7 +719,6 @@ function updatePhysics(dt){
   }
   run.score=Math.floor(run.distance*10)+run.bonus;
   if(collision){
-    if(retryTutorialCollision(collision))return;
     collision.hit=true;
     const brokenCombo=run.combo;run.combo=0;
     if(brokenCombo)emitDashEvent(DASH_EVENTS.comboBreak,dashMeta({combo:brokenCombo,obstacleId:collision.id,patternId:collision.patternId||''}));
