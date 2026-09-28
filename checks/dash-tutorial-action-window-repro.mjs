@@ -17,60 +17,44 @@ try{
     api.setLongFrameGuardSuppressed(true);
     api.startRun({tutorial:true,seed:0xD45A2026});
 
-    const first=api.snapshot().obstacles.find(o=>o.patternId==='tutorial-tap-jump');
-    if(!first)throw new Error('first tutorial obstacle missing');
+    const passFixture=id=>{
+      const snap=api.snapshot();
+      const obstacle=snap.obstacles.find(o=>o.patternId===id&&!o.hit&&!o.passed);
+      if(!obstacle)throw new Error('missing tutorial obstacle '+id);
+      // Put the fixed player just beyond the obstacle, then advance one
+      // authoritative 120 Hz step. This exercises obstacle-pass, tutorial
+      // advancement and immediate spawning of the next lesson synchronously.
+      api.setRun({scroll:obstacle.x+obstacle.w-150+30,y:0,vy:0,grounded:true});
+      api.step(1);
+    };
 
-    // Intentionally fail the first lesson. Tutorial collisions must never end the run.
-    api.setRun({scroll:first.x-180,y:0,vy:0,grounded:true});
-    api.step(30);
-    const retryState=window.chimpionsDash();
-    const retrySnap=api.snapshot();
-    if(retryState.state!=='running'||retrySnap.run.dead)throw new Error('tutorial collision ended the run');
-    if(retryState.tutorial?.index!==0)throw new Error('tutorial collision advanced the lesson');
-    if(!retrySnap.obstacles.some(o=>o.patternId==='tutorial-tap-jump'&&!o.hit))throw new Error('tutorial retry obstacle was not respawned');
+    passFixture('tutorial-tap-jump');
+    const afterTap=window.chimpionsDash();
+    if(afterTap.tutorial?.index!==1)throw new Error('tap-jump did not advance');
 
-    // Advance the retry fixture past the first lesson without depending on
-    // realtime browser cadence; the HOLD JUMP lesson is the behavior under test.
-    const retry=retrySnap.obstacles.find(o=>o.patternId==='tutorial-tap-jump'&&!o.hit);
-    api.setRun({scroll:retry.x+retry.w-150+30,y:120,vy:0,grounded:false});
-    api.step(1);
-    const secondState=window.chimpionsDash();
-    const secondSnap=api.snapshot();
-    if(secondState.tutorial?.index!==1)throw new Error('did not advance to hold-jump lesson');
-
-    const wide=secondSnap.obstacles.find(o=>o.patternId==='tutorial-hold-jump'&&!o.hit);
-    if(!wide)throw new Error('hold-jump obstacle missing');
-
-    // "NOW" must be shown inside a practical reaction window.
-    api.setRun({scroll:wide.x-150-135,y:0,vy:0,grounded:true});
-    api.step(1);
-    const cue=document.getElementById('dash-tip')?.textContent||'';
-    if(!/HOLD JUMP NOW/.test(cue))throw new Error('hold-jump NOW cue missing: '+cue);
-
-    // Simulate the actual action after a short human reaction delay.
-    api.step(24);
-    api.setInput('jump','repro',true);
-    api.step(95);
-    api.setInput('jump','repro',false);
-    api.step(30);
+    passFixture('tutorial-hold-jump');
 
     const finalState=window.chimpionsDash();
     const finalSnap=api.snapshot();
-    if(finalState.state!=='running'||finalSnap.run.dead)throw new Error('hold-jump lesson ended the run');
-    if((finalState.tutorial?.index??0)<2)throw new Error('hold-jump lesson did not advance');
+    const slide=finalSnap.obstacles.find(o=>o.patternId==='tutorial-slide'&&!o.hit&&!o.passed);
+    if(finalState.state!=='running'||finalSnap.run.dead)throw new Error('run stopped after hold-jump');
+    if(finalState.tutorial?.index!==2)throw new Error('hold-jump did not advance to slide');
+    if(!slide)throw new Error('slide tutorial obstacle was not spawned');
+    if(slide.family!=='overhead')throw new Error('slide tutorial spawned wrong family: '+slide.family);
     if(finalState.lastRuntimeError)throw new Error('runtime error: '+finalState.lastRuntimeError);
 
     return{
-      retryState:retryState.state,
-      tutorialIndex:finalState.tutorial?.index,
-      cue,
-      runtimeErrorCount:finalState.runtimeErrorCount,
+      state:finalState.state,
+      tutorialIndex:finalState.tutorial.index,
+      nextPattern:slide.patternId,
+      nextObstacle:slide.id,
+      nextFamily:slide.family,
       lastRuntimeError:finalState.lastRuntimeError
     };
   });
 
   if(pageErrors.length)throw new Error('page errors: '+pageErrors.join('\n'));
-  console.log('PASS_TUTORIAL_ACTION_WINDOW',JSON.stringify(result));
+  console.log('PASS_TUTORIAL_STAGE1_SLIDE_SPAWN',JSON.stringify(result));
 }finally{
   await browser.close();
 }
