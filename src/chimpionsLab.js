@@ -445,7 +445,7 @@ function patternCatalog(){
   }));
 }
 function chooseWeighted(list){return chooseDashWeighted(run,list);}
-function chooseFamily(family,difficulty){return chooseDashObstacle(run,{family,difficulty,stage:run.stage});}
+function chooseFamily(family,difficulty,allowLocked=false){return chooseDashObstacle(run,{family,difficulty,stage:run.stage,allowLocked});}
 function safeGap(previous,next,requested,chainLength=1){
   return requiredDashReactionTime(previous,next,{requested,chainLength});
 }
@@ -464,7 +464,7 @@ function spawnPattern(){
   const created=[];
   let x=spawnCursor;
   for(let i=0;i<def.items.length;i++){
-    const[family,gap]=def.items[i],type=chooseFamily(family,def.difficulty);
+    const[family,gap]=def.items[i],type=chooseFamily(family,def.difficulty,!!def.tutorial);
     let transitionSpeed=null;
     if(i){
       const previous=created.at(-1);
