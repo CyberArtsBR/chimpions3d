@@ -2,7 +2,9 @@ import './menuScreensV2.css';
 import './menuScreensFinal.css';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 
-const launcher=()=>{location.href='/'};
+const BASE=import.meta.env.BASE_URL;
+
+const launcher=()=>{location.href=BASE};
 function backButton(parent,className=''){
   let button=parent.querySelector(':scope > .games-back');
   if(button)return button;
@@ -183,8 +185,8 @@ export function setupDashMenu(){
     setBusy(true,'Loading approved roster…');
     try{
       const [avatars,cards]=await Promise.all([
-        fetch('/avatars.json').then(r=>{if(!r.ok)throw new Error('avatars '+r.status);return r.json()}),
-        fetch('/characters.json').then(r=>r.ok?r.json():[]).catch(()=>[])
+        fetch(BASE+'avatars.json').then(r=>{if(!r.ok)throw new Error('avatars '+r.status);return r.json()}),
+        fetch(BASE+'characters.json').then(r=>r.ok?r.json():[]).catch(()=>[])
       ]);
       const approvedCards=filterBuiltInRoster(cards),images=new Map(approvedCards.map(c=>[String(c.id),c.image]));
       entries=filterBuiltInRoster(avatars.filter(e=>e.url)).map(e=>({...e,image:e.image||images.get(String(e.id))}));
