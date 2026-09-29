@@ -1,3 +1,6 @@
+import './menuScreensV2.css';
+import './menuScreensFinal.css';
+
 const params=new URLSearchParams(location.search);
 const BASE=import.meta.env.BASE_URL;
 
@@ -5,6 +8,7 @@ const BASE=import.meta.env.BASE_URL;
 // Never route through the cartridge launcher or sibling games.
 document.documentElement.style.setProperty('--jump-screen-art',`url("${BASE}screens/chimp-jump-start.png")`);
 document.documentElement.style.setProperty('--jump-legacy-start-art',`url("${BASE}ui/start-screen.webp")`);
+document.body.classList.add('jump-start-screen');
 
 document.body.dataset.uiReady='loading';
 document.body.dataset.menuReady='loading';
