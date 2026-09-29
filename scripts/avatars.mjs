@@ -10,8 +10,9 @@ const overrides=JSON.parse(fs.readFileSync('public/avatar-overrides.json','utf8'
 if(cards.length!==BUILT_IN_CHIMPION_NAMES.length)throw new Error('characters.json must contain all 10 approved built-in Chimpions.');
 const names=new Map(cards.map(c=>[normalize(c.name),c]));
 const characterDir='public/model/characters';
+const assetFilename=name=>name.replace(/\s+/g,'_')+'.glb';
 const diskGlbs=fs.readdirSync(characterDir,{withFileTypes:true}).filter(entry=>entry.isFile()&&/\.glb$/i.test(entry.name)).map(entry=>entry.name);
-const expected=new Set(BUILT_IN_CHIMPION_NAMES.map(name=>name+'.glb'));
+const expected=new Set(BUILT_IN_CHIMPION_NAMES.map(assetFilename));
 const unexpected=diskGlbs.filter(name=>!expected.has(name));
 const missing=[...expected].filter(name=>!diskGlbs.includes(name));
 if(unexpected.length)throw new Error('Unexpected character GLBs: '+unexpected.join(', '));
@@ -19,7 +20,7 @@ if(missing.length)throw new Error('Missing approved character GLBs: '+missing.jo
 
 const entries=[],report={duplicates:[],extra:[],missing:[],unavailable:[]};
 for(const name of BUILT_IN_CHIMPION_NAMES){
- const filename=name+'.glb',full=path.join(characterDir,filename),card=names.get(normalize(name));
+ const filename=assetFilename(name),full=path.join(characterDir,filename),card=names.get(normalize(name));
  if(!card)throw new Error('Missing approved metadata for '+name);
  const entry={...card,id:String(card.id)};
  const reason=overrides[entry.name]?.unavailable;
