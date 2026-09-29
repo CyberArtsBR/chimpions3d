@@ -4,7 +4,7 @@ import './canopyPresentation.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
-const MENU_ART_URL='/screens/chimp-jump-start.png';
+const MENU_ART_URL=import.meta.env.BASE_URL+'screens/chimp-jump-start.png';
 const loadJSON=(key,fallback)=>{try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{return {...fallback}}};
 const loadGoals=()=>{try{const value=JSON.parse(localStorage.getItem(GOALS_KEY)||'[]');return Array.isArray(value)?value:[]}catch{return []}};
 const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
@@ -48,7 +48,7 @@ export function setupJumpExperience(){
   const toolDock=document.createElement('nav');toolDock.id='jump-menu-tools';toolDock.setAttribute('aria-label','Game navigation, help and options');
   const guideButton=makeButton('jump-guide-button','Field Guide');guideButton.setAttribute('aria-haspopup','dialog');
   const optionsButton=makeButton('jump-options-button','Options');optionsButton.setAttribute('aria-haspopup','dialog');
-  const homeButton=makeButton('jump-home-button','Home');homeButton.setAttribute('aria-label','Back to game selection');
+  const homeButton=makeButton('jump-home-button','Home');homeButton.setAttribute('aria-label','Return to Chimp Jump start screen');
   toolDock.append(guideButton,optionsButton,homeButton);
 
   const hint=document.createElement('div');hint.id='jump-control-hint';hint.textContent=matchMedia('(pointer: coarse)').matches?'Hold ◀ ▶ to steer · auto-jump':'← → / A D · mouse · gamepad · auto-jump';
