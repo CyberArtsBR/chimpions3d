@@ -126,7 +126,7 @@ let visualTime=0,acc=0,previous=performance.now(),lastTheme=-1,introTime=3,count
 let best=0,muted=false,audioContext,toastTimer,avatarRequest=0,avatarAbortController=null,catalog=[],collection=[],selectedId='';
 const runSession=new RunSession({beginOnline:()=>leaderboard.begin()});
 let pendingEntry=null,selectionConfirmed=false,runTicket=null,inputTrace=new InputTrace(),deathAge=0,deathPoint=null,splashed=false;
-const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>{location.href='/';}}),recordBook=createRecordBook();
+const results=createResults({retry:()=>start(),replay:seed=>start(seed),choose:()=>{selectionConfirmed=false;menu('menu');openSelection();},back:()=>menu('menu')}),recordBook=createRecordBook();
 const giveUpButton=document.createElement('button');giveUpButton.id='give-up';giveUpButton.textContent='Give up';giveUpButton.hidden=true;document.querySelector('.card').append(giveUpButton);
 const recordsButton=document.createElement('button');recordsButton.id='records-button';recordsButton.textContent='All-time records';recordsButton.onclick=()=>recordBook.open();document.querySelector('.card').append(recordsButton);
 const music=new Audio(import.meta.env.BASE_URL+'audio/music-full.mp3');music.loop=true;music.volume=.4;music.preload='metadata';const audio=createAudio(music);
@@ -166,7 +166,7 @@ function syncUI(){
  const boostLabel=game.jetRemaining>0?'JETPACK '+Math.ceil(game.jetRemaining)+'s':'';if($('pace').textContent!==boostLabel)$('pace').textContent=boostLabel;
  hudText('height',Math.floor(game.height));hudText('coins',game.bananas);hudText('hud-best',Math.floor(Math.max(best,game.height)));hudText('best','PERSONAL BEST  ·  '+Math.floor(best)+' m');
  const eventActive=mode==='playing'&&!!game.event;$('canopy-event').hidden=!eventActive;if(eventActive)$('canopy-event').textContent=eventLabels[game.event.type]||'CANOPY EVENT';
- $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';$('rig-link').hidden=mode==='paused';recordsButton.hidden=mode==='paused';giveUpButton.hidden=mode!=='paused';$('overlay').hidden=['playing','dying','over','starting'].includes(mode);
+ $('pause').hidden=mode!=='playing';$('touch').hidden=mode!=='playing';$('rig-link').hidden=true;recordsButton.hidden=mode==='paused';giveUpButton.hidden=mode!=='paused';$('overlay').hidden=['playing','dying','over','starting'].includes(mode);
  audio.setGameplayActive(mode==='playing'||mode==='starting');audio.setJetActive(mode==='playing'&&game.jetRemaining>0);
 }
 function menu(kind){
@@ -189,6 +189,8 @@ function menu(kind){
  });
  if(kind==='menu'&&ready)runSession.prepare();
 }
+addEventListener('chimp-jump-home',()=>menu('menu'));
+
 function beginPlaying(){
  mode='playing';countdown.hidden=true;countdownTime=0;introTime=0;autoPauseAfter=performance.now()+1200;runSession.markPlaying();
  inputManager.clearGameplay();acc=0;previous=performance.now();syncUI();
