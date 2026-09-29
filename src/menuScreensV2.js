@@ -23,7 +23,7 @@ function backButton(parent,className=''){
 
 export function setupJumpMenu(){
   const card=document.querySelector('#overlay .card');if(!card)return;
-  const button=backButton(card,'jump-back');button.textContent='Back to the game selection';
+  card.querySelector(':scope > .games-back')?.remove();
   document.body.classList.add('jump-start-screen');
 }
 
