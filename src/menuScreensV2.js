@@ -3,6 +3,9 @@ import './menuScreensFinal.css';
 import {filterBuiltInRoster,fallbackBuiltIn} from './roster.js';
 
 const BASE=import.meta.env.BASE_URL;
+document.documentElement.style.setProperty('--jump-screen-art',`url("${BASE}screens/chimp-jump-start.png")`);
+document.documentElement.style.setProperty('--dash-screen-art',`url("${BASE}screens/chimp-dash-start-853ee5d1.png")`);
+document.documentElement.style.setProperty('--arena-screen-art',`url("${BASE}screens/card-arena-start-0920443d.png")`);
 
 const launcher=()=>{location.href=BASE};
 function backButton(parent,className=''){
