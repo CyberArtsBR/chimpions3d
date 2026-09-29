@@ -3,7 +3,7 @@
 /* CHIMPIONS DASH — keep the approved art sharp, full-viewport and free of panel blur. */
 body[data-lab-state="menu"].dash-start-screen #dash-stage:before{
   inset:0!important;
-  background:#06110a url('/screens/chimp-dash-start-853ee5d1.png') center/100% 100% no-repeat!important;
+  background:#06110a var(--dash-screen-art) center/100% 100% no-repeat!important;
   filter:none!important;
 }
 body[data-lab-state="menu"].dash-start-screen #dash-menu{
@@ -49,7 +49,7 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
 .arena-art{
   position:fixed!important;inset:0!important;left:0!important;top:0!important;
   transform:none!important;width:100vw!important;height:100vh!important;
-  background:#06110a url('/screens/card-arena-start-0920443d.png') center/100% 100% no-repeat!important;
+  background:#06110a var(--arena-screen-art) center/100% 100% no-repeat!important;
 }
 .arena-actions{position:absolute!important;inset:0!important}
 .arena-actions button{
@@ -90,7 +90,7 @@ body[data-lab-state="menu"].dash-start-screen .games-back:active{
 
 /* Dash AAA presentation: artwork is decorative; interaction is real viewport UI. */
 body[data-lab-state="menu"].dash-start-screen #dash-stage:before{
-  background:#06110a url('/screens/chimp-dash-start-853ee5d1.png') center/cover no-repeat!important;
+  background:#06110a var(--dash-screen-art) center/cover no-repeat!important;
 }
 body[data-lab-state="menu"].dash-start-screen #dash-menu>.dash-entry-actions{
   display:flex!important;
