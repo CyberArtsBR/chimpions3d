@@ -229,7 +229,7 @@ export function setupJumpExperience(){
 
   guideButton.onclick=()=>openGuide(guideButton);
   optionsButton.onclick=()=>openSettings(optionsButton);
-  homeButton.onclick=()=>{location.href='/';};
+  homeButton.onclick=()=>{window.dispatchEvent(new Event('chimp-jump-home'));};
   dialog.querySelector('.guide-close').onclick=()=>dialog.close();
   settings.querySelector('.settings-close').onclick=()=>settings.close();
   dialog.addEventListener('close',()=>restoreFocus(dialog));
@@ -247,7 +247,7 @@ export function setupJumpExperience(){
     requestAnimationFrame(()=>document.getElementById('play')?.click());
   };
   pauseActions.querySelector('#jump-pause-guide').onclick=event=>openGuide(event.currentTarget);
-  pauseActions.querySelector('#jump-home').onclick=()=>{location.href='/';};
+  pauseActions.querySelector('#jump-home').onclick=()=>{window.dispatchEvent(new Event('chimp-jump-home'));};
 
   window.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&(dialog.open||settings.open)){
