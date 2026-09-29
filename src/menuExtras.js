@@ -50,7 +50,7 @@ function makeSocialButtons(card){
 function mount(){
   const card=document.querySelector('#overlay .card');
   if(!card)return;
-  makeLabButton(card);
+  card.querySelector('#chimpions-lab-button')?.remove();
   makeSocialButtons(card);
 }
 
