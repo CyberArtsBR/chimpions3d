@@ -2,9 +2,10 @@ import './jumpExperience.css';
 import './jumpPresentationV2.css';
 import './canopyPresentation.css';
 import {JUMP_GOALS,evaluateJumpGoals} from './jumpGoals.js';
+import jumpStartArt from './assets/chimp-jump-start.png';
 
 const PREFS_KEY='chimp-jump-comfort-v1',GOALS_KEY='chimp-jump-goals-v1';
-const MENU_ART_URL=import.meta.env.BASE_URL+'screens/chimp-jump-start.png';
+const MENU_ART_URL=jumpStartArt;
 const loadJSON=(key,fallback)=>{try{return {...fallback,...JSON.parse(localStorage.getItem(key)||'{}')}}catch{return {...fallback}}};
 const loadGoals=()=>{try{const value=JSON.parse(localStorage.getItem(GOALS_KEY)||'[]');return Array.isArray(value)?value:[]}catch{return []}};
 const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{}};
