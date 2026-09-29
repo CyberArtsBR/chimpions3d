@@ -49,10 +49,10 @@
 @media(min-width:900px){.card{width:440px;border-radius:30px}.card h1{font-size:72px;letter-spacing:-4px}.primary{padding:18px}.card .eyebrow{letter-spacing:2px}}
 /* Illustrated title screen: artwork underneath real, keyboard-accessible controls. */
 #menu-backdrop{display:none}
-body[data-mode=menu] #menu-backdrop{display:block;position:fixed;inset:-30px;background:#233b20 url('/ui/start-screen.webp') center/cover;filter:blur(16px) brightness(.58);pointer-events:none}
+body[data-mode=menu] #menu-backdrop{display:block;position:fixed;inset:-30px;background:#233b20 var(--jump-legacy-start-art) center/cover;filter:blur(16px) brightness(.58);pointer-events:none}
 body[data-mode=menu] #hud,body[data-mode=menu] #theme,body[data-mode=menu] #pace,body[data-mode=menu] .court-edges,body[data-mode=menu] .footer{visibility:hidden}
 body[data-mode=menu] #overlay{padding:0;background:none;overflow:auto;overflow-x:hidden;display:flex;align-items:safe center;justify-content:center}
-body[data-mode=menu] .card{--menu-width:clamp(560px,75dvh,1080px);width:var(--menu-width);height:calc(var(--menu-width)*4/3);flex-shrink:0;max-height:none;max-width:none;padding:0;border:0;border-radius:0;overflow:visible;background:url('/ui/start-screen.webp') center/100% 100% no-repeat;box-shadow:0 0 80px #0e241e80;container-type:inline-size;position:relative}
+body[data-mode=menu] .card{--menu-width:clamp(560px,75dvh,1080px);width:var(--menu-width);height:calc(var(--menu-width)*4/3);flex-shrink:0;max-height:none;max-width:none;padding:0;border:0;border-radius:0;overflow:visible;background:var(--jump-legacy-start-art) center/100% 100% no-repeat;box-shadow:0 0 80px #0e241e80;container-type:inline-size;position:relative}
 body[data-mode=menu] #title{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;margin:0}
 body[data-mode=menu] .card #eyebrow{position:absolute;left:26%;top:5.1%;width:48%;font-size:2.05cqw;letter-spacing:.18cqw;color:#fff8e5;line-height:1.5;text-shadow:0 2px 3px #241409}
 body[data-mode=menu] .card #description{position:absolute;left:26%;top:32%;width:49%;max-width:none;margin:0;color:#fff8ea;font-size:2.2cqw;font-weight:700;line-height:1.5;text-shadow:0 2px 3px #1a1007}
