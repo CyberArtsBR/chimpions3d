@@ -1,42 +1,45 @@
 import './launcher.css';
 import './launcherFinal.css';
 
+const BASE=import.meta.env.BASE_URL;
+const asset=path=>BASE+String(path).replace(/^\/+/, '');
+
 document.title='Chimpions Games';
 document.body.innerHTML=`
 <div class="app" id="app">
-  <img class="room-bg" src="/launcher/room-background.png" alt="" />
+  <img class="room-bg" src="${asset('launcher/room-background.png')}" alt="" />
   <div class="vignette"></div>
   <div class="header-ui">
-    <img class="logo" src="/launcher/logo.png" alt="The Chimpions Games" />
+    <img class="logo" src="${asset('launcher/logo.png')}" alt="The Chimpions Games" />
     <nav class="socials" aria-label="Chimpions links">
-      <a class="social-link" href="https://www.chimpions.co/" target="_blank" rel="noopener noreferrer" aria-label="Official Chimpions Site"><img src="/launcher/social-site.png" alt="Official Chimpions Site" /></a>
-      <a class="social-link" href="https://x.com/TheChimpions" target="_blank" rel="noopener noreferrer" aria-label="Chimpions on X"><img src="/launcher/social-x.png" alt="Chimpions on X" /></a>
-      <a class="social-link" href="https://discord.com/invite/thechimpions" target="_blank" rel="noopener noreferrer" aria-label="Discord"><img src="/launcher/social-discord.png" alt="Discord" /></a>
+      <a class="social-link" href="https://www.chimpions.co/" target="_blank" rel="noopener noreferrer" aria-label="Official Chimpions Site"><img src="${asset('launcher/social-site.png')}" alt="Official Chimpions Site" /></a>
+      <a class="social-link" href="https://x.com/TheChimpions" target="_blank" rel="noopener noreferrer" aria-label="Chimpions on X"><img src="${asset('launcher/social-x.png')}" alt="Chimpions on X" /></a>
+      <a class="social-link" href="https://discord.com/invite/thechimpions" target="_blank" rel="noopener noreferrer" aria-label="Discord"><img src="${asset('launcher/social-discord.png')}" alt="Discord" /></a>
     </nav>
   </div>
   <div class="carousel" id="carousel">
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Jump" data-index="0"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Jump cartridge" src="/launcher/cartridge-jump.png" /></div></div></div></div>
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Dash" data-index="1"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Dash cartridge" src="/launcher/cartridge-dash.png" /></div></div></div></div>
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Card Arena" data-index="2"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Card Arena cartridge" src="/launcher/cartridge-arena.png" /></div></div></div></div>
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Ski" data-index="3"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Ski cartridge" src="/launcher/cartridge-ski-hq.webp" /></div></div></div></div>
-    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Urban Sports" data-index="4"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Urban Sports cartridge" src="/launcher/cartridge-urban-sports.webp" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Jump" data-index="0"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Jump cartridge" src="${asset('launcher/cartridge-jump.png')}" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimp Dash" data-index="1"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimp Dash cartridge" src="${asset('launcher/cartridge-dash.png')}" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Card Arena" data-index="2"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Card Arena cartridge" src="${asset('launcher/cartridge-arena.png')}" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Ski" data-index="3"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Ski cartridge" src="${asset('launcher/cartridge-ski-hq.webp')}" /></div></div></div></div>
+    <div class="cart-wrap" role="button" tabindex="0" aria-label="Play Chimpions Urban Sports" data-index="4"><div class="cart-entry"><div class="float"><div class="cart-body"><img class="cart-image" alt="Chimpions Urban Sports cartridge" src="${asset('launcher/cartridge-urban-sports.webp')}" /></div></div></div></div>
   </div>
   <div class="play-pill">Click to Play</div>
   <div class="controls"><span class="key">A</span><span class="key">D</span><span>Select</span><span class="sep">•</span><span class="key">↵</span><span>Play</span><span class="sep">•</span><span>Click a side cartridge to center it</span></div>
   <div class="gamepad-status" id="gamepadStatus">Gamepad: not connected</div>
   <button type="button" class="music-toggle" id="musicToggle">Play Music</button>
   <div class="music-status" id="musicStatus">Music: waiting for autoplay</div>
-  <audio id="bgm" src="/launcher/chimpions.mp3" loop preload="none"></audio>
+  <audio id="bgm" src="${asset('launcher/chimpions.mp3')}" loop preload="none"></audio>
   <div class="label-zoom" id="labelZoom"><img id="labelZoomImage" alt="" /></div>
   <div class="fade-cover"></div>
 </div>`;
 
 const games=[
-  {name:'Chimp Jump',url:'/?play=jump',image:'/launcher/cartridge-jump.png'},
-  {name:'Chimp Dash',url:'/?dash=1',image:'/launcher/cartridge-dash.png'},
-  {name:'Chimpions Card Arena',url:'/?arena=1',image:'/launcher/cartridge-arena.png'},
-  {name:'Chimpions Ski',url:'https://chimpions-ski.onrender.com',image:'/launcher/cartridge-ski-hq.webp'},
-  {name:'Chimpions Urban Sports',url:'https://chimpions-urban-sports.onrender.com/',image:'/launcher/cartridge-urban-sports.webp'}
+  {name:'Chimp Jump',url:BASE+'?play=jump',image:asset('launcher/cartridge-jump.png')},
+  {name:'Chimp Dash',url:BASE+'?dash=1',image:asset('launcher/cartridge-dash.png')},
+  {name:'Chimpions Card Arena',url:BASE+'?arena=1',image:asset('launcher/cartridge-arena.png')},
+  {name:'Chimpions Ski',url:'https://chimpions-ski.onrender.com',image:asset('launcher/cartridge-ski-hq.webp')},
+  {name:'Chimpions Urban Sports',url:'https://chimpions-urban-sports.onrender.com/',image:asset('launcher/cartridge-urban-sports.webp')}
 ];
 
 const app=document.getElementById('app');
