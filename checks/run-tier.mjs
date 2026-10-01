@@ -13,9 +13,13 @@ const suites={
     'jump-audit.mjs',
     'production-hook-safety.mjs'
   ],
+  // Current browser acceptance is intentionally split into focused suites.
+  // The old game-browser/collection-browser monoliths encoded retired contracts
+  // (cinematic-max, legacy tree/background readiness, two-step Chimpion confirm)
+  // and duplicated coverage now owned by the targeted regression job, fast asset
+  // validation, countdown, responsive, accessibility, resilience, performance
+  // and visual suites below.
   standard:[
-    'game-browser.mjs',
-    'collection-browser.mjs',
     'countdown-browser.mjs',
     'responsive-browser.mjs',
     'accessibility-browser.mjs',
