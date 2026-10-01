@@ -41,6 +41,7 @@ if(params.has('lab')){
       import('./menuExtras.js')
     ]);
     await import('./game.js');
+    const {setupJumpStartScreenRecovery}=await import('./jumpStartScreenRecovery.js');setupJumpStartScreenRecovery();
     const {setupJumpMasteryPresentation}=await import('./jumpMasteryPresentation.js');setupJumpMasteryPresentation();
     setupBiomePolish();
     setupMenuExtras();
