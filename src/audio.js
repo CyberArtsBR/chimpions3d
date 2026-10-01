@@ -173,7 +173,7 @@ export function createAudio(music){
  };
  const onMastery=event=>{
   const detail=event?.detail||{},nextFlow=Number(detail.flowMultiplier)||1;
-  if(detail.type==='landing'){
+  if(detail.type==='landing'||detail.type==='bounce'){
    if(detail.landingQuality==='PERFECT'){playRaw('milestone',0,.26,1.18);if(detail.fastFallPerfect)playRaw('confirm',.055,.22,1.34);}
    else if(detail.landingQuality==='EDGE')playRaw('crack',0,.18,.82);
   }else if(detail.type==='fast-fall')playRaw('wrap',0,.14,.72);
