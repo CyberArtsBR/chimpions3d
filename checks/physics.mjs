@@ -13,7 +13,7 @@ assert.equal(ordinal(1),'1st');assert.equal(ordinal(2),'2nd');assert.equal(ordin
 
 assert.equal(RULESET,'2026-10-expedition-v15-mastery');
 assert(JUMP*JUMP/(2*GRAVITY)>4.3);
-assert(Math.abs(JUMP**2/12.6**2-1.3)<1e-10);
+assert(Math.abs(JUMP**2/13.6**2-1.3)<1e-10);
 assert(Math.abs(SPRING_JUMP**2/28**2-1.3)<1e-10);
 assert(LEAF_JUMP>JUMP&&LEAF_JUMP<SPRING_JUMP);
 assert.equal(ITEM_SCALE,1.5);assert.equal(BANANA_HEIGHT,1.35);assert.equal(PLATFORM_SCALE,1.5*.75*.75);
