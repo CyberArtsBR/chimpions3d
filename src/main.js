@@ -20,6 +20,34 @@ function forceStandaloneStartArtwork(){
     'important'
   );
   backdrop.style.setProperty('filter','none','important');
+  backdrop.style.setProperty('overflow','hidden','important');
+
+  // Keep the approved start artwork as a real image layer too. This makes the
+  // standalone build resilient when embedded hosts rewrite CSS/base URLs.
+  let image=document.getElementById('jump-menu-art-recovery');
+  if(!image){
+    image=document.createElement('img');
+    image.id='jump-menu-art-recovery';
+    image.alt='';
+    image.setAttribute('aria-hidden','true');
+    image.decoding='async';
+    Object.assign(image.style,{
+      position:'absolute',inset:'0',width:'100%',height:'100%',
+      objectFit:'cover',objectPosition:'center',pointerEvents:'none',zIndex:'0'
+    });
+    backdrop.prepend(image);
+  }
+  image.src=jumpStartArt;
+
+  if(!document.getElementById('jump-standalone-start-recovery-style')){
+    const style=document.createElement('style');
+    style.id='jump-standalone-start-recovery-style';
+    style.textContent=`
+      .jump-start-screen[data-mode="menu"] #jump-menu-art-recovery{display:block!important}
+      body:not([data-mode="playing"]) #jump-fast-fall-hint{display:none!important}
+    `;
+    document.head.append(style);
+  }
 }
 document.body.dataset.uiReady='loading';
 document.body.dataset.menuReady='loading';
