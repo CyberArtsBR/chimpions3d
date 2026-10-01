@@ -171,7 +171,8 @@ assert.deepEqual(avatars.map(a=>a.name),BUILT_IN_CHIMPION_NAMES,'Roster order/na
 assert.equal(new Set(avatars.map(a=>a.id)).size,avatars.length,'Unique IDs');
 assert(avatars.every(a=>a.url?.startsWith('model/characters/')),'Every built-in must resolve inside public/model/characters');
 const characterFiles=fs.readdirSync('public/model/characters').filter(name=>/\.glb$/i.test(name)).sort();
-assert.deepEqual(characterFiles,[...BUILT_IN_CHIMPION_NAMES].map(name=>name+'.glb').sort(),'Character directory must contain only the 10 approved GLBs');
+const expectedCharacterFiles=avatars.map(a=>path.basename(decodeURIComponent(a.url))).sort();
+assert.deepEqual(characterFiles,expectedCharacterFiles,'Character directory must contain only the 10 approved GLBs referenced by the roster');
 assert(fs.existsSync('public/model/chimpion.glb'),'Required non-roster public/model/chimpion.glb must be preserved');
 
 const avatarReport=[];
