@@ -27,8 +27,11 @@ try{
       await gotoJump(page,{test:true});
       await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
       await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
+      assert.equal(await page.locator('#confirm-chimpion').count(),0,scenario.name+': redundant confirmation button must stay removed');
+      const option=page.locator('#collection-dialog .avatar-option:not(:disabled)').first();
+      await option.waitFor({state:'visible'});
       const started=Date.now();
-      await page.locator('#confirm-chimpion').click();
+      await option.click();
       await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:1500});
       const budget=scenario.name==='slow-late-response'?1200:2500;
       await page.waitForFunction(()=>window.chimpJump?.().countdown===3&&!document.getElementById('countdown').hidden,null,{timeout:budget});
@@ -63,7 +66,8 @@ try{
     await offline.context().setOffline(true);
     await offline.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
     await offline.locator('#collection-dialog[open]').waitFor({state:'visible'});
-    await offline.locator('#confirm-chimpion').click();
+    assert.equal(await offline.locator('#confirm-chimpion').count(),0,'offline: redundant confirmation button must stay removed');
+    await offline.locator('#collection-dialog .avatar-option:not(:disabled)').first().click();
     await offline.waitForFunction(()=>window.chimpJump?.().countdown===3,null,{timeout:2500});
     item.countdownStarted=true;
   }catch(error){
