@@ -40,6 +40,25 @@ try{
   await page.waitForFunction(()=>window.chimpJump?.().ready&&document.body?.dataset?.mode==='menu',{timeout:30000});
   await page.waitForFunction(()=>document.getElementById('play')&&!document.getElementById('play').disabled,{timeout:10000});
 
+  // The illustrated title screen is production-critical. A missing image used to
+  // leave only the dark green menu fallback while the transparent hotspots stayed live.
+  await page.waitForFunction(()=>{
+    const image=document.getElementById('jump-menu-art-recovery');
+    return !!image?.complete&&image.naturalWidth>0&&image.naturalHeight>0;
+  },{timeout:15000});
+  const startArt=await page.evaluate(()=>{
+    const image=document.getElementById('jump-menu-art-recovery');
+    const fastFall=document.getElementById('jump-fast-fall-hint');
+    return {
+      width:image.naturalWidth,height:image.naturalHeight,src:image.currentSrc||image.src,
+      visible:getComputedStyle(image).display!=='none'&&getComputedStyle(image).visibility!=='hidden',
+      fastFallVisible:!!fastFall&&getComputedStyle(fastFall).display!=='none'&&!fastFall.hidden
+    };
+  });
+  assert(startArt.visible,'Jump start artwork must be visible in menu mode');
+  assert.equal(startArt.fastFallVisible,false,'Fast Fall hint must never leak onto the title screen');
+  report.startArt=startArt;
+
   // Controller-only title-screen activation: no mouse click.
   await page.waitForFunction(()=>document.activeElement?.id==='play',{timeout:5000});
   assert.equal(await page.evaluate(()=>document.activeElement?.id),'play','Connected controller must focus the transparent Start Game hotspot');
@@ -58,63 +77,69 @@ try{
   assert.equal(await page.locator('#collection-dialog[open]').count(),0,'Selecting a Chimpion with A must close the picker and start the run');
   report.chosenChimpion=chosen;
 
-  await page.waitForFunction(()=>window.chimpJump?.().backgroundReady,{timeout:30000});
+  // Expedition artwork is now the active gameplay backdrop. The legacy scenery
+  // backgroundReady flag intentionally stays false while that backdrop is selected.
+  await page.waitForFunction(()=>{
+    const active=document.querySelector('.expedition-backdrop.active');
+    const image=active?.querySelector('img');
+    return !!active&&!active.hidden&&!!image?.complete&&image.naturalWidth>0;
+  },{timeout:30000});
+  report.expeditionBackdrop=await page.evaluate(()=>{
+    const active=document.querySelector('.expedition-backdrop.active');
+    const image=active?.querySelector('img');
+    return {active:!!active,hidden:!!active?.hidden,width:image?.naturalWidth||0,height:image?.naturalHeight||0};
+  });
+
   await page.evaluate(()=>window.chimpJumpTest.suspendRendering());
   await page.evaluate(()=>window.chimpJumpTest.render());
 
   await page.evaluate(()=>window.chimpJumpTest.setQuality('balanced'));
   await page.evaluate(()=>window.chimpJumpTest.render());
   const balanced=await snapshot('balanced');
-  const balancedDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
+  assert.equal(balanced.quality,'balanced');
+  assert(balanced.rendererDpr<=1.11,'Balanced DPR must stay within its 1.1 cap');
+  assert.equal(balanced.ambientOcclusionEnabled,false,'Balanced must keep AO disabled');
+  assert.equal(balanced.bloomEnabled,false,'Balanced must keep bloom disabled');
 
   await page.evaluate(()=>window.chimpJumpTest.setQuality('high'));
   await page.evaluate(()=>window.chimpJumpTest.render());
   const high=await snapshot('high');
   assert.equal(high.quality,'high');
-  assert.equal(high.backgroundMode,'layered-forest','HIGH must use the Balanced layered-forest background style');
-  assert.equal(high.treeAuthoredVisible,false,'HIGH must not show the authored tree plate');
-  assert.equal(high.treeFallbackVisible,true,'HIGH must render the layered forest');
-  assert.equal(high.forestVisibleLayers,balanced.forestVisibleLayers,'HIGH must use the same forest-layer composition as Balanced');
-  assert(high.forestTextureScale>=1.5,'HIGH layered forest must use the high-density texture set');
   assert(Math.abs(high.rendererDpr-1.6)<.01,'HIGH must render at true 1.6 DPR');
   assert.equal(high.ambientOcclusionEnabled,true,'HIGH must retain max-quality ambient occlusion');
   assert.equal(high.sharpenEnabled,true,'HIGH must retain sharpening');
   assert.equal(high.colorGradingEnabled,true,'HIGH must retain color grading');
-  const highDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
-  assert.deepEqual(highDom,balancedDom,'HIGH must preserve the exact Balanced DOM background composition');
-  report.balancedDom=balancedDom;
-  report.highDom=highDom;
+  assert.equal(high.bloomEnabled,true,'HIGH must retain controlled bloom');
 
-  // The historical arcade ramp was roughly .92x -> 3.0x by five minutes.
-  const checkpoints=[[0,.92],[60,1.336],[120,1.752],[180,2.168],[240,2.584],[300,3]];
+  // Pace is altitude-directed: +0.06 every 200m through 1000m, then +0.035 per 200m.
+  const checkpoints=[[0,.96],[200,1.02],[400,1.08],[600,1.14],[800,1.20],[1000,1.26],[1200,1.295]];
   const pace=[];
-  for(const [time,expected] of checkpoints){
-    const value=await page.evaluate(t=>{window.chimpJumpTest.game().time=t;return window.chimpJump().pace;},time);
-    pace.push({time,value,expected});
-    assert(Math.abs(value-expected)<.0001,'Pace mismatch at '+time+'s: '+value+' vs '+expected);
+  for(const [height,expected] of checkpoints){
+    const value=await page.evaluate(h=>{window.chimpJumpTest.game().height=h;return window.chimpJump().pace;},height);
+    pace.push({height,value,expected});
+    assert(Math.abs(value-expected)<.0001,'Pace mismatch at '+height+'m: '+value+' vs '+expected);
   }
+  const latePace=await page.evaluate(()=>{window.chimpJumpTest.game().height=10000;return window.chimpJump().pace;});
+  assert(latePace>2.8,'Pace must remain uncapped in late game');
   report.pace=pace;
+  report.latePace=latePace;
 
   await page.evaluate(()=>window.chimpJumpTest.setQuality('ultra'));
   await page.evaluate(()=>window.chimpJumpTest.render());
   const ultra=await snapshot('ultra');
   assert.equal(ultra.quality,'ultra');
-  assert.equal(ultra.treeAuthoredVisible,true,'ULTRA must retain the authored scrolling tree');
-  assert.equal(ultra.treeFallbackVisible,false,'ULTRA must not overlay fallback forest');
-  assert.equal(ultra.treeMistVisible,false,'ULTRA must not overlay mist on the 4K tree');
-  assert.equal(ultra.bloomEnabled,false,'ULTRA glow/bloom must be disabled');
-  assert.equal(ultra.atmosphereEnabled,false,'ULTRA atmosphere glow must be disabled');
-  assert.equal(ultra.lightShaftsEnabled,false,'ULTRA top-left light shafts must be disabled');
   assert(Math.abs(ultra.rendererDpr-1.6)<.01,'ULTRA must actually render at 1.6 DPR');
-  assert(ultra.treeAnisotropy>=4,'ULTRA tree must retain high texture anisotropy');
-  const ultraDom=await page.evaluate(()=>['sun','rays','hill','mist'].map(cls=>({cls,display:getComputedStyle(document.querySelector('#world>.'+cls)).display})));
-  assert(ultraDom.every(item=>item.display==='none'),'ULTRA must hide legacy DOM background layers');
-  report.ultraDom=ultraDom;
+  assert.equal(ultra.ambientOcclusionEnabled,true,'ULTRA must retain ambient occlusion');
+  assert.equal(ultra.bloomEnabled,true,'ULTRA must retain controlled bloom');
+  assert.equal(ultra.atmosphereEnabled,true,'ULTRA must retain subtle atmosphere');
+  assert.equal(ultra.lightShaftsEnabled,true,'ULTRA must retain subtle light shafts');
+  assert.equal(ultra.sharpenEnabled,true,'ULTRA must retain sharpening');
+  assert.equal(ultra.colorGradingEnabled,true,'ULTRA must retain color grading');
 
   assert.deepEqual(errors,[],'Targeted regression browser run must not emit runtime errors');
   fs.writeFileSync('checks/reported-regressions-report.json',JSON.stringify(report,null,2));
   await page.screenshot({path:'checks/reported-regressions-ultra.png',fullPage:false,animations:'disabled'});
-  console.log('PASS reported regressions: strong pace ramp, controller Start, one-press Chimpion launch, max-quality HIGH layered forest, crisp no-glow ULTRA');
+  console.log('PASS reported regressions: title artwork, controller Start, one-press Chimpion launch, Expedition backdrop, current quality profiles and uncapped altitude pace');
 }finally{
   await browser.close();
 }
