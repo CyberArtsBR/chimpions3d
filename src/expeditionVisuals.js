@@ -50,7 +50,7 @@ const edge=new THREE.MeshStandardMaterial({color:0x89949b,metalness:.8,roughness
 const dark=new THREE.MeshStandardMaterial({color:0x0c1823,metalness:.65,roughness:.4});
 const moss=new THREE.MeshStandardMaterial({color:0x71972e,roughness:.95});
 const leaf=new THREE.MeshStandardMaterial({color:0xaccb42,roughness:.8});
-const colors={solid:0x20d8ff,cracked:0xff454d,moving:0xffd337,vertical:0xb16aff};
+const colors={solid:0x20d8ff,cracked:0xff454d,moving:0xffd337,vertical:0xb16aff,leaf:0x75da67,swing:0x45d8c6,vanish:0xa778ff,spring:0xff7f50};
 const lights=Object.fromEntries(Object.entries(colors).map(([key,color])=>[key,new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:3.6,roughness:.22,metalness:.3,toneMapped:false})]));
 const paints=Object.fromEntries(Object.entries(colors).map(([key,color])=>[key,new THREE.MeshStandardMaterial({color,metalness:.65,roughness:.35})]));
 const ledCanvas=document.createElement('canvas');ledCanvas.width=ledCanvas.height=64;
@@ -67,8 +67,9 @@ export function createTechPlatform(p,group){
  if(group.userData.tech)return group;
  group.userData.tech=true;group.userData.finalVisualPolish=true;
  const legacy=new THREE.Group();legacy.name='legacy-platform';legacy.visible=false;
- for(const child of [...group.children])if(child!==group.userData.coin)legacy.add(child);
- group.add(legacy);delete group.userData.paddles;delete group.userData.mushroom;
+ const keepVisible=new Set([group.userData.coin,group.userData.mushroom,group.userData.leafPad,group.userData.swingRig,group.userData.vanishGlow].filter(Boolean));
+ for(const child of [...group.children])if(!keepVisible.has(child))legacy.add(child);
+ group.add(legacy);delete group.userData.paddles;
  const hull=new THREE.Group();group.add(hull);
  const type=p.type in colors?p.type:'solid',light=lights[type],paint=paints[type],w=p.width;
  function ledHalo(x,y,z,size){const halo=new THREE.Sprite(ledHalos[type]);halo.position.set(x,y,z);halo.scale.set(size,size*.48,1);hull.add(halo);}
@@ -97,10 +98,17 @@ export function createTechPlatform(p,group){
  for(let i=0;i<3;i++){
   const points=[];for(let n=0;n<=12;n++){const t=n/12;points.push(new THREE.Vector3((t-.5)*w*(.5+i*.13),-.39-Math.sin(t*Math.PI)*(.16+i*.07),-.06+i*.08));}
   const vineGeo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),18,.014,5,false);
-  const vine=new THREE.Mesh(vineGeo,moss);hull.add(vine); // Retained with the bounded branch pool.
+  const vine=new THREE.Mesh(vineGeo,moss);hull.add(vine);
  }
- if(type==='moving'||type==='vertical')for(const side of [-1,1]){
-  const marker=piece(hull,plate,light,side*.16,-.18,.405,.08,.022,.025);marker.rotation.z=side*(type==='vertical'?Math.PI/3:-Math.PI/3);
+ if(type==='moving'||type==='vertical'||type==='swing')for(const side of [-1,1]){
+  const marker=piece(hull,plate,light,side*.16,-.18,.405,.08,.022,.025);marker.rotation.z=side*(type==='vertical'?Math.PI/3:type==='swing'?Math.PI/2:-Math.PI/3);
+ }
+ if(type==='leaf'){
+  hull.scale.y=.78;
+  for(const side of [-1,0,1]){const frond=piece(hull,plate,light,side*w*.22,.055,.31,w*.17,.035,.04);frond.rotation.z=side*.16;}
+ }
+ if(type==='vanish'){
+  for(let i=-2;i<=2;i++){const marker=piece(hull,bolt,light,i*w*.16,.03,.43,.045,.045,.02);marker.userData.vanishMarker=true;}
  }
  const halo=new THREE.Sprite(glowMaterial);halo.scale.set(1.2,1.2,1);halo.position.z=-.12;group.userData.coin.add(halo);
  return group;

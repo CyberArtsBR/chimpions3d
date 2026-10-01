@@ -2,11 +2,21 @@ import {DEFAULT_GAMEPAD_DEADZONE,DEFAULT_MENU_DEADZONE,readPad} from './input.js
 
 const isFormTarget=target=>!!target?.closest?.('input,textarea,select,[contenteditable="true"]');
 const neutralPad=()=>({axis:0,axisY:0,menuX:0,menuY:0,buttons:[],connected:false,index:-1,controllerType:'none',rawX:0,rawY:0});
+const gameplayControl=(steer,fastFall,direction=1)=>{
+ steer=Math.max(-1,Math.min(1,Number(steer)||0));
+ if(!fastFall)return steer;
+ const facing=Math.sign(steer)||Math.sign(direction)||1;
+ return Object.freeze({
+  steer,fastFall:true,direction:facing,
+  valueOf(){return Math.abs(steer)>.0001?steer:facing*1e-9;},
+  toString(){return String(steer);}
+ });
+};
 
 export class InputManager{
  constructor({target=globalThis,doc=globalThis.document,nav=globalThis.navigator,deadzone=DEFAULT_GAMEPAD_DEADZONE,menuDeadzone=DEFAULT_MENU_DEADZONE,pollMs=16,autoStart=true}={}){
   this.target=target;this.doc=doc;this.nav=nav;this.deadzone=deadzone;this.menuDeadzone=menuDeadzone;this.pollMs=pollMs;
-  this.keys=new Set();this.touches=new Map();this.mouseTarget=null;this.pad=neutralPad();this.previousButtons=[];this.previousMenuX=0;this.previousMenuY=0;this.listeners=new Set();this.timer=null;
+  this.keys=new Set();this.touches=new Map();this.mouseTarget=null;this.pad=neutralPad();this.previousButtons=[];this.previousMenuX=0;this.previousMenuY=0;this.listeners=new Set();this.timer=null;this.lastGameplayDirection=1;
   this._keydown=e=>this.handleKeyDown(e);this._keyup=e=>this.handleKeyUp(e);this._blur=()=>this.clearGameplay();
   target?.addEventListener?.('keydown',this._keydown);target?.addEventListener?.('keyup',this._keyup);target?.addEventListener?.('blur',this._blur);
   if(autoStart&&typeof target?.setInterval==='function')this.start();
@@ -18,7 +28,7 @@ export class InputManager{
  emit(event){const payload=Object.freeze({...event,connected:this.pad.connected,controllerType:this.pad.controllerType});for(const listener of [...this.listeners])listener(payload);}
  handleKeyDown(event){
   if(isFormTarget(event?.target))return;const code=event?.code||'';
-  if(['ArrowLeft','ArrowRight','KeyA','KeyD'].includes(code)){this.keys.add(code);if(this.doc?.body?.dataset?.mode==='playing')event.preventDefault?.();}
+  if(['ArrowLeft','ArrowRight','ArrowDown','KeyA','KeyD','KeyS'].includes(code)){this.keys.add(code);if(this.doc?.body?.dataset?.mode==='playing')event.preventDefault?.();}
   if(event?.repeat)return;
   if(code==='Enter'&&event?.target?.closest?.('button,a[href]'))return;
   if(code==='Enter')this.emit({confirmPressed:true,cancelPressed:false,pausePressed:false,menuX:0,menuY:0,source:'keyboard'});
@@ -45,14 +55,17 @@ export class InputManager{
   if(event.confirmPressed||event.cancelPressed||event.pausePressed||event.menuX||event.menuY||prevConnected!==next.connected)this.emit(event);
   return this.snapshot();
  }
+ isFastFallPressed(){return this.keys.has('ArrowDown')||this.keys.has('KeyS')||!!this.pad.buttons?.[2];}
  getMoveX({x=0,vx=0}={}){
   const right=this.keys.has('ArrowRight')||this.keys.has('KeyD')||[...this.touches.values()].includes(1),left=this.keys.has('ArrowLeft')||this.keys.has('KeyA')||[...this.touches.values()].includes(-1);
-  const digital=Number(right)-Number(left);if(digital)return digital;
-  if(this.pad.axis)return this.pad.axis;
-  if(this.mouseTarget!==null){const delta=this.mouseTarget-x-vx*Math.abs(vx)/48;return Math.abs(delta)<.12?0:Math.max(-1,Math.min(1,delta*3));}
-  return 0;
+  const digital=Number(right)-Number(left);let steer=0;
+  if(digital)steer=digital;
+  else if(this.pad.axis)steer=this.pad.axis;
+  else if(this.mouseTarget!==null){const delta=this.mouseTarget-x-vx*Math.abs(vx)/48;steer=Math.abs(delta)<.12?0:Math.max(-1,Math.min(1,delta*3));}
+  if(Math.abs(steer)>.05)this.lastGameplayDirection=Math.sign(steer);
+  return gameplayControl(steer,this.isFastFallPressed(),this.lastGameplayDirection);
  }
- snapshot(){return Object.freeze({moveX:this.getMoveX(),menuX:this.pad.menuX||0,menuY:this.pad.menuY||0,connected:this.pad.connected,controllerType:this.pad.controllerType,deadzone:this.deadzone,rawX:this.pad.rawX||0,rawY:this.pad.rawY||0});}
+ snapshot(){const control=this.getMoveX();return Object.freeze({moveX:Number(control?.steer??control)||0,fastFall:!!control?.fastFall,menuX:this.pad.menuX||0,menuY:this.pad.menuY||0,connected:this.pad.connected,controllerType:this.pad.controllerType,deadzone:this.deadzone,rawX:this.pad.rawX||0,rawY:this.pad.rawY||0});}
 }
 
 export const inputManager=new InputManager({autoStart:typeof window!=='undefined'});
