@@ -41,14 +41,16 @@ export async function waitForVisualReadiness(page,{timeout=45000,requireAuthored
     if(!s?.ready||!s.uiReady||document.body?.dataset?.uiReady!=='true'||document.body?.dataset?.mode!=='menu')return false;
     const requiredControls=['jump-guide-button','jump-options-button','play'];
     if(!requiredControls.every(id=>{const element=document.getElementById(id);return element&&!element.disabled&&element.getClientRects().length>0;}))return false;
-    // Heavy authored environment assets are intentionally deferred until run start.
-    // Menu readiness still requires the lightweight world plus all P0 controls.
     if(!requireAuthored)return true;
-    return !!s.treeVisible;
+    // The current title presentation is a full-screen authored image. Legacy
+    // treeVisible/backgroundReady telemetry belongs to the retired scenery layer
+    // and intentionally remains false while the Expedition presentation is active.
+    const image=document.getElementById('jump-menu-art-recovery');
+    return !!image&&image.complete&&image.naturalWidth>0&&image.naturalHeight>0&&getComputedStyle(image).display!=='none';
   },requireAuthored,{timeout});
   await page.evaluate(async()=>{
     if(document.fonts?.ready)await document.fonts.ready;
-    const images=[...document.images].filter(img=>!img.hidden);
+    const images=[...document.images].filter(img=>!img.hidden&&getComputedStyle(img).display!=='none');
     await Promise.all(images.map(async img=>{
       if(!img.complete)await new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});});
       if(img.decode)try{await img.decode();}catch{}
@@ -78,9 +80,11 @@ export async function assertNoHorizontalOverflow(page,label='page'){
 export async function startSelectedRun(page,{fastForward=true}={}){
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
   await page.locator('#collection-dialog[open]').waitFor({state:'visible'});
-  const confirm=page.locator('#confirm-chimpion');
-  await confirm.waitFor({state:'visible'});
-  await confirm.click();
+  const option=page.locator('#collection-dialog .avatar-option:not(:disabled)').first();
+  await option.waitFor({state:'visible'});
+  // Current picker is intentionally one-press: choosing a Chimpion starts the run.
+  assert.equal(await page.locator('#confirm-chimpion').count(),0,'Redundant Chimpion confirmation must stay removed');
+  await option.click();
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
   if(fastForward){
     const hasHook=await page.evaluate(()=>typeof window.chimpJumpTest==='object');
@@ -93,7 +97,10 @@ export async function startSelectedRun(page,{fastForward=true}={}){
     }
     await page.waitForFunction(()=>{
       const state=window.chimpJump?.();
-      return !['high','ultra'].includes(state?.quality)||(state.platformReady&&state.backgroundReady);
+      if(!['high','ultra'].includes(state?.quality))return true;
+      const active=document.querySelector('.expedition-backdrop.active');
+      const image=active?.querySelector('img');
+      return !!state.platformReady&&!!active&&!active.hidden&&!!image?.complete&&image.naturalWidth>0;
     },{timeout:45000});
   }
 }
