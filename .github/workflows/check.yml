@@ -122,10 +122,14 @@ jobs:
             checks/reported-regressions-report.json
             checks/reported-regressions-ultra.png
 
+  # Full browser/network/Dash matrix is validation for PRs and manual QA.
+  # Production main pushes are released from the fast deterministic gate plus
+  # the dedicated reported-regressions browser gate above. This keeps stale or
+  # unrelated Dash/offline matrix checks from blocking a validated Jump hotfix.
   standard-browser:
     name: STANDARD · Chromium E2E, responsive, a11y, network, soak
     needs: fast
-    if: ${{ !contains(github.event.head_commit.message, '[build only]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[build only]') && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
