@@ -22,6 +22,10 @@ export function createResults({retry,replay,choose,back}){
     <div class="result-stat"><small>BANANAS</small><strong id="result-bananas">0</strong></div>
     <div class="result-stat"><small>BEST</small><strong id="result-best">0 m</strong></div>
     <div class="result-stat"><small>CLEAN LANDINGS</small><strong id="result-landings">0</strong></div>
+    <div class="result-stat"><small>PERFECT</small><strong id="result-perfect">0</strong></div>
+    <div class="result-stat"><small>BEST FLOW</small><strong id="result-flow">×1</strong></div>
+    <div class="result-stat"><small>RISK / DANGER</small><strong id="result-risk">0 / 0</strong></div>
+    <div class="result-stat"><small>NEAR MISSES</small><strong id="result-near">0</strong></div>
     <div class="result-stat"><small>TIME</small><strong id="result-duration">0:00</strong></div>
   </div>
   <p id="result-goals" class="result-goals" role="status" aria-live="polite"></p>
@@ -29,7 +33,7 @@ export function createResults({retry,replay,choose,back}){
   <details id="score-details" class="result-details">
     <summary>Score details</summary>
     <p id="score-formula"></p>
-    <div class="score-conversion"><div><small>FINAL SCORE</small><strong id="converted-score">0</strong></div><span aria-hidden="true">+</span><div><small>BANANA BONUS</small><strong id="remaining-bananas">0</strong></div></div>
+    <div class="score-conversion"><div><small>FINAL SCORE</small><strong id="converted-score">0</strong></div><span aria-hidden="true">+</span><div><small>MASTERY BONUS</small><strong id="remaining-bananas">0</strong></div></div>
   </details>
   <p id="ranking-status" role="status" aria-live="polite" aria-atomic="true"></p>
   <form id="record-name" hidden><label for="player-name">Your name · max 10 characters</label><div><input id="player-name" maxlength="10" minlength="1" required autocomplete="nickname" placeholder="CHIMPION"><button>Save record</button></div></form>
@@ -49,6 +53,7 @@ export function createResults({retry,replay,choose,back}){
 
  function announce(){
   if(!finished||!verified)return;
+  if(Number.isFinite(Number(verified.score)))$('converted-score').textContent=Number(verified.score).toLocaleString();
   setSubmissionState('success',verified.rank?`SCORE SUBMITTED · ${ordinal(verified.rank)} place`:`SCORE SUBMITTED · ${verified.score.toLocaleString()} points`);
   $('record-name').hidden=!verified.rank;
  }
@@ -79,9 +84,9 @@ export function createResults({retry,replay,choose,back}){
  dialog.addEventListener('cancel',event=>{event.preventDefault();$('back-to-games')?.focus({preventScroll:true});});
 
  function finishScoreAnimation(){
-  const total=scoreFor(run.meters,run.bananas);
+  const total=scoreFor(run.meters,run.bananas,run.skillBonus);
   $('converted-score').textContent=total.toLocaleString();
-  $('remaining-bananas').textContent=(run.bananas*10).toLocaleString();
+  $('remaining-bananas').textContent=Math.max(0,Math.floor(Number(run.skillBonus)||0)).toLocaleString();
   finished=true;announce();
  }
 
@@ -89,22 +94,28 @@ export function createResults({retry,replay,choose,back}){
   open(result){
    generation++;run=result;age=0;finished=false;verified=null;
    const meters=Math.floor(Number(result.meters)||0),bananas=Math.max(0,Number(result.bananas)||0),best=Math.floor(Number(result.best)||meters);
-   const landings=Math.max(0,Math.floor(Number(result.cleanLandings)||0));
-   const seed=Number(result.seed),goals=result.goals||{};
+   const landings=Math.max(0,Math.floor(Number(result.cleanLandings)||0)),skillBonus=Math.max(0,Math.floor(Number(result.skillBonus)||0));
+   const perfect=Math.max(0,Math.floor(Number(result.perfectLandings)||0)),near=Math.max(0,Math.floor(Number(result.nearMisses)||0));
+   const risk=Math.max(0,Math.floor(Number(result.riskLandings)||0)),danger=Math.max(0,Math.floor(Number(result.dangerLandings)||0));
+   const bestFlow=Math.max(1,Number(result.bestFlow)||1),seed=Number(result.seed),goals=result.goals||{};
    dialog.dataset.newBest=String(!!result.newBest);$('result-record').hidden=!result.newBest;
    $('result-height').textContent=meters.toLocaleString()+' m';
    $('result-bananas').textContent=bananas.toLocaleString();
    $('result-duration').textContent=formatDuration(result.duration);
    $('result-best').textContent=best.toLocaleString()+' m';
    $('result-landings').textContent=landings.toLocaleString();
+   $('result-perfect').textContent=perfect.toLocaleString();
+   $('result-flow').textContent='×'+String(bestFlow).replace('.0','');
+   $('result-risk').textContent=risk.toLocaleString()+' / '+danger.toLocaleString();
+   $('result-near').textContent=near.toLocaleString();
    $('result-seed').textContent=Number.isFinite(seed)?String(seed>>>0):'—';
    const completed=Math.max(0,Number(goals.completed)||0),totalGoals=Math.max(completed,Number(goals.total)||0),newGoals=Array.isArray(goals.newlyUnlocked)?goals.newlyUnlocked:[];
    $('result-goals').textContent=totalGoals?('GOALS · '+completed+' / '+totalGoals+(newGoals.length?' · NEW: '+newGoals.join(' + '):'')):'';
    $('result-goals').hidden=!totalGoals;
    $('replay-trail').hidden=!Number.isFinite(seed);
    $('record-name').hidden=true;$('record-name').querySelector('button').disabled=false;$('player-name').value='';
-   $('score-formula').textContent='ALTITUDE '+meters.toLocaleString()+' m · BANANAS '+bananas+' × 10';
-   $('converted-score').textContent=String(meters);$('remaining-bananas').textContent=String(bananas*10);
+   $('score-formula').textContent='ALTITUDE '+meters.toLocaleString()+' · BANANAS '+bananas+' × 10 · MASTERY +'+skillBonus.toLocaleString();
+   $('converted-score').textContent=String(meters);$('remaining-bananas').textContent=String(skillBonus);
    $('try-again').disabled=$('choose-again').disabled=false;
    $('score-details').open=false;$('result-records').open=false;
    renderBoard([]);setSubmissionState(result.id?'submitting':'offline',result.id?'SUBMITTING SCORE…':'OFFLINE RUN · score kept locally; online records unavailable.');
@@ -114,8 +125,8 @@ export function createResults({retry,replay,choose,back}){
   },
   update(dt){
    if(!dialog.open||finished)return;
-   age+=dt;const t=Math.min(age/.9,1),ease=1-(1-t)**3,total=scoreFor(run.meters,run.bananas),initial=run.meters;
-   $('converted-score').textContent=Math.round(initial+(total-initial)*ease).toLocaleString();$('remaining-bananas').textContent=Math.round(run.bananas*10).toLocaleString();
+   age+=dt;const t=Math.min(age/.9,1),ease=1-(1-t)**3,total=scoreFor(run.meters,run.bananas,run.skillBonus),initial=run.meters;
+   $('converted-score').textContent=Math.round(initial+(total-initial)*ease).toLocaleString();$('remaining-bananas').textContent=Math.round(Number(run.skillBonus)||0).toLocaleString();
    if(t===1)finishScoreAnimation();
   },
   get isOpen(){return dialog.open;}
