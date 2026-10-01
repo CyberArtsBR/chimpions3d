@@ -4,7 +4,7 @@
 export function createAudio(music){
  let context,master,muted=false,intensity=0,gameplayActive=false,jetActive=false;
  const buffers=new Map(),loops=new Map();
- let bananaVoice=0,lastLandingAt=-Infinity;
+ let bananaVoice=0,lastLandingAt=-Infinity,lastFlowMultiplier=1;
  let settings={music:.16,sfx:.65};
  try{settings={...settings,...JSON.parse(localStorage.getItem('chimp-audio')||'{}')};}catch{}
  for(const key of ['music','sfx'])settings[key]=Number.isFinite(settings[key])?Math.max(0,Math.min(1,settings[key])):(key==='music'?.16:.65);
@@ -171,8 +171,20 @@ export function createAudio(music){
  const onDeathOffscreen=()=>{
   playRaw('impact',0,.7);playRaw('cry',.035,.5);playRaw('splash',.11,.78);
  };
+ const onMastery=event=>{
+  const detail=event?.detail||{},nextFlow=Number(detail.flowMultiplier)||1;
+  if(detail.type==='landing'){
+   if(detail.landingQuality==='PERFECT'){playRaw('milestone',0,.26,1.18);if(detail.fastFallPerfect)playRaw('confirm',.055,.22,1.34);}
+   else if(detail.landingQuality==='EDGE')playRaw('crack',0,.18,.82);
+  }else if(detail.type==='fast-fall')playRaw('wrap',0,.14,.72);
+  else if(detail.type==='near-miss')playRaw('swing',0,.24,1.2);
+  if(nextFlow>lastFlowMultiplier)playRaw('confirm',.035,.22,1+.05*Math.min(4,nextFlow));
+  lastFlowMultiplier=nextFlow;
+  if(detail.type==='death')lastFlowMultiplier=1;
+ };
 
  window.addEventListener('chimp-death-offscreen',onDeathOffscreen);
+ window.addEventListener('chimp-mastery',onMastery);
  const panel=document.createElement('details');panel.id='audio-settings';panel.innerHTML='<summary>Audio</summary>';
  for(const [key,label] of [['music','Music volume'],['sfx','SFX volume']]){
   const row=document.createElement('label'),input=document.createElement('input');
@@ -205,6 +217,7 @@ export function createAudio(music){
   },
   dispose(){
    window.removeEventListener('chimp-death-offscreen',onDeathOffscreen);
+   window.removeEventListener('chimp-mastery',onMastery);
    for(const loop of loops.values()){try{loop.source.stop();}catch{}loop.source.disconnect();loop.gain.disconnect();}
    loops.clear();
   }
