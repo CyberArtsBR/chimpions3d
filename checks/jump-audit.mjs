@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import {JUMP_GOALS,evaluateJumpGoals} from '../src/jumpGoals.js';
 
 const read=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),director=read('src/jumpGameplayDirector.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js'),character=read('src/character.js'),mobileBudget=read('src/mobileVisualBudget.js'),quality=read('src/jumpRenderQuality.js'),input=read('src/InputManager.js'),leaderboard=read('src/leaderboard.js');
+const main=read('src/main.js'),game=read('src/game.js'),runtime=read('src/runtimeEnhancements.js'),results=read('src/results.js'),physics=read('src/physics.js'),director=read('src/jumpGameplayDirector.js'),scenery=read('src/scenery.js'),audio=read('src/audio.js'),character=read('src/character.js'),mobileBudget=read('src/mobileVisualBudget.js'),quality=read('src/jumpRenderQuality.js'),input=read('src/InputManager.js'),leaderboard=read('src/leaderboard.js'),mastery=read('src/jumpMasteryPresentation.js'),trace=read('src/runtime/InputTrace.js'),replay=read('server/lib/replay.mjs');
 
 assert(main.includes("'test'"),'test mode must route to Chimp Jump, not the launcher');
 assert(!mobileBudget.includes('Object3D.prototype.add'),'mobile visual budgets must never patch THREE.Object3D.prototype.add');
@@ -12,6 +12,7 @@ for(const tier of ["'balanced'","'high'","'ultra'"])assert(quality.includes(tier
 assert(!quality.includes("from './physics")&&!quality.includes("from './InputManager")&&!quality.includes("from './leaderboard"),'quality module must not import gameplay/input/leaderboard systems');
 assert(!physics.includes('jumpRenderQuality')&&!input.includes('jumpRenderQuality')&&!leaderboard.includes('jumpRenderQuality'),'visual quality must never affect physics, input or leaderboard rules');
 assert(main.includes("setupJumpExperience"),'the framework experience layer must mount');
+assert(main.includes('setupJumpMasteryPresentation'),'the mastery presentation layer must mount');
 assert(!runtime.includes('new KeyboardEvent'),'mouse steering must never synthesize keyboard key-up/down events');
 assert(!runtime.includes('columns=3'),'desktop character navigation must not hardcode the old three-column grid');
 assert(game.includes('countdownTime=3')&&game.includes('introTime=0'),'fresh runs must begin in the frozen countdown close-up');
@@ -22,6 +23,11 @@ assert(!game.includes("entry.id==='steamboat-willie'")&&!game.includes("entry.id
 assert(game.includes("chimp-run-finished"),'completed runs must publish a summary for goals');
 assert(results.includes('Replay this trail'),'results must expose reproducible same-seed practice');
 for(const type of ["'leaf'","'vanish'","'swing'"])assert(physics.includes(type),'canopy expansion must retain '+type+' platform generation');
+assert(!physics.includes("leaf:'moving'")&&!physics.includes("swing:'moving'")&&!physics.includes("vanish:'cracked'"),'leaf, swing and vanish must be real mechanics, not aliases');
+assert(physics.includes('landingQuality')&&physics.includes("'PERFECT'")&&physics.includes("'EDGE'"),'landing mastery must be authoritative in physics');
+assert(physics.includes('flowMultiplier')&&physics.includes('skillBonus'),'Flow and mastery scoring must be authoritative in physics');
+assert(input.includes('isFastFallPressed')&&trace.includes('fastFall')&&replay.includes('fastFall'),'Fast Fall must remain input-traced and server-replayable');
+assert(mastery.includes('jump-flow-hud')&&mastery.includes('FAST FALL'),'contextual mastery HUD must remain wired');
 assert(!physics.includes('windAt')&&physics.includes("'event-start'"),'wind must be absent while timed canopy events remain wired into physics');
 for(const type of ["'thorn-pod'","'swinging-pod'","'vine-sweep'","'falling-fruit'"])assert(director.includes(type),'gameplay director must expose hazard '+type);
 assert(scenery.includes('animateHazard')&&scenery.includes('jetTrail'),'hazard animation and jet trail polish must remain');
@@ -41,6 +47,6 @@ assert.equal(sample.unlocked.length,6,'a qualifying run should unlock all goals'
 const repeat=evaluateJumpGoals({meters:120,bananas:28,cleanLandings:32},sample.unlocked);
 assert.equal(repeat.newlyUnlocked.length,0,'goals must not announce twice');
 
-assert(physics.includes("2026-09-expedition-v8-gameplay-director"),'replay/server RULESET must reflect gameplay semantic changes');
+assert(physics.includes("2026-10-expedition-v15-mastery"),'replay/server RULESET must reflect mastery gameplay semantic changes');
 assert(director.includes('READ')&&director.includes('BUILD')&&director.includes('CHALLENGE')&&director.includes('RELEASE')&&director.includes('REWARD'),'encounter pacing grammar must remain explicit');
-console.log('PASS Chimp Jump audit gates: routing, camera, replay, goals, director grammar, hazard vocabulary and RULESET');
+console.log('PASS Chimp Jump audit gates: routing, camera, replay, mastery mechanics, goals, director grammar, hazard vocabulary and RULESET');
