@@ -21,14 +21,14 @@ export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITE
 export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-09-expedition-v13-colored-lifts';
+export const RULESET='2026-10-expedition-v14-challenge';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>directedWrappedDistance(a,b,WRAP_SPAN);
 
-// Pace now advances only at deterministic 200m altitude milestones.
-// Jump geometry stays unchanged; only simulation pace increases in modest steps.
+// Pace advances at deterministic 200m altitude milestones and stays unbounded.
+// After 1000m the director softens each step, but never stops increasing pace.
 export const paceAt=height=>directedPaceAt(height);
 
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
@@ -156,7 +156,7 @@ export class Game {
  }
  addOptional(step,safePlatform,difficulty){
   if(!step.optional)return null;
-  let type=({leaf:'moving',swing:'moving',vanish:'cracked',spring:'vertical'})[step.optional]||step.optional;
+  let type=({leaf:'moving',swing:'moving',vanish:'cracked'})[step.optional]||step.optional;
   if(type==='solid'&&step.phase===ENCOUNTER_PHASES.BUILD&&this.random()<difficulty.movingFrequency)type='moving';
   const width=Math.max(.98,difficulty.optionalWidth+(this.random()-.5)*.34);
   const y=safePlatform.y-.92-this.random()*.34;
@@ -187,12 +187,12 @@ export class Game {
    const width=Math.min(2.35,difficulty.routeWidth+(recovery ? .08 : 0));
    const targetWidth=width*PLATFORM_LENGTH;
    const limit=WIDTH/2-VINE_INSET-.35-targetWidth/2;
-   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.98:recovery?.94:.96;
+   const phaseShift=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.99:recovery?.95:.97;
    const reach=Math.min(difficulty.routeShift*phaseShift,WIDTH/2);
-   const minShiftFactor=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.98:recovery?.90:.95;
-   const edgeGap=difficulty.routeEdgeGap*(recovery?.58:1);
+   const minShiftFactor=step.phase===ENCOUNTER_PHASES.CHALLENGE?1:step.phase===ENCOUNTER_PHASES.BUILD?.99:recovery?.94:.97;
+   const edgeGap=difficulty.routeEdgeGap*(recovery?.72:1);
    const footprintShift=(this.nextWidth+targetWidth)/2+edgeGap;
-   const minShift=Math.min(reach*.97,Math.max(2.35,difficulty.routeMinShift*minShiftFactor,footprintShift));
+   const minShift=Math.min(reach*.97,Math.max(2.75,difficulty.routeMinShift*minShiftFactor,footprintShift));
    const candidates=[],viable=[];
    for(let x=-limit;x<=limit+.001;x+=.2){
     if(!this.canPlace(x,y,targetWidth,'solid')||!this.requiredTransferViable(x,y,width))continue;
@@ -209,9 +209,9 @@ export class Game {
      const direction=Math.sign(wrapX(value-this.nextX));
      return direction&&direction!==this.lastRouteDirection;
     });
-    const useOpposite=opposite.length&&this.lastRouteDirection&&this.random()<.72;
+    const useOpposite=opposite.length&&this.lastRouteDirection&&this.random()<.84;
     const directionalPool=useOpposite?opposite:ranked;
-    const hardFraction=step.phase===ENCOUNTER_PHASES.CHALLENGE?.18:recovery?.42:.28;
+    const hardFraction=step.phase===ENCOUNTER_PHASES.CHALLENGE?.12:recovery?.32:.20;
     const hardPool=directionalPool.slice(0,Math.max(1,Math.ceil(directionalPool.length*hardFraction)));
     x=hardPool[Math.floor(this.random()*hardPool.length)];
    }else{
@@ -236,7 +236,7 @@ export class Game {
    else if(specialClear&&optional&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<difficulty.hazardDensity)
     this.addHazardNear(optional,safePlatform,'thorn-pod');
 
-   if(optional&&difficulty.complexity>=4&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<.28){
+   if(optional&&difficulty.complexity>=4&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&this.random()<.38){
     const echo={...step,optional:this.random()<.5?'leaf':'cracked',reward:true,hazard:null};
     this.addOptional(echo,safePlatform,difficulty);
    }
