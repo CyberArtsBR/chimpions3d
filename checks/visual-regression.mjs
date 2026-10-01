@@ -11,7 +11,10 @@ try{
   await shot('menu');
   await page.getByRole('button',{name:'Field Guide',exact:true}).click();await shot('field-guide');await page.getByRole('button',{name:'Close Field Guide',exact:true}).click();
   await page.getByRole('button',{name:'LET’S JUMP',exact:true}).click();await shot('character-picker');
-  await page.locator('#confirm-chimpion').click();await page.waitForFunction(()=>window.chimpJump().mode==='starting');await page.evaluate(()=>window.chimpJumpTest.render());await shot('countdown');
+  const option=page.locator('#collection-dialog .avatar-option:not(:disabled)').first();
+  await option.waitFor({state:'visible'});
+  await option.click();
+  await page.waitForFunction(()=>window.chimpJump().mode==='starting');await page.evaluate(()=>window.chimpJumpTest.render());await shot('countdown');
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
   await page.waitForFunction(()=>window.chimpJump().mode==='playing');
   await page.evaluate(()=>{
