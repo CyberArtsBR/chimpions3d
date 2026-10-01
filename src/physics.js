@@ -18,34 +18,56 @@ import {
 
 export const WIDTH=14.4, GRAVITY=18, JUMP=13.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
 export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5, BANANA_HEIGHT=1.35;
-export const SPRING_JUMP=28*Math.sqrt(1.3), JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
+export const SPRING_JUMP=28*Math.sqrt(1.3), LEAF_JUMP=JUMP*1.08, JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
+export const FAST_FALL_EXTRA_GRAVITY=16, FAST_FALL_MAX_SPEED=22, FAST_FALL_MIN_BOUNCE_AGE=.18;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
-export const RULESET='2026-10-expedition-v14-challenge';
+export const RULESET='2026-10-expedition-v15-mastery';
 export const WRAP_SPAN=WIDTH-2*VINE_INSET;
 
+const clamp=(value,min=0,max=1)=>Math.max(min,Math.min(max,value));
 const wrapX=x=>((x+WRAP_SPAN/2)%WRAP_SPAN+WRAP_SPAN)%WRAP_SPAN-WRAP_SPAN/2;
 const wrappedDistance=(a,b)=>directedWrappedDistance(a,b,WRAP_SPAN);
+const FLOW_THRESHOLDS=Object.freeze([0,14,32,56,88,126]);
+const FLOW_MULTIPLIERS=Object.freeze([1,1.5,2,3,4,5]);
+const flowMultiplierFor=points=>{
+ let index=0;for(let i=1;i<FLOW_THRESHOLDS.length;i++)if(points>=FLOW_THRESHOLDS[i])index=i;else break;
+ return FLOW_MULTIPLIERS[index];
+};
+const flowProgressFor=points=>{
+ let index=0;for(let i=1;i<FLOW_THRESHOLDS.length;i++)if(points>=FLOW_THRESHOLDS[i])index=i;else break;
+ if(index>=FLOW_THRESHOLDS.length-1)return 1;
+ return clamp((points-FLOW_THRESHOLDS[index])/(FLOW_THRESHOLDS[index+1]-FLOW_THRESHOLDS[index]));
+};
+const normalizeControl=input=>{
+ if(input&&typeof input==='object')return {steer:Math.max(-1,Math.min(1,Number(input.steer)||0)),fastFall:!!input.fastFall};
+ return {steer:Math.max(-1,Math.min(1,Number(input)||0)),fastFall:false};
+};
 
 // Pace advances at deterministic 200m altitude milestones and stays unbounded.
 // After 1000m the director softens each step, but never stops increasing pace.
 export const paceAt=height=>directedPaceAt(height);
 
 const PLATFORM_TRAVEL=1.65, PLATFORM_HEIGHT_BAND=2.2, PLATFORM_GAP=.8;
-export const platformTravelFor=type=>type==='moving'?PLATFORM_TRAVEL:type==='leaf'?1.05:type==='swing'?1.35:0;
+export const platformTravelFor=type=>type==='moving'?PLATFORM_TRAVEL:type==='swing'?1.35:0;
 
 // Moving-platform speed no longer gets a second late-run acceleration multiplier.
 export const platformPhaseAt=time=>.72*Math.max(0,time);
 const VERTICAL_PHASE_SPEED=1.22;
+const swingAngleAt=(platform,time)=>Math.sin(time*(.78+(platform.moveSpeed||1)*.18)+(platform.phase||0))*.62;
 
 export const movingX=(platform,time)=>
  platform.baseX+Math.sin(platformPhaseAt(time)*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange??PLATFORM_TRAVEL);
 
 export const platformX=(platform,time)=>{
  if(platform.type==='moving')return movingX(platform,time);
- if(platform.type==='leaf')return platform.baseX+Math.sin(platformPhaseAt(time)*.58*(platform.moveSpeed||1)+(platform.phase||0))*(platform.moveRange||1.05);
- if(platform.type==='swing')return platform.baseX+Math.sin(time*(.78+(platform.moveSpeed||1)*.18)+(platform.phase||0))*(platform.moveRange||1.35);
+ if(platform.type==='swing')return platform.baseX+Math.sin(swingAngleAt(platform,time))*(platform.moveRange||1.35);
  return platform.baseX;
+};
+export const platformY=(platform,time)=>{
+ if(platform.type==='vertical')return platform.baseY+Math.sin(platformPhaseAt(time)*VERTICAL_PHASE_SPEED+platform.phase)*.65;
+ if(platform.type==='swing')return platform.baseY+(1-Math.cos(swingAngleAt(platform,time)))*.36;
+ return platform.baseY;
 };
 
 export const hazardX=(hazard,time)=>hazardMotion(hazard,time).x;
@@ -67,14 +89,38 @@ export class Game {
   this.lastMilestone=0;this.hazardCooldown=0;this.hazards=[];this.nextHazardId=0;
   this.platforms=[];this.nextId=0;this.nextY=0;this.nextX=0;this.nextWidth=2.8*PLATFORM_LENGTH;this.lastRouteDirection=0;
   this.encounterIndex=0;this.encounter=null;this.lastEncounterId='';this.extraRecoveryPending=false;
-  this.add(0,0,2.8,'solid',false,'safe',{encounterType:'start',encounterPhase:ENCOUNTER_PHASES.READ});
+  this.flowPoints=0;this.flowMultiplier=1;this.bestFlowMultiplier=1;this.skillBonus=0;
+  this.perfectLandings=0;this.goodLandings=0;this.edgeLandings=0;this.riskLandings=0;this.dangerLandings=0;this.nearMisses=0;this.encountersCompleted=0;this.safeLandingStreak=0;
+  this.fastFallActive=false;this.fastFallUsedSinceBounce=false;
+  this.add(0,0,2.8,'solid',false,'safe',{routeTier:'SAFE',encounterType:'start',encounterPhase:ENCOUNTER_PHASES.READ});
   this.generate();
  }
  random(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296;}
+ adjustFlow(delta){
+  this.flowPoints=clamp(this.flowPoints+(Number(delta)||0),0,160);
+  this.flowMultiplier=flowMultiplierFor(this.flowPoints);
+  this.bestFlowMultiplier=Math.max(this.bestFlowMultiplier,this.flowMultiplier);
+  return this.flowMultiplier;
+ }
+ awardSkill(base){
+  const award=Math.max(0,Math.round((Number(base)||0)*this.flowMultiplier));
+  this.skillBonus+=award;return award;
+ }
+ masterySnapshot(extra={}){return Object.freeze({
+  flowPoints:this.flowPoints,flowMultiplier:this.flowMultiplier,flowProgress:flowProgressFor(this.flowPoints),bestFlow:this.bestFlowMultiplier,
+  skillBonus:this.skillBonus,perfectLandings:this.perfectLandings,goodLandings:this.goodLandings,edgeLandings:this.edgeLandings,
+  riskLandings:this.riskLandings,dangerLandings:this.dangerLandings,nearMisses:this.nearMisses,encountersCompleted:this.encountersCompleted,
+  ...extra
+ });}
+ publishMastery(type,extra={}){
+  if(typeof window==='undefined'||typeof window.dispatchEvent!=='function'||typeof window.CustomEvent!=='function')return;
+  window.dispatchEvent(new window.CustomEvent('chimp-mastery',{detail:{type,...this.masterySnapshot(extra)}}));
+ }
  canPlace(x,y,width,type){
   const extent=width/2+platformTravelFor(type);
   if(Math.abs(x)+extent>WIDTH/2-VINE_INSET-.35)return false;
-  return this.platforms.every(p=>p.broken||Math.abs((p.baseY??p.y)-y)>=PLATFORM_HEIGHT_BAND+(type==='vertical'?.65:0)+(p.type==='vertical'?.65:0)||
+  const motionBand=type==='vertical'?.65:type==='swing'?.16:0;
+  return this.platforms.every(p=>p.broken||Math.abs((p.baseY??p.y)-y)>=PLATFORM_HEIGHT_BAND+motionBand+(p.type==='vertical'?.65:p.type==='swing'?.16:0)||
    Math.abs(p.baseX-x)>=extent+p.width/2+platformTravelFor(p.type)+PLATFORM_GAP);
  }
  add(x,y,width,type,coin=true,route='safe',metadata={}){
@@ -83,14 +129,13 @@ export class Game {
   const moveRange=platformTravelFor(type),moveSpeed=1.25*(.62+.86*size);
   if(!this.canPlace(x,y,width,type))return false;
   this.platforms.push({
-   id:this.nextId++,x,baseX:x,y,baseY:y,width,type,coin,route,
+   id:this.nextId++,x,baseX:x,y,baseY:y,width,type,coin,route,routeTier:metadata.routeTier||String(route||'safe').toUpperCase(),
    reward:width<=1.3*PLATFORM_LENGTH?2:1,
    fragile:type==='cracked',broken:false,phase:this.random()*6.28,
    moveSpeed,moveRange,vanishAt:null,...metadata
   });
   const platform=this.platforms.at(-1);
-  if(moveRange)platform.x=platformX(platform,this.time);
-  if(type==='vertical')platform.y=platform.baseY+Math.sin(platformPhaseAt(this.time)*VERTICAL_PHASE_SPEED+platform.phase)*.65;
+  platform.x=platformX(platform,this.time);platform.y=platformY(platform,this.time);
   return true;
  }
  nextEncounterStep(difficulty){
@@ -156,7 +201,7 @@ export class Game {
  }
  addOptional(step,safePlatform,difficulty){
   if(!step.optional)return null;
-  let type=({leaf:'moving',swing:'moving',vanish:'cracked'})[step.optional]||step.optional;
+  let type=step.optional;
   if(type==='solid'&&step.phase===ENCOUNTER_PHASES.BUILD&&this.random()<difficulty.movingFrequency)type='moving';
   const width=Math.max(.98,difficulty.optionalWidth+(this.random()-.5)*.34);
   const y=safePlatform.y-.92-this.random()*.34;
@@ -170,11 +215,14 @@ export class Game {
   if(!places.length)return null;
   places.sort((a,b)=>wrappedDistance(b,safePlatform.baseX)-wrappedDistance(a,safePlatform.baseX));
   const px=places[Math.min(places.length-1,Math.floor(this.random()*Math.min(4,places.length)))];
-  const reward=!!step.reward,coin=this.random()<(reward ? .88 : .44);
-  if(!this.add(px,y,width,type,coin,reward?'reward':'risk',{
-   encounterId:step.encounterId,encounterType:step.encounterType,encounterPhase:step.phase,encounterStep:step.encounterStep
+  const reward=!!step.reward;
+  const danger=!!step.hazard||(reward&&step.phase===ENCOUNTER_PHASES.CHALLENGE&&difficulty.complexity>=4);
+  const routeTier=danger?'DANGER':'RISK',route=routeTier.toLowerCase();
+  const coin=this.random()<(reward ? .9 : .5);
+  if(!this.add(px,y,width,type,coin,route,{
+   routeTier,encounterId:step.encounterId,encounterType:step.encounterType,encounterPhase:step.phase,encounterStep:step.encounterStep
   }))return null;
-  const placed=this.platforms.at(-1);if(reward)placed.reward=2;
+  const placed=this.platforms.at(-1);placed.reward=danger?3:reward?2:1;
   return placed;
  }
  generate(){
@@ -222,7 +270,7 @@ export class Game {
    }
    const safeBanana=this.random()<(step.phase===ENCOUNTER_PHASES.REWARD ? .76 : .48);
    if(!this.add(x,y,width,'solid',safeBanana,'safe',{
-    encounterId:step.encounterId,encounterType:step.encounterType,encounterPhase:step.phase,encounterStep:step.encounterStep,
+    routeTier:'SAFE',encounterId:step.encounterId,encounterType:step.encounterType,encounterPhase:step.phase,encounterStep:step.encounterStep,
     required:true,recovery,extendedRecovery:!!step.extendedRecovery
    }))break;
    const safePlatform=this.platforms.at(-1);
@@ -245,7 +293,6 @@ export class Game {
  spawnJetpack(){
   const optional=this.platforms.filter(p=>!p.broken&&p.route!=='safe'&&p.y>this.camera-4&&p.y<this.camera+4);
   const supports=optional.length?optional:this.platforms.filter(p=>!p.broken&&p.y>this.camera-4&&p.y<this.camera+4);
-  const span=WRAP_SPAN;
   for(let attempt=0;attempt<64&&supports.length;attempt++){
    const support=supports[Math.floor(this.random()*supports.length)];
    const side=support.route==='safe'?(this.random()<.5?-1:1):Math.sign(support.baseX||1);
@@ -304,12 +351,12 @@ export class Game {
  }
  step(input,dt=STEP){
   if(this.dead)return [];
-  const events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
+  const control=normalizeControl(input),events=[],realDt=dt;this.time+=realDt;this.updateCanopyEvent(events);
   this.hazardCooldown=Math.max(0,this.hazardCooldown-realDt);
 
   dt*=paceAt(this.height);this.bounceAge+=dt;
   this.previousCamera=this.camera;
-  const target=input*SPEED,amount=24*dt;
+  const target=control.steer*SPEED,amount=24*dt;
   this.vx+=Math.max(-amount,Math.min(amount,target-this.vx));
 
   const oldX=this.x,oldY=this.y,travel=this.vx*dt;
@@ -319,6 +366,7 @@ export class Game {
   else this.x=nextX;
 
   if(this.jetRemaining>0){
+   this.fastFallActive=false;
    const flight=Math.min(realDt,this.jetRemaining);this.y+=JET_SPEED*flight;this.jetRemaining=Math.max(0,this.jetRemaining-realDt);this.vy=JET_SPEED/paceAt(this.height);
    if(this.jetRemaining===0){
     this.vy=JUMP;
@@ -326,7 +374,14 @@ export class Game {
     events.push({type:'jet-end'});
    }
   }else{
-   this.y+=this.vy*dt-.5*GRAVITY*dt*dt;this.vy-=GRAVITY*dt;
+   const fastFall=control.fastFall&&this.vy<0&&this.bounceAge>=FAST_FALL_MIN_BOUNCE_AGE;
+   const gravity=GRAVITY+(fastFall?FAST_FALL_EXTRA_GRAVITY:0);
+   this.y+=this.vy*dt-.5*gravity*dt*dt;this.vy-=gravity*dt;
+   if(fastFall){
+    this.vy=Math.max(this.vy,-FAST_FALL_MAX_SPEED);this.fastFallUsedSinceBounce=true;
+    if(!this.fastFallActive){events.push({type:'fast-fall',x:this.x,y:this.y});this.publishMastery('fast-fall',{x:this.x,y:this.y});}
+   }
+   this.fastFallActive=fastFall;
   }
 
   if(this.time>=this.nextJetAt&&this.jetRemaining<=0&&!this.jetpack){
@@ -354,22 +409,21 @@ export class Game {
    }
   }
 
-  let landing=null,earliest=2;
+  let landing=null,landingMeta=null,earliest=2;
   for(const p of this.platforms){
    const previousX=p.x,previousY=p.y;
-   if(p.type==='vertical')p.y=p.baseY+Math.sin(platformPhaseAt(this.time)*VERTICAL_PHASE_SPEED+p.phase)*.65;
-   if(platformTravelFor(p.type))p.x=platformX(p,this.time);
+   p.x=platformX(p,this.time);p.y=platformY(p,this.time);
    if(p.broken)continue;
    if(this.vy<0&&oldY>=previousY&&this.y<=p.y){
-    const t=(oldY-previousY)/((oldY-this.y)+(p.y-previousY)),x=oldX+travel*t;
+    const denominator=(oldY-this.y)+(p.y-previousY),t=denominator?clamp((oldY-previousY)/denominator,0,1):1,x=oldX+travel*t;
     const px=previousX+(p.x-previousX)*t,distance=wrappedDistance(x,px);
-    if(distance<p.width/2+.24&&t<earliest){earliest=t;landing=p;}
+    if(distance<p.width/2+.24&&t<earliest){earliest=t;landing=p;landingMeta={distance,platformVx:(p.x-previousX)/Math.max(dt,1e-6)};}
    }
    const dx=wrappedDistance(this.x,p.x);
    if(p.coin&&dx<.65*ITEM_SCALE&&Math.abs(this.y+.65-(p.y+BANANA_HEIGHT))<.85+.25*(ITEM_SCALE-1)){
     p.coin=false;
     const bloom=this.event?.type==='banana-bloom'?1:0,value=(p.reward||1)+bloom;
-    this.bananas+=value;events.push({type:'coin',x:p.x,y:p.y+BANANA_HEIGHT,value,bloom:!!bloom,route:p.route});
+    this.bananas+=value;events.push({type:'coin',x:p.x,y:p.y+BANANA_HEIGHT,value,bloom:!!bloom,route:p.route,routeTier:p.routeTier});
    }
   }
 
@@ -381,31 +435,50 @@ export class Game {
     if(collision){
      const delta=wrapX(this.x-h.x),push=delta>=0?1:-1;
      this.vx=Math.max(-SPEED*1.25,Math.min(SPEED*1.25,this.vx+push*3.8));
-     this.vy=Math.min(this.vy,-2.4);this.hazardCooldown=.9;
-     events.push({type:'hazard',hazardType:h.type,x:h.x,y:h.y,hazardId:h.id});break;
+     this.vy=Math.min(this.vy,-2.4);this.hazardCooldown=.9;this.adjustFlow(-18);
+     const event={type:'hazard',hazardType:h.type,x:h.x,y:h.y,hazardId:h.id,...this.masterySnapshot()};events.push(event);this.publishMastery('hazard',{hazardType:h.type});break;
     }
     if(dx<h.radius+1.0&&dy<.86&&h.nearMissCycle!==h.activeCycle){
-     h.nearMissCycle=h.activeCycle;
-     events.push({type:'near-miss',hazardType:h.type,x:h.x,y:h.y,hazardId:h.id});
+     h.nearMissCycle=h.activeCycle;this.nearMisses++;this.adjustFlow(8);const skillAward=this.awardSkill(20);
+     const event={type:'near-miss',hazardType:h.type,x:h.x,y:h.y,hazardId:h.id,skillAward,...this.masterySnapshot()};events.push(event);this.publishMastery('near-miss',{hazardType:h.type,skillAward});
     }
    }
   }
 
   if(landing){
    this.y=landing.y;
+   const half=Math.max(.2,landing.width/2),centerRatio=(landingMeta?.distance||0)/half,relativeVx=Math.abs(this.vx-(landingMeta?.platformVx||0));
+   const landingQuality=centerRatio<=.28&&relativeVx<=SPEED*.60?'PERFECT':centerRatio>=.76||relativeVx>=SPEED*1.05?'EDGE':'GOOD';
+   const routeTier=landing.routeTier||String(landing.route||'safe').toUpperCase(),usedFastFall=this.fastFallUsedSinceBounce;
+   let baseSkill=0;
+   if(landingQuality==='PERFECT'){this.perfectLandings++;this.adjustFlow(10);baseSkill+=15;}
+   else if(landingQuality==='GOOD'){this.goodLandings++;this.adjustFlow(2);baseSkill+=3;}
+   else{this.edgeLandings++;this.adjustFlow(-8);}
+   if(routeTier==='DANGER'){this.dangerLandings++;this.riskLandings++;this.safeLandingStreak=0;this.adjustFlow(8);baseSkill+=25;}
+   else if(routeTier==='RISK'){this.riskLandings++;this.safeLandingStreak=0;this.adjustFlow(4);baseSkill+=10;}
+   else{this.safeLandingStreak++;if(this.safeLandingStreak>3)this.adjustFlow(-2);}
+   if((landing.type==='moving'||landing.type==='swing')&&landingQuality!=='EDGE'){this.adjustFlow(3);baseSkill+=6;}
+   const fastFallPerfect=usedFastFall&&landingQuality==='PERFECT';if(fastFallPerfect){this.adjustFlow(5);baseSkill+=10;}
+   const skillAward=this.awardSkill(baseSkill);
    const springBoost=this.event?.type==='spring-fever'?1.08:1;
-   this.vy=landing.type==='spring'?SPRING_JUMP*springBoost:JUMP;
-   this.bounceAge=0;this.bounces++;
+   this.vy=landing.type==='spring'?SPRING_JUMP*springBoost:landing.type==='leaf'?LEAF_JUMP:JUMP;
+   this.bounceAge=0;this.bounces++;this.fastFallActive=false;this.fastFallUsedSinceBounce=false;
    if(landing.type==='cracked'||landing.fragile)landing.broken=true;
-   if(landing.type==='vanish'&&landing.vanishAt==null)landing.vanishAt=this.time+.55;
-   events.push({
+   if(landing.type==='vanish'&&landing.vanishAt==null)landing.vanishAt=this.time+.8;
+   const bounceEvent={
     type:'bounce',x:this.x,y:this.y,spring:landing.type==='spring',
     fragile:landing.type==='cracked',platformType:landing.type,
-    route:landing.route,platformId:landing.id,
-    encounterId:landing.encounterId,encounterType:landing.encounterType,encounterPhase:landing.encounterPhase
-   });
-   if(landing.route==='safe'&&landing.encounterPhase===ENCOUNTER_PHASES.RELEASE)
-    events.push({type:'encounter-complete',encounterId:landing.encounterId,encounterType:landing.encounterType,x:this.x,y:this.y});
+    route:landing.route,routeTier,platformId:landing.id,
+    landingQuality,centerRatio,relativeVx,fastFallPerfect,skillAward,
+    encounterId:landing.encounterId,encounterType:landing.encounterType,encounterPhase:landing.encounterPhase,
+    ...this.masterySnapshot()
+   };
+   events.push(bounceEvent);this.publishMastery('landing',bounceEvent);
+   if(landing.route==='safe'&&landing.encounterPhase===ENCOUNTER_PHASES.RELEASE){
+    this.encountersCompleted++;this.adjustFlow(6);const encounterSkill=this.awardSkill(30);
+    const event={type:'encounter-complete',encounterId:landing.encounterId,encounterType:landing.encounterType,x:this.x,y:this.y,skillAward:encounterSkill,...this.masterySnapshot()};
+    events.push(event);this.publishMastery('encounter-complete',{encounterId:landing.encounterId,encounterType:landing.encounterType,skillAward:encounterSkill});
+   }
   }
 
   this.height=Math.max(this.height,this.y);
@@ -416,7 +489,7 @@ export class Game {
 
   const cameraTarget=Math.max(this.camera,this.height-VIEW_HEIGHT*.085+Math.max(0,this.vy)*.018);
   this.camera+=Math.max(0,cameraTarget-this.camera)*(1-Math.exp(-8*dt));
-  if(this.y+1.45<this.camera-VIEW_HEIGHT/2){this.dead=true;events.push({type:'death'});}
+  if(this.y+1.45<this.camera-VIEW_HEIGHT/2){this.dead=true;events.push({type:'death',...this.masterySnapshot()});this.publishMastery('death');}
 
   this.platforms=this.platforms.filter(p=>p.y>this.camera-10);
   this.hazards=this.hazards.filter(h=>h.baseY>this.camera-10);
