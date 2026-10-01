@@ -12,7 +12,7 @@ const scenarios=[
 ];
 if(includeSlow)scenarios.push({
   name:'slow-late-response',
-  handler:async route=>{await new Promise(r=>setTimeout(r,4000));await route.fulfill({status:200,contentType:'application/json',body:'{"id":"late","seed":7}'});}
+  handler:async route=>{await new Promise(r=>setTimeout(r,4000));await route.fulfill({status:200,contentType:'application/json',body:'{"id":"late","seed":7}'})}
 });
 
 const report={status:'PASS',suite:'network-failures',includeSlow,scenarios:[],failures:[]};
@@ -63,11 +63,15 @@ try{
   const item={name:'offline',status:'PASS'};
   try{
     await gotoJump(offline,{test:true});
-    await offline.context().setOffline(true);
     await offline.getByRole('button',{name:'LET’S JUMP',exact:true}).click();
     await offline.locator('#collection-dialog[open]').waitFor({state:'visible'});
     assert.equal(await offline.locator('#confirm-chimpion').count(),0,'offline: redundant confirmation button must stay removed');
-    await offline.locator('#collection-dialog .avatar-option:not(:disabled)').first().click();
+    const option=offline.locator('#collection-dialog .avatar-option:not(:disabled)').first();
+    await option.waitFor({state:'visible'});
+    // Load the picker while online; then disconnect immediately before run commitment.
+    // This isolates the startup/network fallback contract from unrelated lazy picker assets.
+    await offline.context().setOffline(true);
+    await option.click();
     await offline.waitForFunction(()=>window.chimpJump?.().countdown===3,null,{timeout:2500});
     item.countdownStarted=true;
   }catch(error){

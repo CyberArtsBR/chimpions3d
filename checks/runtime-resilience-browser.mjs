@@ -37,7 +37,7 @@ try{
   await padEdge({axisX:-1});
   assert.equal(await page.evaluate(()=>document.activeElement?.classList.contains('avatar-option')?[...document.querySelectorAll('#collection-dialog .avatar-option:not(:disabled)')].indexOf(document.activeElement):-1),1,'One left controller edge must move exactly one avatar');
   report.checks.controllerPickerSingleStep=true;
-  await page.locator('#collection-dialog #confirm-chimpion').focus();
+  // Current picker is one-press: A on the focused Chimpion starts the run directly.
   await padEdge({button:0});
   await page.waitForFunction(()=>window.chimpJump?.().mode==='starting',{timeout:10000});
   await page.evaluate(()=>{window.chimpJumpTest.finishCountdown();window.chimpJumpTest.settleIntro();window.chimpJumpTest.render();});
