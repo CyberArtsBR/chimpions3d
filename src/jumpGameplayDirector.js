@@ -17,23 +17,24 @@ export const HAZARD_TYPES=Object.freeze([
 ]);
 
 export const JUMP_DIFFICULTY=Object.freeze({
- altitudeFull:900,
- timeFull:600,
+ altitudeFull:1500,
+ timeFull:720,
  paceStepMeters:200,
  paceStart:.96,
  paceStep:.06,
- paceCap:1.38,
- routeWidth:Object.freeze({start:2.00,end:1.34}),
- rise:Object.freeze({start:4.08,end:4.48,jitter:.26}),
- routeShift:Object.freeze({start:4.20,end:5.50}),
- routeMinShift:Object.freeze({start:3.00,end:4.10}),
- routeEdgeGap:Object.freeze({start:.65,end:1.15}),
- optionalWidth:Object.freeze({start:1.85,end:1.12}),
- optionalRewardDistance:Object.freeze({start:1.2,end:3.0}),
- movingFrequency:Object.freeze({start:.08,end:.25}),
- hazardDensity:Object.freeze({start:.03,end:.22}),
- recoveryFrequency:Object.freeze({start:.10,end:.04}),
- maxEncounterComplexity:5,
+ paceSoftStepAfter:1000,
+ paceLateStep:.035,
+ routeWidth:Object.freeze({start:1.78,end:1.08}),
+ rise:Object.freeze({start:4.12,end:4.78,jitter:.34}),
+ routeShift:Object.freeze({start:4.70,end:6.05}),
+ routeMinShift:Object.freeze({start:3.50,end:4.95}),
+ routeEdgeGap:Object.freeze({start:.86,end:1.40}),
+ optionalWidth:Object.freeze({start:1.65,end:1.00}),
+ optionalRewardDistance:Object.freeze({start:1.8,end:3.7}),
+ movingFrequency:Object.freeze({start:.14,end:.38}),
+ hazardDensity:Object.freeze({start:.08,end:.34}),
+ recoveryFrequency:Object.freeze({start:.06,end:.015}),
+ maxEncounterComplexity:6,
  safeLandingMargin:.36,
  hazardSafeMargin:.65,
  dynamicHazardTelegraphMin:.85
@@ -54,7 +55,7 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  Object.freeze({
   id:'moving-choice',
   complexity:1,
-  weight:1.25,
+  weight:1.15,
   steps:Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:'solid'}),
    Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'moving',reward:false}),
@@ -77,7 +78,7 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  Object.freeze({
   id:'spring-reward-line',
   complexity:2,
-  weight:1,
+  weight:1.08,
   steps:Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:null}),
    Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'spring',reward:true}),
@@ -88,7 +89,7 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  Object.freeze({
   id:'swing-opening',
   complexity:3,
-  weight:.95,
+  weight:1,
   steps:Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:'swing',reward:false}),
    Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'swing',reward:true}),
@@ -99,7 +100,7 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  Object.freeze({
   id:'vanish-reunion',
   complexity:4,
-  weight:.82,
+  weight:.9,
   steps:Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:'solid'}),
    Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'vanish',reward:true}),
@@ -111,7 +112,7 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
  Object.freeze({
   id:'fruit-gauntlet',
   complexity:5,
-  weight:.72,
+  weight:.84,
   steps:Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:'solid'}),
    Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'moving',reward:true}),
@@ -120,19 +121,35 @@ export const ENCOUNTER_TEMPLATES=Object.freeze([
    Object.freeze({phase:ENCOUNTER_PHASES.REWARD,optional:'spring',reward:true}),
    Object.freeze({phase:ENCOUNTER_PHASES.RELEASE,optional:null,recovery:true})
   ])
+ }),
+ Object.freeze({
+  id:'canopy-scramble',
+  complexity:6,
+  weight:.78,
+  steps:Object.freeze([
+   Object.freeze({phase:ENCOUNTER_PHASES.READ,optional:'moving'}),
+   Object.freeze({phase:ENCOUNTER_PHASES.BUILD,optional:'cracked',reward:true,hazard:'thorn-pod'}),
+   Object.freeze({phase:ENCOUNTER_PHASES.CHALLENGE,optional:'swing',reward:true,hazard:'swinging-pod'}),
+   Object.freeze({phase:ENCOUNTER_PHASES.CHALLENGE,optional:'vanish',reward:true,hazard:'falling-fruit'}),
+   Object.freeze({phase:ENCOUNTER_PHASES.REWARD,optional:'spring',reward:true}),
+   Object.freeze({phase:ENCOUNTER_PHASES.RELEASE,optional:null,recovery:true})
+  ])
  })
 ]);
 
 export const paceAt=height=>{
  const meters=Math.max(0,Number(height)||0);
- const steps=Math.floor(meters/JUMP_DIFFICULTY.paceStepMeters);
- return Math.min(JUMP_DIFFICULTY.paceCap,JUMP_DIFFICULTY.paceStart+steps*JUMP_DIFFICULTY.paceStep);
+ const earlyMeters=Math.min(meters,JUMP_DIFFICULTY.paceSoftStepAfter);
+ const earlySteps=Math.floor(earlyMeters/JUMP_DIFFICULTY.paceStepMeters);
+ const lateMeters=Math.max(0,meters-JUMP_DIFFICULTY.paceSoftStepAfter);
+ const lateSteps=Math.floor(lateMeters/JUMP_DIFFICULTY.paceStepMeters);
+ return JUMP_DIFFICULTY.paceStart+earlySteps*JUMP_DIFFICULTY.paceStep+lateSteps*JUMP_DIFFICULTY.paceLateStep;
 };
 
 export function difficultyAt(height=0,time=0){
  const altitude=clamp((Number(height)||0)/JUMP_DIFFICULTY.altitudeFull);
  const activeTime=clamp((Number(time)||0)/JUMP_DIFFICULTY.timeFull);
- const intensity=clamp(altitude*.72+activeTime*.28);
+ const intensity=clamp(altitude*.74+activeTime*.26);
  const complexity=Math.max(1,Math.min(JUMP_DIFFICULTY.maxEncounterComplexity,1+Math.floor(intensity*JUMP_DIFFICULTY.maxEncounterComplexity)));
  return Object.freeze({
   altitude,
