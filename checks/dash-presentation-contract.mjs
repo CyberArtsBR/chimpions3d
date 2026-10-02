@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
+const main=fs.readFileSync('src/main.js','utf8');
 const menu=fs.readFileSync('src/menuScreensV2.js','utf8');
 const finalCss=fs.readFileSync('src/menuScreensFinal.css','utf8');
 const dash=fs.readFileSync('src/chimpionsLab.js','utf8');
 const dashCss=fs.readFileSync('src/chimpionsLab.css','utf8');
 const audio=fs.readFileSync('src/dashAudio.js','utf8');
+const recovery=fs.readFileSync('src/startArtRecovery.js','utf8');
 
 assert(!menu.includes('beginWhenReady'),'Dash picker must not poll for avatar readiness');
 assert(!menu.includes('setTimeout(beginWhenReady'),'Dash picker must not poll a disabled start button');
@@ -15,6 +17,10 @@ assert(menu.includes("const back=backButton(menu,'dash-back')"),'Dash Back hotsp
 assert(!menu.includes("className='dash-entry-start'"),'Duplicate visible Dash entry buttons must not be recreated');
 assert(finalCss.includes('#dash-menu>.screen-primary'),'Dash START hotspot must have explicit artwork-aligned CSS');
 assert(finalCss.includes('#dash-menu>.dash-entry-actions{display:none!important}'),'Legacy duplicate entry controls must stay hidden');
+assert(main.includes("setupDashStartArtRecovery")&&main.indexOf("setupDashStartArtRecovery")<main.indexOf("await import('./chimpionsLab.js')"),'Dash must mount real start artwork before the heavy runtime completes');
+assert(main.includes('setupArenaGate();')&&main.includes('setupArenaStartArtRecovery();'),'Arena gate must mount real artwork after its DOM is built');
+assert(recovery.includes("id='start-art-recovery-style'")&&recovery.includes('fetchPriority')&&recovery.includes("'dash-start-art-recovery'")&&recovery.includes("'arena-start-art-recovery'"),'Dash/Arena start art recovery must use eager real image layers');
+assert(recovery.includes('chimp-dash-start.png')&&recovery.includes('card-arena-start.png'),'Start art recovery must keep duplicate filename fallbacks');
 assert(dash.includes('Chimpion load timed out'),'Runtime must enforce avatar load timeout');
 assert(dash.includes('cancelAvatarLoad'),'Runtime must expose avatar load cancellation');
 for(const bus of ['master','music','sfx','ui','ambience'])assert(audio.includes(`'${bus}'`),`Missing ${bus} audio bus`);
