@@ -11,15 +11,26 @@ if(params.has('lab')){
 }else if(!['dash','rig','play','dev','arena','test'].some(key=>params.has(key))){
   import('./launcherV2.js');
 }else if(params.has('arena')){
-  import('./menuScreensV2.js').then(({setupArenaGate})=>setupArenaGate());
+  Promise.all([
+    import('./menuScreensV2.js'),
+    import('./startArtRecovery.js')
+  ]).then(([{setupArenaGate},{setupArenaStartArtRecovery}])=>{
+    setupArenaGate();
+    setupArenaStartArtRecovery();
+  });
 }else if(params.has('dash')){
   import('./polish.css');
-  // Load the Dash presentation CSS before the runtime builds its DOM, and mark
-  // the page as the artwork start screen immediately. This prevents the legacy
-  // internal 2.5D setup panel from flashing for a frame before the real menu.
+  // Mark Dash as artwork-first immediately and start the real image recovery
+  // before the heavier runtime finishes loading. The interactive menu remains
+  // above this layer and the recovery hides automatically once gameplay starts.
   document.body.classList.add('dash-start-screen');
+  import('./startArtRecovery.js').then(({setupDashStartArtRecovery})=>setupDashStartArtRecovery());
   import('./menuScreensV2.js').then(async({setupDashMenu})=>{
     await import('./chimpionsLab.js');
+    // The Dash runtime rebuilds body contents during startup, so remount the
+    // real artwork after that rebuild and before exposing the menu hotspots.
+    const {setupDashStartArtRecovery}=await import('./startArtRecovery.js');
+    setupDashStartArtRecovery();
     setupDashMenu();
   });
 }else if(params.has('rig')){
