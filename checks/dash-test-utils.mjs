@@ -28,7 +28,11 @@ export async function waitForDash(page,{test=true,url=localBase}={}){
   const suffix=test?'/?dash=1&test=1':'/?dash=1';
   await page.goto(url+suffix,{waitUntil:'domcontentloaded',timeout:90000});
   await page.waitForFunction(()=>window.chimpionsDash?.().ready,{timeout:90000});
-  await page.waitForFunction(()=>document.querySelector('.dash-start-hotspot'),{timeout:30000});
+  // Do not couple the release smoke to a presentation-only CSS class.
+  // The authoritative contract is semantic: Dash is ready, the runtime is in
+  // menu state, and an accessible Start Game control is visible.
+  await page.waitForFunction(()=>document.body.dataset.labState==='menu',{timeout:30000});
+  await page.getByRole('button',{name:'Start Game'}).waitFor({state:'visible',timeout:30000});
   return page.evaluate(()=>window.chimpionsDash());
 }
 

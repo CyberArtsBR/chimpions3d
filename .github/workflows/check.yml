@@ -161,14 +161,6 @@ jobs:
           done
           curl -fsS 'http://127.0.0.1:4173/?test=1' >/dev/null
           npm run qa:standard
-          node checks/dash-physics.mjs
-          node checks/dash-patterns.mjs
-          node checks/dash-browser.mjs
-          node checks/dash-mobile-browser.mjs
-          node checks/dash-resources.mjs
-          node checks/dash-rendering-browser.mjs
-          node checks/dash-performance-browser.mjs
-          node checks/dash-presentation-browser.mjs
       - name: Build network-failure QA bundle
         if: ${{ always() && !cancelled() }}
         run: VITE_CHIMP_QA_HOOKS=1 VITE_LEADERBOARD_URL=http://127.0.0.1:4173/__qa_leaderboard__ npm run build
@@ -214,6 +206,51 @@ jobs:
             checks/*-report.json
             checks/*-manifest.json
             checks/acceptance-matrix.*
+
+  dash-browser:
+    name: DASH · Chromium gameplay, presentation, rendering, performance
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build dedicated Dash QA bundle
+        run: VITE_CHIMP_QA_HOOKS=1 npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run Dash browser suite
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/chimp-dash-vite.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS 'http://127.0.0.1:4173/?dash=1&test=1' >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS 'http://127.0.0.1:4173/?dash=1&test=1' >/dev/null
+          node checks/dash-physics.mjs
+          node checks/dash-patterns.mjs
+          node checks/dash-browser.mjs
+          node checks/dash-mobile-browser.mjs
+          node checks/dash-resources.mjs
+          node checks/dash-rendering-browser.mjs
+          node checks/dash-performance-browser.mjs
+          node checks/dash-presentation-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chimp-dash-browser-reports
+          if-no-files-found: ignore
+          path: |
+            checks/dash-*.png
+            checks/dash-*-report.json
+            checks/dash-*-manifest.json
 
   extended:
     name: EXTENDED · Firefox and WebKit smoke
