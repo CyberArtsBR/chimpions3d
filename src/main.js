@@ -44,7 +44,9 @@ function forceStandaloneStartArtwork(){
     style.id='jump-standalone-start-recovery-style';
     style.textContent=`
       .jump-start-screen[data-mode="menu"] #jump-menu-art-recovery{display:block!important}
-      body:not([data-mode="playing"]) #jump-fast-fall-hint{display:none!important}
+      #hud .stat{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;padding:6px 8px!important;text-shadow:0 2px 8px #000c}
+      #hud #pause,#hud #mute,#hud #quality{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;text-shadow:0 2px 8px #000c}
+      #jump-mastery-feedback,#jump-fast-fall-hint{display:none!important}
     `;
     document.head.append(style);
   }
@@ -62,6 +64,7 @@ Promise.all([
     import('./menuExtras.js')
   ]);
 
+  await import('./portalFastFall.js');
   await import('./game.js');
   forceStandaloneStartArtwork();
   setupBiomePolish();
