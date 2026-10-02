@@ -19,7 +19,7 @@ import {
 export const WIDTH=14.4, GRAVITY=18, JUMP=13.6*Math.sqrt(1.3), SPEED=6.2, VIEW_HEIGHT=12.4, STEP=1/60;
 export const PLATFORM_SCALE=1.5*.75*.75, PLATFORM_LENGTH=PLATFORM_SCALE*1.3, ITEM_SCALE=1.5, BANANA_HEIGHT=1.35;
 export const SPRING_JUMP=28*Math.sqrt(1.3), LEAF_JUMP=JUMP*1.08, JET_DURATION=SPECIAL_INTENSITY.jetDuration, JET_SPEED=24;
-export const FAST_FALL_EXTRA_GRAVITY=16, FAST_FALL_MAX_SPEED=22, FAST_FALL_MIN_BOUNCE_AGE=.18;
+export const FAST_FALL_EXTRA_GRAVITY=24, FAST_FALL_MAX_SPEED=33, FAST_FALL_MIN_BOUNCE_AGE=.18;
 export const VINE_INSET=.24;
 export const EVENT_INTERVAL=65, EVENT_DURATION=SPECIAL_INTENSITY.eventDuration;
 export const RULESET='2026-10-expedition-v15-mastery';
@@ -277,7 +277,6 @@ export class Game {
    const chosenDirection=Math.sign(wrapX(x-this.nextX));
    if(chosenDirection)this.lastRouteDirection=chosenDirection;
    this.nextX=x;this.nextY=y;this.nextWidth=safePlatform.width;
-
    const optional=this.addOptional(step,safePlatform,difficulty);
    const specialClear=!this.event&&this.jetRemaining<=0&&!this.jetpack&&this.time>=this.specialBlockedUntil;
    if(specialClear&&optional&&step.hazard)this.addHazardNear(optional,safePlatform,step.hazard);
