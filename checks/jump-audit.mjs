@@ -27,7 +27,9 @@ assert(!physics.includes("leaf:'moving'")&&!physics.includes("swing:'moving'")&&
 assert(physics.includes('landingQuality')&&physics.includes("'PERFECT'")&&physics.includes("'EDGE'"),'landing mastery must be authoritative in physics');
 assert(physics.includes('flowMultiplier')&&physics.includes('skillBonus'),'Flow and mastery scoring must be authoritative in physics');
 assert(input.includes('isFastFallPressed')&&trace.includes('fastFall')&&replay.includes('fastFall'),'Fast Fall must remain input-traced and server-replayable');
-assert(mastery.includes('jump-flow-hud')&&mastery.includes('FAST FALL'),'contextual mastery HUD must remain wired');
+assert(physics.includes('FAST_FALL_EXTRA_GRAVITY=24')&&physics.includes('FAST_FALL_MAX_SPEED=33'),'Fast Fall 50% speed tuning must remain');
+assert(mastery.includes('jump-flow-hud')&&!mastery.includes('jump-mastery-feedback')&&!mastery.includes("showFeedback('FAST FALL')"),'Flow HUD must remain wired without center mastery feedback');
+assert(mastery.includes('#hud .stat')&&mastery.includes('background:transparent'),'top run HUD must remain transparent');
 assert(!physics.includes('windAt')&&physics.includes("'event-start'"),'wind must be absent while timed canopy events remain wired into physics');
 for(const type of ["'thorn-pod'","'swinging-pod'","'vine-sweep'","'falling-fruit'"])assert(director.includes(type),'gameplay director must expose hazard '+type);
 assert(scenery.includes('animateHazard')&&scenery.includes('jetTrail'),'hazard animation and jet trail polish must remain');
@@ -49,4 +51,4 @@ assert.equal(repeat.newlyUnlocked.length,0,'goals must not announce twice');
 
 assert(physics.includes("2026-10-expedition-v15-mastery"),'replay/server RULESET must reflect mastery gameplay semantic changes');
 assert(director.includes('READ')&&director.includes('BUILD')&&director.includes('CHALLENGE')&&director.includes('RELEASE')&&director.includes('REWARD'),'encounter pacing grammar must remain explicit');
-console.log('PASS Chimp Jump audit gates: routing, camera, replay, mastery mechanics, goals, director grammar, hazard vocabulary and RULESET');
+console.log('PASS Chimp Jump audit gates: routing, camera, replay, mastery mechanics, clean HUD, Fast Fall tuning, goals, director grammar, hazard vocabulary and RULESET');
