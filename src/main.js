@@ -27,6 +27,10 @@ if(params.has('lab')){
   import('./startArtRecovery.js').then(({setupDashStartArtRecovery})=>setupDashStartArtRecovery());
   import('./menuScreensV2.js').then(async({setupDashMenu})=>{
     await import('./chimpionsLab.js');
+    // The Dash runtime rebuilds body contents during startup, so remount the
+    // real artwork after that rebuild and before exposing the menu hotspots.
+    const {setupDashStartArtRecovery}=await import('./startArtRecovery.js');
+    setupDashStartArtRecovery();
     setupDashMenu();
   });
 }else if(params.has('rig')){
