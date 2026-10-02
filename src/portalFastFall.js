@@ -1,12 +1,12 @@
 import {Game,STEP,paceAt} from './physics.js';
 
-const EXTRA_GRAVITY=24;
-const MAX_SPEED=33;
+const EXTRA_GRAVITY=32;
+const MAX_SPEED=44;
 const MIN_BOUNCE_AGE=.18;
 const originalStep=Game.prototype.step;
 
 // Targeted compatibility patch for the older Portals standalone ruleset.
-// It adds the same 50%-faster Fast Fall feel as current main without pulling
+// It adds the same 100%-faster Fast Fall feel as current main without pulling
 // newer route-generation/mastery systems into the standalone branch.
 if(!Game.prototype.__portalFastFallPatched){
  Object.defineProperty(Game.prototype,'__portalFastFallPatched',{value:true});

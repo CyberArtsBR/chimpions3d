@@ -44,9 +44,27 @@ function forceStandaloneStartArtwork(){
     style.id='jump-standalone-start-recovery-style';
     style.textContent=`
       .jump-start-screen[data-mode="menu"] #jump-menu-art-recovery{display:block!important}
-      #hud .stat{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;padding:6px 8px!important;text-shadow:0 2px 8px #000c}
-      #hud #pause,#hud #mute,#hud #quality{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;text-shadow:0 2px 8px #000c}
+      #hud{width:min(96vw,720px)!important;display:grid!important;grid-template-columns:minmax(64px,1fr) minmax(64px,1fr) minmax(164px,auto);align-items:start!important;gap:clamp(6px,1.8vw,16px)!important}
+      #hud>.stat{min-width:0;white-space:nowrap;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;padding:5px 6px!important;text-shadow:0 2px 8px #000c}
+      #hud>.height-stat{justify-self:start;text-align:left}
+      #hud>.stat:not(.height-stat){justify-self:center;text-align:center}
+      #hud .right{display:grid!important;grid-template-columns:minmax(58px,auto) repeat(3,36px);align-items:start;justify-content:end;justify-self:end;gap:4px!important;min-width:0}
+      #hud .right .coins{min-width:58px;text-align:right;padding:5px 4px!important}
+      #hud #pause,#hud #mute,#hud #quality{width:36px!important;height:36px!important;min-width:36px!important;padding:0!important;display:grid;place-items:center;background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;text-shadow:0 2px 8px #000c;line-height:1}
+      #hud #quality{font-size:9px!important;font-weight:900!important;letter-spacing:.02em}
       #jump-mastery-feedback,#jump-fast-fall-hint{display:none!important}
+      @media(max-width:480px){
+        #hud{top:max(8px,env(safe-area-inset-top))!important;width:calc(100vw - 12px)!important;grid-template-columns:minmax(48px,.8fr) minmax(48px,.8fr) minmax(128px,1.35fr);gap:3px!important}
+        #hud>.stat{padding:3px!important}
+        #hud .stat small{font-size:8px!important;letter-spacing:1.1px!important}
+        #hud .stat strong{font-size:clamp(19px,6vw,23px)!important}
+        #hud .stat em{font-size:10px!important}
+        #hud .right{grid-template-columns:minmax(44px,auto) repeat(3,28px);gap:2px!important}
+        #hud .right .coins{min-width:44px;padding:3px 2px!important}
+        #hud .coins strong{font-size:18px!important}
+        #hud #pause,#hud #mute,#hud #quality{width:28px!important;height:28px!important;min-width:28px!important;font-size:13px!important}
+        #hud #quality{font-size:8px!important}
+      }
     `;
     document.head.append(style);
   }
