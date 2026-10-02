@@ -40,6 +40,7 @@ if(params.has('lab')){
       import('./biome-polish.js'),
       import('./menuExtras.js')
     ]);
+    await import('./jumpFastFallTuning.js');
     await import('./game.js');
     const {setupJumpStartScreenRecovery}=await import('./jumpStartScreenRecovery.js');setupJumpStartScreenRecovery();
     const {setupJumpMasteryPresentation}=await import('./jumpMasteryPresentation.js');setupJumpMasteryPresentation();

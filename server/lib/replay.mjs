@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import {Game,STEP,RULESET} from '../../src/physics.js';
+import '../../src/jumpFastFallTuning.js';
 import {scoreFor} from '../../src/score.js';
 import {fail,MAX_STEPS,MAX_TRACE_SEGMENTS,MAX_SEGMENT_STEPS,TRACE_VERSION,TIMING_GRACE_MS} from './protocol.mjs';
 
